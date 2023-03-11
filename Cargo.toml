@@ -1,0 +1,15 @@
+[package]
+name = "projectable"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.69"
+crossterm = "0.25"
+notify = "5.1.0"
+notify-debouncer-mini = "0.2.1"
+tui = "0.19.0"
+tui-tree-widget = "0.11.0"
+
+[dev-dependencies]
+assert_fs = "1.0.10"
