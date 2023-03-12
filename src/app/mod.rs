@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct App<'a> {
-    pub path: PathBuf,
-    pub tree: Filetree<'a>,
-    pub should_quit: bool,
+    tree: Filetree<'a>,
+    path: PathBuf,
+    should_quit: bool,
 }
 
 impl<'a> App<'a> {
@@ -20,11 +20,6 @@ impl<'a> App<'a> {
         };
 
         Ok(app)
-    }
-
-    fn refresh_tree(&mut self) {
-        let res = self.tree.refresh();
-        self.handle_result(res);
     }
 
     pub fn handle_result(&self, res: Result<()>) {
@@ -39,7 +34,8 @@ impl<'a> App<'a> {
             'g' => self.tree.first(),
             'G' => self.tree.last(),
             'r' => {
-                self.refresh_tree();
+                let res = self.tree.refresh();
+                self.handle_result(res);
             }
 
             // Movement
@@ -69,5 +65,21 @@ impl<'a> App<'a> {
 
     pub fn on_down(&mut self) {
         self.tree.down();
+    }
+
+    pub fn should_quit(&self) -> bool {
+        self.should_quit
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn tree(&self) -> &Filetree<'a> {
+        &self.tree
+    }
+
+    pub fn tree_mut(&mut self) -> &mut Filetree<'a> {
+        &mut self.tree
     }
 }

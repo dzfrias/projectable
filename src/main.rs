@@ -41,13 +41,13 @@ fn main() -> Result<()> {
 fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = mpsc::channel();
-    event::fs_watch(&app.path, event_send.clone())?;
+    event::fs_watch(app.path(), event_send.clone())?;
     event::crossterm_watch(event_send);
 
     loop {
         match event_recv.try_recv() {
             Ok(event) => match event {
-                EventType::RefreshFiletree => app.tree.refresh()?,
+                EventType::RefreshFiletree => app.tree_mut().refresh()?,
                 EventType::Crossterm(ev) => {
                     if let Event::Key(key) = ev {
                         match key.code {
@@ -69,7 +69,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
 
         terminal.draw(|f| ui::ui(f, app))?;
 
-        if app.should_quit {
+        if app.should_quit() {
             return Ok(());
         }
     }

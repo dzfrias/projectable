@@ -6,9 +6,9 @@ use tui_tree_widget::{TreeItem, TreeState};
 
 #[derive(Debug)]
 pub struct Filetree<'a> {
-    pub root_path: PathBuf,
     pub state: TreeState,
     pub items: Vec<TreeItem<'a>>,
+    root_path: PathBuf,
 }
 
 impl<'a> Filetree<'a> {
@@ -49,6 +49,15 @@ impl<'a> Filetree<'a> {
 
     pub fn up(&mut self) {
         self.state.key_up(&self.items);
+    }
+
+    pub fn get_node(&self, place: &[usize]) -> Option<&TreeItem<'a>> {
+        let mut places = place.iter();
+        let mut node = self.items.get(*places.next().unwrap())?;
+        for idx in places {
+            node = node.child(*idx)?;
+        }
+        Some(node)
     }
 }
 
