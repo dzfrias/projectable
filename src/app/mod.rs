@@ -47,7 +47,7 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_enter(&mut self) -> Option<PathBuf> {
+    pub fn activate(&mut self) -> Option<PathBuf> {
         let selected = self.tree.get_selected();
         match selected {
             Item::Dir(_) => self.tree.toggle(),
