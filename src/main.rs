@@ -1,11 +1,13 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use projectable::{
     app::App,
     event::{self, EventType},
     ui,
 };
 use std::{
+    env,
     io::{self, Stdout},
+    process::Command,
     sync::mpsc,
 };
 
@@ -42,7 +44,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
     // Set up event channel
     let (event_send, event_recv) = mpsc::channel();
     event::fs_watch(app.path(), event_send.clone())?;
-    event::crossterm_watch(event_send);
+    event::crossterm_watch(event_send.clone());
 
     loop {
         match event_recv.try_recv() {
@@ -56,15 +58,31 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                             KeyCode::Down => app.on_down(),
                             KeyCode::Left => app.on_left(),
                             KeyCode::Right => app.on_right(),
-                            KeyCode::Enter => app.on_enter(),
+                            KeyCode::Enter => app
+                                .on_enter()
+                                .and_then(|path| {
+                                    let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
+                                    if let Err(err) = Command::new(editor).arg(path).status() {
+                                        event_send
+                                            .send(EventType::Error(err.into()))
+                                            .expect("could not send error message");
+                                    }
+                                    if let Err(err) = terminal.clear() {
+                                        event_send
+                                            .send(EventType::Error(err.into()))
+                                            .expect("could not send error message");
+                                    }
+                                    Some(())
+                                })
+                                .unwrap_or(()),
                             _ => {}
                         }
                     }
                 }
-                EventType::Error(err) => bail!(err),
+                EventType::Error(err) => anyhow::bail!(err),
             },
             Err(mpsc::TryRecvError::Empty) => {}
-            Err(err) => bail!(err),
+            Err(err) => anyhow::bail!(err),
         }
 
         terminal.draw(|f| ui::ui(f, app))?;

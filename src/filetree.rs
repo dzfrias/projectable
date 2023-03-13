@@ -70,7 +70,7 @@ impl Dir {
         Ok(())
     }
 
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
@@ -80,7 +80,7 @@ impl Dir {
 }
 
 impl File {
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 }

@@ -1,13 +1,25 @@
-use crate::filetree::{Dir, DirBuilder, Item};
+pub use crate::filetree::*;
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 
 use tui_tree_widget::{TreeItem, TreeState};
 
 #[derive(Debug)]
+pub struct Files<'a> {
+    items: Vec<TreeItem<'a>>,
+    dir: Dir,
+}
+
+impl<'a> Files<'a> {
+    pub fn items(&self) -> &[TreeItem] {
+        self.items.as_ref()
+    }
+}
+
+#[derive(Debug)]
 pub struct Filetree<'a> {
     pub state: TreeState,
-    pub items: Vec<TreeItem<'a>>,
+    pub files: Files<'a>,
     root_path: PathBuf,
 }
 
@@ -20,14 +32,20 @@ impl<'a> Filetree<'a> {
         Ok(Filetree {
             root_path: path.as_ref().to_path_buf(),
             state,
-            items: file_tree,
+            files: Files {
+                items: file_tree,
+                dir: tree,
+            },
         })
     }
 
     pub fn refresh(&mut self) -> Result<()> {
         let tree = DirBuilder::new(&self.root_path).build()?;
         let file_tree = build_filetree(&tree);
-        self.items = file_tree;
+        self.files = Files {
+            items: file_tree,
+            dir: tree,
+        };
         Ok(())
     }
 
@@ -36,7 +54,7 @@ impl<'a> Filetree<'a> {
     }
 
     pub fn last(&mut self) {
-        self.state.select_last(&self.items);
+        self.state.select_last(&self.files.items);
     }
 
     pub fn toggle(&mut self) {
@@ -44,20 +62,29 @@ impl<'a> Filetree<'a> {
     }
 
     pub fn down(&mut self) {
-        self.state.key_down(&self.items);
+        self.state.key_down(&self.files.items);
     }
 
     pub fn up(&mut self) {
-        self.state.key_up(&self.items);
+        self.state.key_up(&self.files.items);
     }
 
-    pub fn get_node(&self, place: &[usize]) -> Option<&TreeItem<'a>> {
+    pub fn get_node(&self, place: &[usize]) -> Option<&Item> {
         let mut places = place.iter();
-        let mut node = self.items.get(*places.next().unwrap())?;
+        let mut node = self.files.dir.children().get(*places.next()?)?;
         for idx in places {
-            node = node.child(*idx)?;
+            node = match node {
+                Item::Dir(dir) => dir.children().get(*idx)?,
+                // Path goes to file, invalid
+                Item::File(_) => return None,
+            };
         }
         Some(node)
+    }
+
+    pub fn get_selected(&self) -> &Item {
+        self.get_node(&self.state.selected())
+            .expect("selected should be in tree")
     }
 }
 

@@ -1,7 +1,7 @@
 mod filetree;
 
 use anyhow::Result;
-use filetree::Filetree;
+use filetree::{Filetree, Item};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -47,8 +47,13 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_enter(&mut self) {
-        self.tree.toggle();
+    pub fn on_enter(&mut self) -> Option<PathBuf> {
+        let selected = self.tree.get_selected();
+        match selected {
+            Item::Dir(_) => self.tree.toggle(),
+            Item::File(file) => return Some(file.path().to_path_buf()),
+        }
+        None
     }
 
     pub fn on_left(&mut self) {
