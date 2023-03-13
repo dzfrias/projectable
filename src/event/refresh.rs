@@ -1,16 +1,12 @@
-use std::{
-    path::Path,
-    sync::mpsc::{self, Sender},
-    thread,
-    time::Duration,
-};
+use crossbeam_channel::{unbounded, Sender};
+use std::{path::Path, thread, time::Duration};
 
 use super::EventType;
 use anyhow::Result;
 use notify::RecursiveMode;
 
 pub fn fs_watch(path: &Path, event_sender: Sender<EventType>) -> Result<()> {
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = unbounded();
     let mut bouncer = notify_debouncer_mini::new_debouncer(Duration::from_secs(1), None, tx)?;
     bouncer.watcher().watch(path, RecursiveMode::Recursive)?;
     std::mem::forget(bouncer);

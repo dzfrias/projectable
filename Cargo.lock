@@ -444,6 +444,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_fs",
+ "crossbeam-channel",
  "crossterm",
  "notify",
  "notify-debouncer-mini",

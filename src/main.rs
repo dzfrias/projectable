@@ -1,4 +1,5 @@
 use anyhow::Result;
+use crossbeam_channel::{unbounded, TryRecvError};
 use projectable::{
     app::App,
     event::{self, EventType},
@@ -8,7 +9,6 @@ use std::{
     env,
     io::{self, Stdout},
     process::Command,
-    sync::mpsc,
 };
 
 use crossterm::{
@@ -42,7 +42,7 @@ fn main() -> Result<()> {
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> Result<()> {
     // Set up event channel
-    let (event_send, event_recv) = mpsc::channel();
+    let (event_send, event_recv) = unbounded();
     event::fs_watch(app.path(), event_send.clone())?;
     event::crossterm_watch(event_send.clone());
 
@@ -81,7 +81,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                 }
                 EventType::Error(err) => anyhow::bail!(err),
             },
-            Err(mpsc::TryRecvError::Empty) => {}
+            Err(TryRecvError::Empty) => {}
             Err(err) => anyhow::bail!(err),
         }
 

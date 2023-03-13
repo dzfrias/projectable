@@ -1,6 +1,7 @@
 use super::EventType;
+use crossbeam_channel::Sender;
 use crossterm::event;
-use std::{sync::mpsc::Sender, thread, time::Duration};
+use std::{thread, time::Duration};
 
 pub fn crossterm_watch(event_sender: Sender<EventType>) {
     thread::spawn(move || loop {

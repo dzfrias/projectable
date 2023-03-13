@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.69"
+crossbeam-channel = "0.5.7"
 crossterm = "0.25"
 notify = "5.1.0"
 notify-debouncer-mini = "0.2.1"
