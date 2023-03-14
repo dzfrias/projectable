@@ -57,7 +57,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                             KeyCode::Up => app.on_up(),
                             KeyCode::Down => app.on_down(),
                             KeyCode::Enter => app
-                                .on_enter()
+                                .on_enter()?
                                 .and_then(|path| {
                                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
                                     if let Err(err) = Command::new(editor).arg(path).status() {

@@ -53,28 +53,23 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn on_enter(&mut self) -> Option<PathBuf> {
-        if self.pending != PendingOperations::NoPending {
-            // TODO: Handle errors
-            let _result = self
-                .complete_pending(false)
-                .expect("should have pending operations");
-            return None;
+    pub fn on_enter(&mut self) -> Result<Option<PathBuf>> {
+        if let Some(result) = self.complete_pending(true) {
+            return match result {
+                Ok(_) => Ok(None),
+                Err(err) => Err(err),
+            };
         }
 
-        let selected = self.tree.get_selected();
-        match selected {
+        match self.tree.get_selected() {
             Item::Dir(_) => self.tree.toggle(),
-            Item::File(file) => return Some(file.path().to_path_buf()),
+            Item::File(file) => return Ok(Some(file.path().to_path_buf())),
         }
-        None
+        Ok(None)
     }
 
     pub fn on_esc(&mut self) -> Result<()> {
-        if self.pending != PendingOperations::NoPending {
-            let result = self
-                .complete_pending(false)
-                .expect("should have pending operations");
+        if let Some(result) = self.complete_pending(false) {
             return result;
         }
 
@@ -94,7 +89,7 @@ impl<'a> App<'a> {
         self.should_quit
     }
 
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
@@ -107,7 +102,7 @@ impl<'a> App<'a> {
     }
 
     fn complete_pending(&mut self, confirmed: bool) -> Option<Result<()>> {
-        if !confirmed {
+        if self.pending != PendingOperations::NoPending && !confirmed {
             self.pending = PendingOperations::NoPending;
             return Some(Ok(()));
         }
