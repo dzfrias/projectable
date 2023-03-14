@@ -56,8 +56,6 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                             KeyCode::Char(c) => app.handle_key(c)?,
                             KeyCode::Up => app.on_up(),
                             KeyCode::Down => app.on_down(),
-                            KeyCode::Left => app.on_left(),
-                            KeyCode::Right => app.on_right(),
                             KeyCode::Enter => app
                                 .on_enter()
                                 .and_then(|path| {

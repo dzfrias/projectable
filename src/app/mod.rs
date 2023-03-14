@@ -46,10 +46,8 @@ impl<'a> App<'a> {
             'd' => self.pending = PendingOperations::DeleteFile,
 
             // Movement
-            'h' => self.on_left(),
             'j' => self.on_down(),
             'k' => self.on_up(),
-            'l' => self.on_right(),
             _ => {}
         }
         Ok(())
@@ -84,16 +82,8 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn on_left(&mut self) {
-        // TODO: Something here
-    }
-
     pub fn on_up(&mut self) {
         self.tree.up();
-    }
-
-    pub fn on_right(&mut self) {
-        // TODO: Something here
     }
 
     pub fn on_down(&mut self) {
