@@ -1,4 +1,4 @@
-pub use crate::filetree::*;
+pub use crate::dir::*;
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 

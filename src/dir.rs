@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{
     fs::{self, File as FsFile},
     path::{Path, PathBuf},
