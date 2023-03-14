@@ -14,6 +14,15 @@ pub enum Item {
     Dir(Dir),
 }
 
+impl Item {
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::Dir(d) => d.path(),
+            Self::File(f) => f.path(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct File {
     path: PathBuf,
