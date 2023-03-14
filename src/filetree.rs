@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
-use std::fs::{self, File as FsFile};
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{self, File as FsFile},
+    path::{Path, PathBuf},
+    slice,
+};
 
 use anyhow::Result;
 
@@ -61,21 +64,60 @@ impl Dir {
         }
     }
 
-    pub fn remove_child(&mut self, index: usize) -> Result<()> {
+    pub fn remove_child(&mut self, index: usize) -> Result<Item> {
         let item = self.children.remove(index);
-        match item {
-            Item::File(f) => fs::remove_file(f.path)?,
-            Item::Dir(dir) => fs::remove_dir_all(dir.path)?,
+        match &item {
+            Item::File(f) => fs::remove_file(f.path())?,
+            Item::Dir(dir) => fs::remove_dir_all(dir.path())?,
         }
-        Ok(())
+        Ok(item)
+    }
+
+    pub fn child(&self, index: usize) -> Option<&Item> {
+        self.children.get(index)
+    }
+
+    pub fn child_mut(&mut self, index: usize) -> Option<&mut Item> {
+        self.children.get_mut(index)
+    }
+
+    pub fn iter(&self) -> slice::Iter<'_, Item> {
+        self.into_iter()
+    }
+
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, Item> {
+        self.into_iter()
     }
 
     pub fn path(&self) -> &Path {
         &self.path
     }
+}
 
-    pub fn children(&self) -> &Vec<Item> {
-        &self.children
+impl IntoIterator for Dir {
+    type Item = Item;
+    type IntoIter = <Vec<Item> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.children.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Dir {
+    type Item = &'a Item;
+    type IntoIter = slice::Iter<'a, Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.children.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Dir {
+    type Item = &'a mut Item;
+    type IntoIter = slice::IterMut<'a, Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.children.iter_mut()
     }
 }
 

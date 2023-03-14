@@ -53,7 +53,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                 EventType::Crossterm(ev) => {
                     if let Event::Key(key) = ev {
                         match key.code {
-                            KeyCode::Char(c) => app.handle_key(c),
+                            KeyCode::Char(c) => app.handle_key(c)?,
                             KeyCode::Up => app.on_up(),
                             KeyCode::Down => app.on_down(),
                             KeyCode::Left => app.on_left(),

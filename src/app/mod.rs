@@ -22,21 +22,14 @@ impl<'a> App<'a> {
         Ok(app)
     }
 
-    pub fn handle_result(&self, res: Result<()>) {
-        // TODO: Error handling
-        _ = res;
-    }
-
-    pub fn handle_key(&mut self, key: char) {
+    pub fn handle_key(&mut self, key: char) -> Result<()> {
         match key {
             'q' => self.should_quit = true,
 
             'g' => self.tree.first(),
             'G' => self.tree.last(),
-            'r' => {
-                let res = self.tree.refresh();
-                self.handle_result(res);
-            }
+            'r' => self.tree.refresh()?,
+            'd' => drop(self.tree.remove_selected()?),
 
             // Movement
             'h' => self.on_left(),
@@ -45,6 +38,7 @@ impl<'a> App<'a> {
             'l' => self.on_right(),
             _ => {}
         }
+        Ok(())
     }
 
     pub fn activate(&mut self) -> Option<PathBuf> {
