@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File as FsFile},
-    path::{Path, PathBuf},
+    path::{self, Path, PathBuf},
     slice,
 };
 
@@ -59,7 +59,7 @@ impl DirBuilder {
 
 impl Dir {
     pub fn new_file(&mut self, name: &str) -> Result<&File> {
-        if name.contains('/') {
+        if name.contains(path::MAIN_SEPARATOR) {
             panic!("invalid path name")
         }
         FsFile::create(self.path.join(&name))?;
