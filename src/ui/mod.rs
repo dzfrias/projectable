@@ -40,7 +40,7 @@ pub fn ui(f: &mut Frame<impl Backend>, app: &mut App) {
 
 fn draw_file_tree(f: &mut Frame<impl Backend>, app: &mut App, area: Rect) {
     let app_tree = app.tree_mut();
-    let items = Tree::new(app_tree.files.items().clone())
+    let items = Tree::new(app_tree.files.items())
         .block(Block::default().borders(Borders::ALL))
         .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
     f.render_stateful_widget(items, area, &mut app_tree.state);

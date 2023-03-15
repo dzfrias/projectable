@@ -46,11 +46,10 @@ impl PendingPopup {
     }
 
     pub fn selected(&mut self) -> usize {
-        let current = self.state.selected().unwrap_or_else(|| {
+        self.state.selected().unwrap_or_else(|| {
             self.state.select(Some(0));
             0
-        });
-        current
+        })
     }
 }
 

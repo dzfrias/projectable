@@ -57,7 +57,7 @@ impl<'a> App<'a> {
             return self
                 .complete_pending(confirmed)
                 .expect("should have work")
-                .and_then(|_| Ok(None));
+                .map(|_| None);
         }
 
         match self.tree.get_selected() {
@@ -109,9 +109,7 @@ impl<'a> App<'a> {
         }
         let res = match self.pending.operation {
             PendingOperations::NoPending => None,
-            PendingOperations::DeleteFile => {
-                Some(self.tree_mut().remove_selected().and_then(|_| Ok(())))
-            }
+            PendingOperations::DeleteFile => Some(self.tree_mut().remove_selected().map(|_| ())),
         };
         self.pending.reset_work();
         res

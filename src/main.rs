@@ -58,7 +58,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                             KeyCode::Down => app.on_down(),
                             KeyCode::Enter => app
                                 .on_enter()?
-                                .and_then(|path| {
+                                .map(|path| {
                                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
                                     if let Err(err) = Command::new(editor).arg(path).status() {
                                         event_send
@@ -70,7 +70,6 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                                             .send(EventType::Error(err.into()))
                                             .expect("could not send error message");
                                     }
-                                    Some(())
                                 })
                                 .unwrap_or(()),
                             KeyCode::Esc => app.on_esc()?,

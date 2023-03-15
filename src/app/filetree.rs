@@ -175,8 +175,7 @@ impl<'a> Filetree<'a> {
             return self.add_file(&selected, name);
         }
         self.add_file(
-            &self
-                .state
+            self.state
                 .selected()
                 .split_last()
                 .expect("selected should not be empty")

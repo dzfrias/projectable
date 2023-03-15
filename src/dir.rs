@@ -62,9 +62,9 @@ impl Dir {
         if name.contains('/') || (cfg!(windows) && name.contains('\\')) {
             panic!("invalid path name")
         }
-        FsFile::create(self.path.join(&name))?;
+        FsFile::create(self.path.join(name))?;
         self.children.push(Item::File(File {
-            path: self.path.join(&name),
+            path: self.path.join(name),
         }));
         // Access from new `children` to get a reference
         if let Item::File(f) = self.children.last().unwrap() {
@@ -84,7 +84,7 @@ impl Dir {
     }
 
     pub fn nested_child(&self, location: &[usize]) -> Option<&Item> {
-        let mut item = self.child(*location.get(0)?)?;
+        let mut item = self.child(*location.first()?)?;
         for index in location.iter().skip(1) {
             item = if let Item::Dir(d) = item {
                 d.child(*index)?
@@ -96,7 +96,7 @@ impl Dir {
     }
 
     pub fn nested_child_mut(&mut self, location: &[usize]) -> Option<&mut Item> {
-        let mut item = self.child_mut(*location.get(0)?)?;
+        let mut item = self.child_mut(*location.first()?)?;
         for index in location.iter().skip(1) {
             item = if let Item::Dir(d) = item {
                 d.child_mut(*index)?
