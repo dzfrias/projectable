@@ -95,6 +95,16 @@ impl<'a> Filetree<'a> {
         })
     }
 
+    pub fn refresh(&mut self) -> Result<()> {
+        let tree = DirBuilder::new(&self.root_path).build()?;
+        let file_tree = build_filetree(&tree);
+        self.files = Files {
+            items: file_tree,
+            dir: tree,
+        };
+        Ok(())
+    }
+
     pub fn first(&mut self) {
         self.state.select_first();
     }
