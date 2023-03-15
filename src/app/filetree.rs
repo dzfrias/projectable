@@ -1,5 +1,5 @@
 pub use crate::dir::*;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use std::path::{Path, PathBuf};
 
 use tui_tree_widget::{TreeItem, TreeState};
@@ -13,19 +13,54 @@ pub struct Files<'a> {
 impl<'a> Files<'a> {
     pub fn remove_file(&mut self, location: &[usize]) -> Result<Item> {
         if location.len() == 1 {
-            return self.dir.remove_child(location[0]);
+            let item = self.dir.remove_child(location[0])?;
+            self.update();
+            return Ok(item);
         }
-        let mut dir = &mut self.dir;
-        for index in location.iter().take(location.len() - 1) {
-            dir = if let Some(Item::Dir(d)) = dir.child_mut(*index) {
-                d
-            } else {
-                return Err(anyhow::anyhow!("could not remove file: invalid path"));
-            };
-        }
-        let item = dir.remove_child(location[location.len() - 1])?;
+        let item = if let Item::Dir(dir) = self
+            .dir
+            .nested_child_mut(&location[..location.len() - 1])
+            .ok_or(anyhow!("could not remove file: invalid location"))?
+        {
+            dir.remove_child(location[location.len() - 1])?
+        } else {
+            bail!("could not remove file: invalid location")
+        };
         self.update();
         Ok(item)
+    }
+
+    pub fn add_file(&mut self, location: &[usize], name: &str) -> Result<&File> {
+        const MESSAGE: &str = "could not add file: invalid location";
+
+        if let Item::Dir(dir) = self
+            .dir
+            .nested_child_mut(location)
+            .ok_or(anyhow!(MESSAGE))?
+        {
+            dir.new_file(name)?;
+        } else {
+            bail!(MESSAGE)
+        };
+        self.update();
+        let child = if let Item::Dir(dir) = self
+            .dir
+            .nested_child(location)
+            .expect("path should be valid by by this point")
+        {
+            if let Item::File(file) = dir
+                .iter()
+                .find(|child| last_of_path(child.path()) == name)
+                .expect("file should be in directory")
+            {
+                file
+            } else {
+                unreachable!("path must lead to file")
+            }
+        } else {
+            unreachable!("path cannot be a dir at this point")
+        };
+        Ok(child)
     }
 
     pub fn items(&self) -> &[TreeItem] {
@@ -58,16 +93,6 @@ impl<'a> Filetree<'a> {
                 dir: tree,
             },
         })
-    }
-
-    pub fn refresh(&mut self) -> Result<()> {
-        let tree = DirBuilder::new(&self.root_path).build()?;
-        let file_tree = build_filetree(&tree);
-        self.files = Files {
-            items: file_tree,
-            dir: tree,
-        };
-        Ok(())
     }
 
     pub fn first(&mut self) {
@@ -112,8 +137,12 @@ impl<'a> Filetree<'a> {
         let item = self.files.remove_file(location)?;
         // Prevents opening next selected item
         self.state.close(&self.state.selected());
-        self.refresh()?;
         Ok(item)
+    }
+
+    pub fn add_file(&mut self, location: &[usize], name: &str) -> Result<()> {
+        self.files.add_file(location, name)?;
+        Ok(())
     }
 
     pub fn remove_selected(&mut self) -> Result<Item> {

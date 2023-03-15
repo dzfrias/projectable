@@ -58,7 +58,10 @@ impl DirBuilder {
 }
 
 impl Dir {
-    pub fn new_file(&mut self, name: impl AsRef<Path>) -> Result<&File> {
+    pub fn new_file(&mut self, name: &str) -> Result<&File> {
+        if name.contains('/') {
+            panic!("invalid path name")
+        }
         FsFile::create(self.path.join(&name))?;
         self.children.push(Item::File(File {
             path: self.path.join(&name),
@@ -78,6 +81,30 @@ impl Dir {
             Item::Dir(dir) => fs::remove_dir_all(dir.path())?,
         }
         Ok(item)
+    }
+
+    pub fn nested_child(&self, location: &[usize]) -> Option<&Item> {
+        let mut item = self.child(*location.get(0)?)?;
+        for index in location.iter().skip(1) {
+            item = if let Item::Dir(d) = item {
+                d.child(*index)?
+            } else {
+                return None;
+            };
+        }
+        Some(item)
+    }
+
+    pub fn nested_child_mut(&mut self, location: &[usize]) -> Option<&mut Item> {
+        let mut item = self.child_mut(*location.get(0)?)?;
+        for index in location.iter().skip(1) {
+            item = if let Item::Dir(d) = item {
+                d.child_mut(*index)?
+            } else {
+                return None;
+            };
+        }
+        Some(item)
     }
 
     pub fn child(&self, index: usize) -> Option<&Item> {
@@ -209,7 +236,8 @@ mod tests {
     }
 
     #[test]
-    fn can_add_nested_file_to_dir() {
+    #[should_panic]
+    fn cannot_add_nested_file_to_dir() {
         let temp = TempDir::new().unwrap();
         fs::create_dir(temp.path().join("test")).unwrap();
         let mut dir = DirBuilder::new(temp.path())

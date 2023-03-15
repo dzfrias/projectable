@@ -41,7 +41,6 @@ impl<'a> App<'a> {
 
             'g' => self.tree.first(),
             'G' => self.tree.last(),
-            'r' => self.tree.refresh()?,
             'd' => self.pending.operation = PendingOperations::DeleteFile,
 
             // Movement
