@@ -31,17 +31,27 @@ impl<'a> Files<'a> {
     }
 
     pub fn add_file(&mut self, location: &[usize], name: &str) -> Result<&File> {
-        const MESSAGE: &str = "could not add file: invalid location";
-
-        if let Item::Dir(dir) = self
-            .dir
-            .nested_child_mut(location)
-            .ok_or(anyhow!(MESSAGE))?
-        {
-            dir.new_file(name)?;
+        if location.len() == 1 && {
+            self.dir.child(location[0]).is_none()
+                || !matches!(
+                    self.dir.child(location[0]).expect("should have child"),
+                    Item::Dir(_)
+                )
+        } {
+            self.dir.new_file(name)?;
         } else {
-            bail!(MESSAGE)
-        };
+            const MESSAGE: &str = "could not add file: invalid location";
+
+            if let Item::Dir(dir) = self
+                .dir
+                .nested_child_mut(location)
+                .ok_or(anyhow!(MESSAGE))?
+            {
+                dir.new_file(name)?;
+            } else {
+                bail!(MESSAGE)
+            };
+        }
         self.update();
         let child = if let Item::Dir(dir) = self
             .dir
@@ -53,6 +63,18 @@ impl<'a> Files<'a> {
                 .find(|child| last_of_path(child.path()) == name)
                 .expect("file should be in directory")
             {
+                file
+            } else {
+                unreachable!("path must lead to file")
+            }
+        } else if location.len() == 1 && {
+            self.dir.child(location[0]).is_none()
+                || !matches!(
+                    self.dir.child(location[0]).expect("should have child"),
+                    Item::Dir(_)
+                )
+        } {
+            if let Item::File(file) = self.dir.child(0).expect("file should be created") {
                 file
             } else {
                 unreachable!("path must lead to file")
@@ -125,22 +147,11 @@ impl<'a> Filetree<'a> {
         self.state.key_up(&self.files.items);
     }
 
-    pub fn get_node(&self, place: &[usize]) -> Option<&Item> {
-        let mut places = place.iter();
-        let mut node = self.files.dir.child(*places.next()?)?;
-        for idx in places {
-            node = match node {
-                Item::Dir(dir) => dir.child(*idx)?,
-                // Path goes to file, invalid
-                Item::File(_) => return None,
-            };
-        }
-        Some(node)
-    }
-
     pub fn get_selected(&self) -> &Item {
-        self.get_node(&self.state.selected())
-            .expect("selected should be in tree")
+        self.files
+            .dir
+            .nested_child(&self.state.selected())
+            .expect("selected item should be in tree")
     }
 
     pub fn remove_file(&mut self, location: &[usize]) -> Result<Item> {
@@ -150,13 +161,28 @@ impl<'a> Filetree<'a> {
         Ok(item)
     }
 
-    pub fn add_file(&mut self, location: &[usize], name: &str) -> Result<()> {
-        self.files.add_file(location, name)?;
-        Ok(())
+    pub fn add_file(&mut self, location: &[usize], name: &str) -> Result<&File> {
+        self.files.add_file(location, name)
     }
 
     pub fn remove_selected(&mut self) -> Result<Item> {
         self.remove_file(&self.state.selected())
+    }
+
+    pub fn add_file_at_selected(&mut self, name: &str) -> Result<&File> {
+        let selected = self.state.selected();
+        if selected.len() == 1 {
+            return self.add_file(&selected, name);
+        }
+        self.add_file(
+            &self
+                .state
+                .selected()
+                .split_last()
+                .expect("selected should not be empty")
+                .1,
+            name,
+        )
     }
 }
 
@@ -179,4 +205,160 @@ fn build_filetree<'a>(tree: &Dir) -> Vec<TreeItem<'a>> {
         items.push(tree_item);
     }
     items
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_fs::prelude::*;
+
+    #[test]
+    fn last_of_path_only_gets_last_part() {
+        let name = last_of_path("t/d/d/s/test.txt");
+        assert_eq!("test.txt".to_owned(), name);
+    }
+
+    #[test]
+    fn last_of_path_works_with_one_part() {
+        let name = last_of_path("test.txt");
+        assert_eq!("test.txt", name);
+    }
+
+    #[test]
+    fn new_filetree_gets_all_files() {
+        let temp = temp_files!("test/test.txt", "test/test2.txt", "test.txt");
+        let filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert_eq!(temp.path(), filetree.root_path);
+        assert_eq!(
+            DirBuilder::new(temp.path()).build().unwrap(),
+            filetree.files.dir
+        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn new_filetree_selects_first() {
+        let temp = temp_files!();
+        let filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert_eq!(vec![0], filetree.state.selected());
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn refresh_gets_new_changes() {
+        let temp = temp_files!("test.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        temp.child("new.txt").touch().unwrap();
+        assert!(filetree.refresh().is_ok());
+        assert_eq!(
+            DirBuilder::new(temp.path()).build().unwrap(),
+            filetree.files.dir
+        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn get_selected_works_with_flat_tree() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        filetree.down();
+        assert_eq!(
+            filetree
+                .files
+                .dir
+                .child(1)
+                .expect("should have second child"),
+            filetree.get_selected()
+        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn get_selected_works_with_nested_item_in_tree() {
+        let temp = temp_files!("test/test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        filetree.toggle();
+        filetree.down();
+        let Some(Item::Dir(dir)) = filetree.files.dir.child(0) else {
+            panic!("wrong item of filetree");
+        };
+        assert_eq!(dir.child(0).unwrap(), filetree.get_selected());
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn can_remove_file_in_flat_tree() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert!(filetree.remove_file(&[0]).is_ok());
+        assert_eq!(1, filetree.files.dir.iter().len());
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn can_remove_nested_item_in_tree() {
+        let temp = temp_files!("test/test.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert!(filetree.remove_file(&[0, 0]).is_ok());
+        let Some(Item::Dir(dir)) = filetree.files.dir.child(0) else {
+            panic!("did not get dir for first child");
+        };
+        assert_eq!(0, dir.iter().len());
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn removing_item_updates_tree_automatically() {
+        let temp = temp_files!("test.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert!(filetree.remove_file(&[0]).is_ok());
+        assert_eq!(0, filetree.files.dir.iter().len());
+        assert_eq!(0, filetree.files.items.len());
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn can_add_file_at_location() {
+        let temp = temp_files!();
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        assert_eq!(
+            temp.path().join("test.txt"),
+            filetree
+                .add_file_at_selected("test.txt")
+                .expect("should be able to make file")
+                .path()
+        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn can_add_nested_file() {
+        let temp = temp_files!("test/test.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        filetree.toggle();
+        filetree.down();
+        assert_eq!(
+            temp.path().join("test/test2.txt"),
+            filetree
+                .add_file_at_selected("test2.txt")
+                .expect("should be able to make file")
+                .path()
+        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    fn adding_file_adds_child_if_current_is_directoy() {
+        let temp = temp_files!("test/test.txt");
+        let mut filetree = Filetree::from_dir(temp.path()).expect("should be able to create");
+        filetree.toggle();
+        assert_eq!(
+            temp.path().join("test/test2.txt"),
+            filetree
+                .add_file_at_selected("test2.txt")
+                .expect("should be able to make file")
+                .path()
+        );
+        temp.close().unwrap();
+    }
 }

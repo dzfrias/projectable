@@ -182,17 +182,32 @@ fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf]) -> Result<Dir> {
     })
 }
 
+#[allow(unused_macros)]
+macro_rules! temp_files {
+    ($($name:expr),*) => {
+        {
+            #[allow(unused_imports)]
+            use ::assert_fs::prelude::*;
+
+            let __temp = ::assert_fs::TempDir::new().unwrap();
+            $(
+                __temp.child($name).touch().unwrap();
+             )*
+            __temp
+        }
+    };
+}
+#[allow(unused_imports)]
+pub(crate) use temp_files;
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_fs::{prelude::*, TempDir};
+    use assert_fs::TempDir;
 
     #[test]
     fn can_build_new_dir() {
-        let temp = TempDir::new().unwrap();
-        temp.child("test.txt").touch().unwrap();
-        temp.child("test/test.txt").touch().unwrap();
-
+        let temp = temp_files!("test.txt", "test/test.txt");
         let dir = DirBuilder::new(temp.path())
             .build()
             .expect("should be able to read directory");
@@ -257,15 +272,13 @@ mod tests {
 
     #[test]
     fn can_remove_file() {
-        let temp = TempDir::new().unwrap();
-        let child = temp.child("test.txt");
-        child.touch().unwrap();
+        let temp = temp_files!("test.txt");
         let mut dir = DirBuilder::new(temp.path())
             .build()
             .expect("should be able to read directory");
         assert!(dir.remove_child(0).is_ok());
         assert!(dir.children.is_empty());
-        assert!(!child.exists());
+        assert!(!temp.path().join("test.txt").exists());
         temp.close().unwrap();
     }
 
@@ -285,23 +298,19 @@ mod tests {
 
     #[test]
     fn can_remove_dir_with_child() {
-        let temp = TempDir::new().unwrap();
-        let child = temp.child("test/test.txt");
-        child.touch().unwrap();
+        let temp = temp_files!("test/test.txt");
         let mut dir = DirBuilder::new(temp.path())
             .build()
             .expect("should be able to read directory");
         assert!(dir.remove_child(0).is_ok());
         assert!(dir.children.is_empty());
-        assert!(!child.exists());
+        assert!(!temp.path().join("test/test.txt").exists());
         temp.close().unwrap();
     }
 
     #[test]
     fn dir_can_ignore() {
-        let temp = TempDir::new().unwrap();
-        temp.child("test.txt").touch().unwrap();
-        temp.child("ignore.txt").touch().unwrap();
+        let temp = temp_files!("test.txt", "ignore.txt");
         let dir = DirBuilder::new(temp.path())
             .ignore(vec![temp.path().join("ignore.txt")])
             .build()
