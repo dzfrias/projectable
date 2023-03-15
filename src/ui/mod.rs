@@ -1,13 +1,12 @@
-use tui::widgets::Clear;
 use tui_tree_widget::Tree;
 
-use crate::app::{App, PendingOperations};
-use tui::backend::Backend;
-use tui::text::{Span, Spans};
+use crate::app::App;
 use tui::{
+    backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    text::Span,
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -48,29 +47,37 @@ fn draw_file_tree(f: &mut Frame<impl Backend>, app: &mut App, area: Rect) {
 }
 
 fn draw_confirm_popup(f: &mut Frame<impl Backend>, app: &mut App) {
-    let text;
-    match app.pending {
-        PendingOperations::DeleteFile => {
-            text = vec![
-                Spans::from("Are you sure you want to delete this file or directory?"),
-                Spans::from("Enter to confirm"),
-                Spans::from("Esc to deny"),
-            ];
-        }
-        PendingOperations::NoPending => return,
+    if !app.pending.has_work() {
+        return;
     }
-    const X_SIZE: u16 = 30;
-    const Y_SIZE: u16 = 20;
-    let area = centered_rect(X_SIZE, Y_SIZE, f.size());
-    let p = Paragraph::new(text)
-        .block(Block::default().title("Confirm").borders(Borders::ALL))
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true });
-    f.render_widget(Clear, area); //this clears out the background
-    f.render_widget(p, area);
+    let items = [ListItem::new("Confirm"), ListItem::new("Deny")];
+    let list =
+        List::new(items).highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+    let area = centered_rect(30, 20, f.size());
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Percentage(50)].as_ref())
+        .horizontal_margin(2)
+        .vertical_margin(2)
+        .split(area);
+    f.render_widget(Clear, area);
+    f.render_widget(
+        Block::default()
+            .title("Confirm")
+            .borders(Borders::ALL)
+            .title_alignment(Alignment::Center),
+        area,
+    );
+    f.render_widget(
+        Paragraph::new("Are you sure you want to delete this file/directory?")
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true }),
+        layout[0],
+    );
+    f.render_stateful_widget(list, layout[1], &mut app.pending.state);
 }
 
-/// helper function to create a centered rect using up certain percentage of the available rect `r`
+/// Center a `Rect` with a height and width as a percentage of `r`
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
