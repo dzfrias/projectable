@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File as FsFile},
-    path::{self, Path, PathBuf},
+    path::{Path, PathBuf},
     slice,
 };
 
@@ -59,7 +59,7 @@ impl DirBuilder {
 
 impl Dir {
     pub fn new_file(&mut self, name: &str) -> Result<&File> {
-        if name.contains(path::MAIN_SEPARATOR) {
+        if name.contains('/') || (cfg!(windows) && name.contains('\\')) {
             panic!("invalid path name")
         }
         FsFile::create(self.path.join(&name))?;
@@ -258,15 +258,22 @@ mod tests {
         let mut dir = DirBuilder::new(temp.path())
             .build()
             .expect("should be able to read directory");
-        let file = dir
-            .new_file("test/test.txt")
+        dir.new_file("test/test.txt")
             .expect("should be able to make new file");
-        assert_eq!(
-            &File {
-                path: temp.to_path_buf().join("test/test.txt")
-            },
-            file
-        );
+        temp.close().unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    #[cfg(target_os = "windows")]
+    fn cannot_make_file_with_backslash_on_windows() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("test")).unwrap();
+        let mut dir = DirBuilder::new(temp.path())
+            .build()
+            .expect("should be able to read directory");
+        dir.new_file("test\\test.txt")
+            .expect("should be able to make new file");
         temp.close().unwrap();
     }
 
