@@ -344,4 +344,18 @@ mod tests {
         );
         temp.close().unwrap();
     }
+
+    #[test]
+    fn dir_can_order_directories_first() {
+        let temp = temp_files!("test.txt", "test/test.txt", "test2/test.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(&path)
+            .dirs_first(true)
+            .build()
+            .expect("should be able to build dir");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(path.join("test2"), dir.child(0).unwrap().path());
+        assert_eq!(path.join("test"), dir.child(1).unwrap().path());
+    }
 }
