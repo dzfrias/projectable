@@ -23,7 +23,6 @@ fn main() -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
     // Restore terminal
     defer! {
@@ -42,6 +41,7 @@ fn main() -> Result<()> {
         }
     }
 
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let mut app = App::new(".")?;
     run_app(&mut terminal, &mut app)?;
 
