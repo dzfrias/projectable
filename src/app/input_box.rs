@@ -10,10 +10,10 @@ use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-use tui_textarea::{Input, Key, TextArea};
+use tui_textarea::{CursorMove, Input, Key, TextArea};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InputOperation {
@@ -31,6 +31,8 @@ pub struct InputBox {
     pub operation: InputOperation,
     queue: Queue,
     text: String,
+    /// Offset from back of `text`
+    cursor_offset: u32,
 }
 
 impl InputBox {
@@ -39,6 +41,7 @@ impl InputBox {
             text: String::new(),
             queue,
             operation: Default::default(),
+            cursor_offset: 0,
         }
     }
 
@@ -49,6 +52,21 @@ impl InputBox {
     fn reset(&mut self) {
         self.text = String::new();
         self.operation = InputOperation::NoOperations;
+    }
+
+    fn cursor_left(&mut self) {
+        self.cursor_offset += 1;
+        let len = self.text.len() as u32;
+        if self.cursor_offset > len {
+            self.cursor_offset = len;
+        }
+    }
+
+    fn cursor_right(&mut self) {
+        if self.cursor_offset == 0 {
+            return;
+        }
+        self.cursor_offset -= 1;
     }
 
     fn has_valid_input(&self) -> Option<bool> {
@@ -81,6 +99,10 @@ impl Component for InputBox {
             let input_event: Input = ev.clone().into();
             match input_event {
                 Input { key: Key::Esc, .. } => self.reset(),
+                Input {
+                    key: Key::Right, ..
+                } => self.cursor_right(),
+                Input { key: Key::Left, .. } => self.cursor_left(),
                 Input {
                     key: Key::Enter, ..
                 } if self
@@ -149,12 +171,26 @@ impl Drawable for InputBox {
                 Style::default().fg(Color::Red)
             },
         ));
+        for _ in 0..self.cursor_offset {
+            textarea.move_cursor(CursorMove::Back);
+        }
+        let title = match self.operation {
+            InputOperation::NewDir { .. } => "Create Directory",
+            InputOperation::NewFile { .. } => "Create File",
+            InputOperation::NoOperations => unreachable!("has work, checked at top of method"),
+        };
         let block = Block::default()
             .borders(Borders::ALL)
-            .title("Create File")
+            .title(title)
             .title_alignment(Alignment::Center);
-        let p =
-            Paragraph::new("What would you like to name the file?").alignment(Alignment::Center);
+        let text = match self.operation {
+            InputOperation::NewDir { .. } => "What would you like to name the directory?",
+            InputOperation::NewFile { .. } => "What would you like to name the file?",
+            InputOperation::NoOperations => unreachable!("has work, checked at top of method"),
+        };
+        let p = Paragraph::new(text)
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
         f.render_widget(Clear, area);
         f.render_widget(block, area);
         f.render_widget(p, layout[1]);
@@ -319,5 +355,23 @@ mod tests {
             input_box.operation = operation;
             assert!(!input_box.has_valid_input().expect("should have work"))
         }
+    }
+
+    #[test]
+    fn moving_cursor_does_not_go_past_text_on_right() {
+        let mut input_box = InputBox::new(Queue::new());
+        input_box.text = "testing".to_owned();
+        input_box.cursor_right();
+        assert_eq!(0, input_box.cursor_offset);
+    }
+
+    #[test]
+    fn moving_cursor_does_not_go_past_text_on_left() {
+        let mut input_box = InputBox::new(Queue::new());
+        input_box.text = "test".to_owned();
+        for _ in 0..5 {
+            input_box.cursor_left();
+        }
+        assert_eq!(4, input_box.cursor_offset);
     }
 }
