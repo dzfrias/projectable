@@ -1,87 +1,111 @@
+pub mod component;
 mod filetree;
+mod input_box;
 mod pending_popup;
 
+use self::component::{Component, Drawable};
+use crate::{
+    event::ExternalEvent,
+    queue::{AppEvent, Queue},
+};
 use anyhow::Result;
-use filetree::{Filetree, Item};
+use crossterm::event::{Event, KeyCode, KeyEvent};
+use filetree::Filetree;
+pub use input_box::*;
 pub use pending_popup::*;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{self, File},
+    path::{Path, PathBuf},
+};
+use tui::{
+    backend::Backend,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    text::Span,
+    widgets::{Block, Borders, Paragraph, Wrap},
+    Frame,
+};
 
-pub struct App<'a> {
-    tree: Filetree<'a>,
-    path: PathBuf,
-    should_quit: bool,
-    pub pending: PendingPopup,
+#[derive(Debug)]
+pub enum TerminalEvent {
+    OpenFile(PathBuf),
+    Nothing,
 }
 
-impl<'a> App<'a> {
-    pub fn new(path: impl AsRef<Path>) -> Result<App<'a>> {
+pub struct App {
+    tree: Filetree,
+    path: PathBuf,
+    should_quit: bool,
+    queue: Queue,
+    pending: PendingPopup,
+    input_box: InputBox,
+}
+
+impl App {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let queue = Queue::new();
         let app = App {
             path: path.as_ref().to_path_buf(),
-            tree: Filetree::from_dir(&path)?,
+            tree: Filetree::from_dir(&path, queue.clone())?,
             should_quit: false,
-            pending: PendingPopup::default(),
+            pending: PendingPopup::new(queue.clone()),
+            input_box: InputBox::new(queue.clone()),
+            queue,
         };
 
         Ok(app)
     }
 
-    pub fn handle_key(&mut self, key: char) -> Result<()> {
-        if self.pending.has_work() {
-            match key {
-                'q' => drop(self.complete_pending(false)),
-                'j' => self.pending.select_next(),
-                'k' => self.pending.select_prev(),
-                _ => {}
+    pub fn update(&mut self) -> Result<TerminalEvent> {
+        let app_event = if let Some(ev) = self.queue.pop() {
+            ev
+        } else {
+            return Ok(TerminalEvent::Nothing);
+        };
+
+        match app_event {
+            AppEvent::OpenPopup(operation) => self.pending.operation = operation,
+            AppEvent::DeleteFile(path) => {
+                if path.is_file() {
+                    fs::remove_file(path)?;
+                } else {
+                    fs::remove_dir_all(path)?;
+                }
+                self.tree.refresh()?;
             }
+            AppEvent::OpenFile(path) => return Ok(TerminalEvent::OpenFile(path)),
+            AppEvent::OpenInput(op) => self.input_box.operation = op,
+            AppEvent::NewFile(path) => {
+                File::create(path)?;
+                self.tree.refresh()?;
+            }
+            AppEvent::NewDir(path) => {
+                fs::create_dir(path)?;
+                self.tree.refresh()?;
+            }
+        }
+        Ok(TerminalEvent::Nothing)
+    }
+
+    pub fn handle_event(&mut self, ev: &ExternalEvent) -> Result<()> {
+        let popup_open = self.pending.visible() || self.input_box.visible();
+        self.tree.focus(!popup_open);
+
+        self.pending.handle_event(ev)?;
+        self.input_box.handle_event(ev)?;
+        self.tree.handle_event(ev)?;
+
+        if popup_open {
             return Ok(());
         }
-
-        match key {
-            'q' => self.should_quit = true,
-
-            'g' => self.tree.first(),
-            'G' => self.tree.last(),
-            'd' => self.pending.operation = PendingOperations::DeleteFile,
-
-            // Movement
-            'j' => self.on_down(),
-            'k' => self.on_up(),
+        match ev {
+            ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) => match code {
+                KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+                _ => {}
+            },
             _ => {}
         }
         Ok(())
-    }
-
-    pub fn on_enter(&mut self) -> Result<Option<PathBuf>> {
-        if self.pending.has_work() {
-            let confirmed = self.pending.selected() == 0;
-            return self
-                .complete_pending(confirmed)
-                .expect("should have work")
-                .map(|_| None);
-        }
-
-        match self.tree.get_selected() {
-            Item::Dir(_) => self.tree.toggle(),
-            Item::File(file) => return Ok(Some(file.path().to_path_buf())),
-        }
-        Ok(None)
-    }
-
-    pub fn on_esc(&mut self) -> Result<()> {
-        if let Some(result) = self.complete_pending(false) {
-            return result;
-        }
-
-        self.should_quit = true;
-        Ok(())
-    }
-
-    pub fn on_up(&mut self) {
-        self.tree.up();
-    }
-
-    pub fn on_down(&mut self) {
-        self.tree.down();
     }
 
     pub fn should_quit(&self) -> bool {
@@ -91,27 +115,37 @@ impl<'a> App<'a> {
     pub fn path(&self) -> &Path {
         &self.path
     }
+}
 
-    pub fn tree(&self) -> &Filetree<'a> {
-        &self.tree
-    }
+impl Drawable for App {
+    fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
+        let main_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .horizontal_margin(1)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(area);
+        let left_hand_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
+            .split(main_layout[0]);
 
-    pub fn tree_mut(&mut self) -> &mut Filetree<'a> {
-        &mut self.tree
-    }
+        let text = vec![
+            Span::raw("hi").into(),
+            Span::styled("Second line", Style::default().fg(Color::Red)).into(),
+        ];
+        let p = Paragraph::new(text)
+            .block(Block::default().borders(Borders::ALL))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
 
-    /// Returns `None` if there is no work, and `Some` if the operation is executed, with the
-    /// result of the work
-    fn complete_pending(&mut self, confirmed: bool) -> Option<Result<()>> {
-        if self.pending.has_work() && !confirmed {
-            self.pending.reset_work();
-            return Some(Ok(()));
-        }
-        let res = match self.pending.operation {
-            PendingOperations::NoPending => None,
-            PendingOperations::DeleteFile => Some(self.tree_mut().remove_selected().map(|_| ())),
-        };
-        self.pending.reset_work();
-        res
+        let block = Block::default().title("Block").borders(Borders::ALL);
+
+        self.tree.draw(f, left_hand_layout[0])?;
+        f.render_widget(block, left_hand_layout[1]);
+        f.render_widget(p, main_layout[1]);
+        self.pending.draw(f, area)?;
+        self.input_box.draw(f, area)?;
+
+        Ok(())
     }
 }

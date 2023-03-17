@@ -1,13 +1,13 @@
 mod refresh;
+
 pub use refresh::fs_watch;
 mod crossterm_event;
-pub use crossterm_event::crossterm_watch;
-
 use anyhow::Error;
 use crossterm::event::Event;
+pub use crossterm_event::crossterm_watch;
 
 #[derive(Debug)]
-pub enum EventType {
+pub enum ExternalEvent {
     RefreshFiletree,
     Crossterm(Event),
     Error(Error),

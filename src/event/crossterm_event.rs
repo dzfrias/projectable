@@ -1,9 +1,9 @@
-use super::EventType;
+use super::ExternalEvent;
 use crossbeam_channel::Sender;
 use crossterm::event;
 use std::{thread, time::Duration};
 
-pub fn crossterm_watch(event_sender: Sender<EventType>) {
+pub fn crossterm_watch(event_sender: Sender<ExternalEvent>) {
     thread::spawn(move || loop {
         match event::poll(Duration::from_millis(300)) {
             Ok(can_poll) => {
@@ -12,16 +12,16 @@ pub fn crossterm_watch(event_sender: Sender<EventType>) {
                 }
                 match event::read() {
                     Ok(ev) => event_sender
-                        .send(EventType::Crossterm(ev))
+                        .send(ExternalEvent::Crossterm(ev))
                         .expect("receiver should not have been deallocated"),
                     Err(err) => event_sender
-                        .send(EventType::Error(err.into()))
+                        .send(ExternalEvent::Error(err.into()))
                         .expect("receiver should not have been deallocated"),
                 }
             }
             Err(err) => {
                 event_sender
-                    .send(EventType::Error(err.into()))
+                    .send(ExternalEvent::Error(err.into()))
                     .expect("receiver should not have been deallocated");
             }
         }

@@ -1,11 +1,11 @@
 use crossbeam_channel::{unbounded, Sender};
 use std::{path::Path, thread, time::Duration};
 
-use super::EventType;
+use super::ExternalEvent;
 use anyhow::Result;
 use notify::RecursiveMode;
 
-pub fn fs_watch(path: &Path, event_sender: Sender<EventType>) -> Result<()> {
+pub fn fs_watch(path: &Path, event_sender: Sender<ExternalEvent>) -> Result<()> {
     let (tx, rx) = unbounded();
     let mut bouncer = notify_debouncer_mini::new_debouncer(Duration::from_secs(1), None, tx)?;
     bouncer.watcher().watch(path, RecursiveMode::Recursive)?;
@@ -16,7 +16,7 @@ pub fn fs_watch(path: &Path, event_sender: Sender<EventType>) -> Result<()> {
         if let Ok(ev) = ev {
             if !ev.is_empty() {
                 event_sender
-                    .send(EventType::RefreshFiletree)
+                    .send(ExternalEvent::RefreshFiletree)
                     .expect("receiver should not have been deallocated");
             }
         };

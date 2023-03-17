@@ -1,9 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use crossbeam_channel::{unbounded, TryRecvError};
 use projectable::{
-    app::App,
-    event::{self, EventType},
-    ui,
+    app::{component::Drawable, App, TerminalEvent},
+    event,
 };
 use std::{
     env,
@@ -12,7 +11,7 @@ use std::{
 };
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -44,46 +43,29 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
     // Set up event channel
     let (event_send, event_recv) = unbounded();
     event::fs_watch(app.path(), event_send.clone())?;
-    event::crossterm_watch(event_send.clone());
+    event::crossterm_watch(event_send);
 
     loop {
         match event_recv.try_recv() {
-            Ok(event) => match event {
-                EventType::RefreshFiletree => app.tree_mut().refresh()?,
-                EventType::Crossterm(ev) => {
-                    if let Event::Key(key) = ev {
-                        match key.code {
-                            KeyCode::Char(c) => app.handle_key(c)?,
-                            KeyCode::Up => app.on_up(),
-                            KeyCode::Down => app.on_down(),
-                            KeyCode::Enter => app
-                                .on_enter()?
-                                .map(|path| {
-                                    let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
-                                    if let Err(err) = Command::new(editor).arg(path).status() {
-                                        event_send
-                                            .send(EventType::Error(err.into()))
-                                            .expect("could not send error message");
-                                    }
-                                    if let Err(err) = terminal.clear() {
-                                        event_send
-                                            .send(EventType::Error(err.into()))
-                                            .expect("could not send error message");
-                                    }
-                                })
-                                .unwrap_or(()),
-                            KeyCode::Esc => app.on_esc()?,
-                            _ => {}
-                        }
-                    }
-                }
-                EventType::Error(err) => anyhow::bail!(err),
-            },
+            Ok(event) => {
+                app.handle_event(&event)?;
+            }
             Err(TryRecvError::Empty) => {}
-            Err(err) => anyhow::bail!(err),
+            Err(err) => bail!(err),
         }
 
-        terminal.draw(|f| ui::ui(f, app))?;
+        terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
+        let event = app.update()?;
+        match event {
+            TerminalEvent::OpenFile(path) => {
+                let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
+                Command::new(editor).arg(path).status()?;
+                let mut stdout = io::stdout();
+                execute!(stdout, EnterAlternateScreen)?;
+                terminal.clear()?;
+            }
+            TerminalEvent::Nothing => {}
+        }
 
         if app.should_quit() {
             return Ok(());
