@@ -175,6 +175,7 @@ fn build_filetree(tree: &Dir) -> Vec<TreeItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::testing::*;
 
     #[test]
     fn last_of_path_only_gets_last_part() {
@@ -186,5 +187,132 @@ mod tests {
     fn last_of_path_works_with_one_part() {
         let name = last_of_path("test.txt");
         assert_eq!("test.txt", name);
+    }
+
+    #[test]
+    fn new_filetree_selects_first() {
+        let temp = temp_files!("test.txt");
+        let path = temp.path().to_owned();
+        let filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        assert_eq!(path.join("test.txt"), filetree.get_selected().path())
+    }
+
+    #[test]
+    fn sends_delete_event() {
+        let temp = temp_files!("test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let d = input_event!(KeyCode::Char('d'));
+        filetree
+            .handle_event(&d)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenPopup(PendingOperation::DeleteFile(path.join("test.txt"))),
+            filetree.queue.pop().unwrap()
+        );
+    }
+
+    #[test]
+    fn sends_new_file_and_new_dir_events() {
+        let temp = temp_files!("test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let n = input_event!(KeyCode::Char('n'));
+        filetree
+            .handle_event(&n)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenInput(InputOperation::NewFile { at: path.clone() }),
+            filetree.queue.pop().unwrap()
+        );
+
+        let caps_n = input_event!(KeyCode::Char('N'));
+        filetree
+            .handle_event(&caps_n)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenInput(InputOperation::NewDir { at: path }),
+            filetree.queue.pop().unwrap()
+        );
+    }
+
+    #[test]
+    fn makes_new_file_as_sibling_when_selected_dir_is_closed() {
+        let temp = temp_files!("test/test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        assert_eq!(path.join("test"), filetree.get_selected().path());
+
+        let n = input_event!(KeyCode::Char('n'));
+        filetree
+            .handle_event(&n)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenInput(InputOperation::NewFile { at: path }),
+            filetree.queue.pop().unwrap()
+        );
+    }
+
+    #[test]
+    fn makes_new_file_as_child_when_selected_dir_is_open() {
+        let temp = temp_files!("test/test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        filetree.state.get_mut().toggle_selected();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let n = input_event!(KeyCode::Char('n'));
+        filetree
+            .handle_event(&n)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenInput(InputOperation::NewFile {
+                at: path.join("test")
+            }),
+            filetree.queue.pop().unwrap()
+        );
+    }
+
+    #[test]
+    fn enter_opens_when_over_dir() {
+        let temp = temp_files!("test/test.txt");
+        let mut filetree =
+            Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let enter = input_event!(KeyCode::Enter);
+        filetree
+            .handle_event(&enter)
+            .expect("should be able to handle keypress");
+        assert_eq!(vec![vec![0]], filetree.state.get_mut().get_all_opened());
+    }
+
+    #[test]
+    fn enter_sends_open_file_when_over_files() {
+        let temp = temp_files!("test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree =
+            Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let enter = input_event!(KeyCode::Enter);
+        filetree
+            .handle_event(&enter)
+            .expect("should be able to handle keypress");
+        assert_eq!(
+            AppEvent::OpenFile(path.join("test.txt")),
+            filetree.queue.pop().unwrap()
+        );
     }
 }
