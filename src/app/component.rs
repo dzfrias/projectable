@@ -1,4 +1,4 @@
-use crate::event::ExternalEvent;
+use crate::external_event::ExternalEvent;
 use anyhow::Result;
 use tui::{backend::Backend, layout::Rect, Frame};
 

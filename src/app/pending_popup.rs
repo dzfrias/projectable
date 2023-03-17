@@ -2,7 +2,7 @@ use std::{cell::Cell, path::PathBuf};
 
 use super::component::{Component, Drawable};
 use crate::{
-    event::ExternalEvent,
+    external_event::ExternalEvent,
     queue::{AppEvent, Queue},
     ui,
 };

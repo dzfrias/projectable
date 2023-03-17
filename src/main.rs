@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use crossbeam_channel::{unbounded, TryRecvError};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
-    event,
+    external_event,
 };
 use std::{
     env,
@@ -51,8 +51,8 @@ fn main() -> Result<()> {
 fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = unbounded();
-    event::fs_watch(app.path(), event_send.clone())?;
-    event::crossterm_watch(event_send);
+    external_event::fs_watch(app.path(), event_send.clone())?;
+    external_event::crossterm_watch(event_send);
 
     loop {
         match event_recv.try_recv() {

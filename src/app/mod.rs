@@ -6,7 +6,7 @@ pub mod testing;
 
 use self::component::{Component, Drawable};
 use crate::{
-    event::ExternalEvent,
+    external_event::ExternalEvent,
     queue::{AppEvent, Queue},
 };
 use anyhow::Result;

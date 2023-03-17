@@ -4,7 +4,7 @@ use super::{
 };
 use crate::dir::*;
 use crate::{
-    event::ExternalEvent,
+    external_event::ExternalEvent,
     queue::{AppEvent, Queue},
 };
 use anyhow::Result;
