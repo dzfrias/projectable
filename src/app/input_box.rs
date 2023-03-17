@@ -16,7 +16,7 @@ use tui::{
 use tui_textarea::{Input, Key, TextArea};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum InputOperations {
+pub enum InputOperation {
     NewFile {
         at: PathBuf,
     },
@@ -28,7 +28,7 @@ pub enum InputOperations {
 }
 
 pub struct InputBox {
-    pub operation: InputOperations,
+    pub operation: InputOperation,
     queue: Queue,
     text: String,
 }
@@ -43,12 +43,12 @@ impl InputBox {
     }
 
     fn has_work(&self) -> bool {
-        self.operation != InputOperations::NoOperations
+        self.operation != InputOperation::NoOperations
     }
 
     fn reset(&mut self) {
         self.text = String::new();
-        self.operation = InputOperations::NoOperations;
+        self.operation = InputOperation::NoOperations;
     }
 
     fn has_valid_input(&self) -> Option<bool> {
@@ -56,14 +56,14 @@ impl InputBox {
             return Some(false);
         }
         match self.operation {
-            InputOperations::NewFile { .. } | InputOperations::NewDir { .. } => {
+            InputOperation::NewFile { .. } | InputOperation::NewDir { .. } => {
                 if MAIN_SEPARATOR == '\\' {
                     Some(!(self.text.contains('/') || self.text.contains('\\')))
                 } else {
                     Some(!self.text.contains('/'))
                 }
             }
-            InputOperations::NoOperations => None,
+            InputOperation::NoOperations => None,
         }
     }
 }
@@ -88,14 +88,14 @@ impl Component for InputBox {
                     .expect("should not be called with no work") =>
                 {
                     match &self.operation {
-                        InputOperations::NewFile { at } => {
+                        InputOperation::NewFile { at } => {
                             self.queue
                                 .add(AppEvent::NewFile(at.join(self.text.as_str())));
                         }
-                        InputOperations::NewDir { at } => self
+                        InputOperation::NewDir { at } => self
                             .queue
                             .add(AppEvent::NewDir(at.join(self.text.as_str()))),
-                        InputOperations::NoOperations => unreachable!("checked in match guard"),
+                        InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };
                     self.reset();
                 }
@@ -191,15 +191,15 @@ mod tests {
     fn giving_operation_gives_work() {
         let mut input_box = InputBox::new(Queue::new());
         assert!(!input_box.has_work());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         assert!(input_box.has_work());
     }
 
     #[test]
     fn cannot_add_slash_when_creating_file_or_dir() {
         for operation in [
-            InputOperations::NewDir { at: "/".into() },
-            InputOperations::NewFile { at: "/".into() },
+            InputOperation::NewDir { at: "/".into() },
+            InputOperation::NewFile { at: "/".into() },
         ] {
             let mut input_box = InputBox::new(Queue::new());
             input_box.operation = operation;
@@ -212,8 +212,8 @@ mod tests {
     #[cfg(target_os = "windows")]
     fn invalid_input_with_backslash_when_creating_file_or_dir_on_windows() {
         for operation in [
-            InputOperations::NewDir { at: "/".into() },
-            InputOperations::NewFile { at: "/".into() },
+            InputOperation::NewDir { at: "/".into() },
+            InputOperation::NewFile { at: "/".into() },
         ] {
             let mut input_box = InputBox::new(Queue::new());
             input_box.operation = operation;
@@ -227,10 +227,10 @@ mod tests {
         let event = input_event!(KeyCode::Esc);
         let mut input_box = InputBox::new(Queue::new());
         input_box.text = "text".to_owned();
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         input_box.handle_event(&event).expect("should not error");
         assert_eq!(String::new(), input_box.text);
-        assert_eq!(InputOperations::NoOperations, input_box.operation);
+        assert_eq!(InputOperation::NoOperations, input_box.operation);
     }
 
     #[test]
@@ -247,7 +247,7 @@ mod tests {
     fn takes_input() {
         let events = input_events!(KeyCode::Char('h'), KeyCode::Char('i'));
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -263,7 +263,7 @@ mod tests {
             KeyCode::Delete
         );
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -280,7 +280,7 @@ mod tests {
             state: KeyEventState::empty(),
         }));
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -294,7 +294,7 @@ mod tests {
     fn can_send_new_dir_event() {
         let event = input_event!(KeyCode::Enter);
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewDir { at: "/".into() };
+        input_box.operation = InputOperation::NewDir { at: "/".into() };
         input_box.text = "hello_world".to_owned();
         input_box.handle_event(&event).expect("input should work");
         assert_eq!(
@@ -307,7 +307,7 @@ mod tests {
     fn can_send_new_file_event() {
         let event = input_event!(KeyCode::Enter);
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         input_box.text = "hello_world.txt".to_owned();
         input_box.handle_event(&event).expect("input should work");
         assert_eq!(
@@ -320,18 +320,18 @@ mod tests {
     fn resets_after_option_entered() {
         let event = input_event!(KeyCode::Enter);
         let mut input_box = InputBox::new(Queue::new());
-        input_box.operation = InputOperations::NewFile { at: "/".into() };
+        input_box.operation = InputOperation::NewFile { at: "/".into() };
         input_box.text = "test".to_owned();
         input_box.handle_event(&event).expect("input should work");
         assert!(input_box.text.is_empty());
-        assert_eq!(InputOperations::NoOperations, input_box.operation);
+        assert_eq!(InputOperation::NoOperations, input_box.operation);
     }
 
     #[test]
     fn cannot_take_empty_input() {
         for operation in [
-            InputOperations::NewFile { at: "/".into() },
-            InputOperations::NewDir { at: "/".into() },
+            InputOperation::NewFile { at: "/".into() },
+            InputOperation::NewDir { at: "/".into() },
         ] {
             let mut input_box = InputBox::new(Queue::new());
             input_box.operation = operation;

@@ -1,6 +1,6 @@
 use super::{
     component::{Component, Drawable},
-    InputOperations, PendingOperations,
+    InputOperation, PendingOperations,
 };
 use crate::dir::*;
 use crate::{
@@ -132,11 +132,11 @@ impl Component for Filetree {
                         item => item.path().parent().expect("item should have parent"),
                     };
                     let event = if *key == 'n' {
-                        AppEvent::OpenInput(InputOperations::NewFile {
+                        AppEvent::OpenInput(InputOperation::NewFile {
                             at: add_path.to_path_buf(),
                         })
                     } else {
-                        AppEvent::OpenInput(InputOperations::NewDir {
+                        AppEvent::OpenInput(InputOperation::NewDir {
                             at: add_path.to_path_buf(),
                         })
                     };
