@@ -165,27 +165,9 @@ impl Drawable for InputBox {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
-    macro_rules! input_event {
-        ($key:expr) => {{
-            ExternalEvent::Crossterm(Event::Key(KeyEvent {
-                code: $key,
-                modifiers: KeyModifiers::empty(),
-                kind: KeyEventKind::Press,
-                state: KeyEventState::empty(),
-            }))
-        }};
-    }
-
-    macro_rules! input_events {
-        ($($key:expr),+) => {
-            {
-                [$(input_event!($key)),+]
-            }
-        };
-    }
+    use super::{super::testing::*, *};
 
     #[test]
     fn giving_operation_gives_work() {

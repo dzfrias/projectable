@@ -2,6 +2,7 @@ pub mod component;
 mod filetree;
 mod input_box;
 mod pending_popup;
+pub mod testing;
 
 use self::component::{Component, Drawable};
 use crate::{

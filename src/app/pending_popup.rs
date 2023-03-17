@@ -66,11 +66,11 @@ impl PendingPopup {
         self.state.get_mut().select(Some(current - 1));
     }
 
-    fn selected(&mut self) -> usize {
-        self.state.get_mut().selected().unwrap_or_else(|| {
-            self.state.get_mut().select(Some(0));
-            0
-        })
+    fn selected(&self) -> usize {
+        let state = self.state.take();
+        let selected = state.selected().expect("should have selected something");
+        self.state.set(state);
+        selected
     }
 }
 
@@ -116,7 +116,7 @@ impl Component for PendingPopup {
                             AppEvent::DeleteFile(path.to_owned())
                         }
                         PendingOperations::NoPending => {
-                            panic!("should not have no pending work during confirmation")
+                            unreachable!("has work, checked at top of method")
                         }
                     };
                     self.queue.add(event);
@@ -162,5 +162,74 @@ impl Drawable for PendingPopup {
         f.render_stateful_widget(list, layout[1], &mut state);
         self.state.set(state);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::testing::*;
+
+    #[test]
+    fn new_popup_selects_first_item() {
+        let popup = PendingPopup::new(Queue::new());
+        assert_eq!(0, popup.selected())
+    }
+
+    #[test]
+    fn selecting_next_does_not_go_over_num_of_items() {
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.select_next();
+        popup.select_next();
+        popup.select_next();
+        assert_eq!(1, popup.selected());
+    }
+
+    #[test]
+    fn selecting_prev_does_not_go_below_num_of_items() {
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.select_prev();
+        popup.select_prev();
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn receives_no_input_when_has_no_work() {
+        let down = input_event!(KeyCode::Char('j'));
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.handle_event(&down).expect("should handle input");
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn can_go_up_and_down() {
+        let down = input_event!(KeyCode::Char('j'));
+        let up = input_event!(KeyCode::Char('k'));
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.operation = PendingOperations::DeleteFile("/".into());
+        popup.handle_event(&down).expect("should handle input");
+        assert_eq!(1, popup.selected());
+        popup.handle_event(&up).expect("should handle input");
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn sends_message_on_confirm() {
+        let enter = input_event!(KeyCode::Enter);
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.operation = PendingOperations::DeleteFile("/".into());
+        popup.handle_event(&enter).expect("should handle input");
+        assert!(popup.queue.pop().is_some());
+    }
+
+    #[test]
+    fn sends_no_message_on_deny() {
+        let events = input_events!(KeyCode::Char('j'), KeyCode::Enter);
+        let mut popup = PendingPopup::new(Queue::new());
+        popup.operation = PendingOperations::DeleteFile("/".into());
+        for event in events {
+            popup.handle_event(&event).expect("should handle input");
+        }
+        assert!(popup.queue.pop().is_none())
     }
 }
