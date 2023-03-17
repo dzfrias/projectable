@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::VecDeque, path::PathBuf, rc::Rc};
 
-use crate::app::{InputOperation, PendingOperations};
+use crate::app::{InputOperation, PendingOperation};
 
 #[derive(Debug, Clone)]
 pub struct Queue(Rc<RefCell<VecDeque<AppEvent>>>);
@@ -27,7 +27,7 @@ impl Default for Queue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
-    OpenPopup(PendingOperations),
+    OpenPopup(PendingOperation),
     OpenFile(PathBuf),
     DeleteFile(PathBuf),
     OpenInput(InputOperation),

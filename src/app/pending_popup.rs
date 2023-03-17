@@ -17,14 +17,14 @@ use tui::{
 };
 
 #[derive(Debug, PartialEq, Eq, Default, Clone)]
-pub enum PendingOperations {
+pub enum PendingOperation {
     DeleteFile(PathBuf),
     #[default]
     NoPending,
 }
 
 pub struct PendingPopup {
-    pub operation: PendingOperations,
+    pub operation: PendingOperation,
     pub state: Cell<ListState>,
     queue: Queue,
 }
@@ -41,11 +41,11 @@ impl PendingPopup {
     }
 
     fn has_work(&self) -> bool {
-        self.operation != PendingOperations::NoPending
+        self.operation != PendingOperation::NoPending
     }
 
     fn reset_work(&mut self) {
-        self.operation = PendingOperations::NoPending;
+        self.operation = PendingOperation::NoPending;
         self.state = ListState::default().into();
         self.state.get_mut().select(Some(0));
     }
@@ -112,10 +112,8 @@ impl Component for PendingPopup {
                         return Ok(());
                     }
                     let event = match &self.operation {
-                        PendingOperations::DeleteFile(path) => {
-                            AppEvent::DeleteFile(path.to_owned())
-                        }
-                        PendingOperations::NoPending => {
+                        PendingOperation::DeleteFile(path) => AppEvent::DeleteFile(path.to_owned()),
+                        PendingOperation::NoPending => {
                             unreachable!("has work, checked at top of method")
                         }
                     };
@@ -206,7 +204,7 @@ mod tests {
         let down = input_event!(KeyCode::Char('j'));
         let up = input_event!(KeyCode::Char('k'));
         let mut popup = PendingPopup::new(Queue::new());
-        popup.operation = PendingOperations::DeleteFile("/".into());
+        popup.operation = PendingOperation::DeleteFile("/".into());
         popup.handle_event(&down).expect("should handle input");
         assert_eq!(1, popup.selected());
         popup.handle_event(&up).expect("should handle input");
@@ -217,7 +215,7 @@ mod tests {
     fn sends_message_on_confirm() {
         let enter = input_event!(KeyCode::Enter);
         let mut popup = PendingPopup::new(Queue::new());
-        popup.operation = PendingOperations::DeleteFile("/".into());
+        popup.operation = PendingOperation::DeleteFile("/".into());
         popup.handle_event(&enter).expect("should handle input");
         assert!(popup.queue.pop().is_some());
     }
@@ -226,7 +224,7 @@ mod tests {
     fn sends_no_message_on_deny() {
         let events = input_events!(KeyCode::Char('j'), KeyCode::Enter);
         let mut popup = PendingPopup::new(Queue::new());
-        popup.operation = PendingOperations::DeleteFile("/".into());
+        popup.operation = PendingOperation::DeleteFile("/".into());
         for event in events {
             popup.handle_event(&event).expect("should handle input");
         }

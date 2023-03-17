@@ -1,6 +1,6 @@
 use super::{
     component::{Component, Drawable},
-    InputOperation, PendingOperations,
+    InputOperation, PendingOperation,
 };
 use crate::dir::*;
 use crate::{
@@ -115,7 +115,7 @@ impl Component for Filetree {
                 KeyCode::Char('k') => self.state.get_mut().key_up(&items),
                 KeyCode::Char('d') => {
                     self.queue
-                        .add(AppEvent::OpenPopup(PendingOperations::DeleteFile(
+                        .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
                             self.get_selected().path().to_path_buf(),
                         )))
                 }
