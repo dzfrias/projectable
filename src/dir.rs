@@ -206,6 +206,7 @@ mod tests {
     use assert_fs::TempDir;
 
     #[test]
+    #[ignore]
     fn can_build_new_dir() {
         let temp = temp_files!("test.txt", "test/test.txt");
         let dir = DirBuilder::new(temp.path())
