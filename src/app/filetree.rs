@@ -128,7 +128,9 @@ impl Component for Filetree {
                 KeyCode::Char(key) if *key == 'n' || *key == 'N' => {
                     let opened = self.current_is_open();
                     let add_path = match self.get_selected() {
+                        // Create new as a child of current selected directory
                         Item::Dir(dir) if opened => dir.path(),
+                        // Create new as a siblilng of selected item
                         item => item.path().parent().expect("item should have parent"),
                     };
                     let event = if *key == 'n' {

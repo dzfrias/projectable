@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, path::PathBuf, rc::Rc};
 
 use crate::app::{InputOperation, PendingOperation};
 
+/// Single-threaded queue for events within the app
 #[derive(Debug, Clone)]
 pub struct Queue(Rc<RefCell<VecDeque<AppEvent>>>);
 

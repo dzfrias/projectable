@@ -59,8 +59,9 @@ impl DirBuilder {
 
 impl Dir {
     pub fn new_file(&mut self, name: &str) -> Result<&File> {
+        // Reject if contains '/' or '\' (on windows)
         if name.contains('/') || (cfg!(windows) && name.contains('\\')) {
-            panic!("invalid path name")
+            panic!("invalid path name");
         }
         FsFile::create(self.path.join(name))?;
         self.children.push(Item::File(File {
@@ -183,6 +184,7 @@ fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf]) -> Result<Dir> {
 }
 
 #[allow(unused_macros)]
+/// Create temporary files and return the temp dir
 macro_rules! temp_files {
     ($($name:expr),*) => {
         {

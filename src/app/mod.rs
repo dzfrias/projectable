@@ -27,6 +27,7 @@ use tui::{
     Frame,
 };
 
+/// Event that is sent back up to main.rs
 #[derive(Debug)]
 pub enum TerminalEvent {
     OpenFile(PathBuf),
@@ -56,6 +57,7 @@ impl App {
         Ok(app)
     }
 
+    /// Returns None if no events should be sent to the terminal
     pub fn update(&mut self) -> Result<Option<TerminalEvent>> {
         let app_event = if let Some(ev) = self.queue.pop() {
             ev
@@ -63,6 +65,7 @@ impl App {
             return Ok(None);
         };
 
+        // Handle events from queue
         match app_event {
             AppEvent::OpenPopup(operation) => self.pending.operation = operation,
             AppEvent::DeleteFile(path) => {
@@ -89,6 +92,7 @@ impl App {
 
     pub fn handle_event(&mut self, ev: &ExternalEvent) -> Result<()> {
         let popup_open = self.pending.visible() || self.input_box.visible();
+        // Do not give the Filetree focus if there are any popups open
         self.tree.focus(!popup_open);
 
         self.pending.handle_event(ev)?;

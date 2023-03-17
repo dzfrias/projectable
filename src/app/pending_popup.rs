@@ -107,6 +107,7 @@ impl Component for PendingPopup {
                         .get_mut()
                         .selected()
                         .expect("should always have something selected");
+                    // Delete option
                     if selected == 1 {
                         self.reset_work();
                         return Ok(());
