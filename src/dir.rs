@@ -36,6 +36,7 @@ pub struct Dir {
 pub struct DirBuilder {
     path: PathBuf,
     ignore: Vec<PathBuf>,
+    dirs_first: bool,
 }
 
 impl DirBuilder {
@@ -43,7 +44,13 @@ impl DirBuilder {
         DirBuilder {
             path: path.as_ref().to_path_buf(),
             ignore: Vec::new(),
+            dirs_first: false,
         }
+    }
+
+    pub fn dirs_first(mut self, dirs_first: bool) -> Self {
+        self.dirs_first = dirs_first;
+        self
     }
 
     pub fn ignore(mut self, ignore: Vec<PathBuf>) -> Self {
@@ -52,7 +59,7 @@ impl DirBuilder {
     }
 
     pub fn build(self) -> Result<Dir> {
-        let dir = build_tree(self.path, &self.ignore)?;
+        let dir = build_tree(self.path, &self.ignore, self.dirs_first)?;
         Ok(dir)
     }
 }
@@ -162,7 +169,7 @@ impl File {
     }
 }
 
-fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf]) -> Result<Dir> {
+fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf], dirs_first: bool) -> Result<Dir> {
     let mut children = Vec::new();
     for entry in fs::read_dir(&path)?
         .filter_map(|entry| entry.ok())
@@ -171,8 +178,12 @@ fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf]) -> Result<Dir> {
         let path = entry.path();
         let file_type = entry.file_type()?;
         if file_type.is_dir() {
-            let dir = build_tree(path, ignore)?;
-            children.push(Item::Dir(dir))
+            let dir = build_tree(path, ignore, dirs_first)?;
+            if dirs_first {
+                children.insert(0, Item::Dir(dir));
+            } else {
+                children.push(Item::Dir(dir));
+            }
         } else {
             children.push(Item::File(File { path }))
         }

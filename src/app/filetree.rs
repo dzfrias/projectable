@@ -32,7 +32,7 @@ pub struct Filetree {
 
 impl Filetree {
     pub fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
-        let tree = DirBuilder::new(&path).build()?;
+        let tree = DirBuilder::new(&path).dirs_first(true).build()?;
         let mut state = TreeState::default();
         state.select_first();
         Ok(Filetree {
@@ -45,7 +45,7 @@ impl Filetree {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        let tree = DirBuilder::new(&self.root_path).build()?;
+        let tree = DirBuilder::new(&self.root_path).dirs_first(true).build()?;
         self.dir = tree;
         Ok(())
     }
