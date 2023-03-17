@@ -448,6 +448,7 @@ dependencies = [
  "crossterm",
  "notify",
  "notify-debouncer-mini",
+ "scopeguard",
  "tui",
  "tui-textarea",
  "tui-tree-widget",

@@ -15,6 +15,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use scopeguard::defer;
 use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
@@ -24,17 +25,25 @@ fn main() -> Result<()> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
 
+    // Restore terminal
+    defer! {
+        let mut stdout = io::stdout();
+        let leave_screen = execute!(stdout, LeaveAlternateScreen);
+        if let Err(err) = leave_screen {
+            eprintln!("could not leave screen:\n{err}");
+        }
+        let disable_raw_mode = disable_raw_mode();
+        if let Err(err) = disable_raw_mode {
+            eprintln!("could not disable raw mode:\n{err}");
+        }
+        let disable_mouse_capture = execute!(stdout, DisableMouseCapture);
+        if let Err(err) = disable_mouse_capture {
+            eprintln!("could not disable mouse capture:\n{err}");
+        }
+    }
+
     let mut app = App::new(".")?;
     run_app(&mut terminal, &mut app)?;
-
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
 
     Ok(())
 }
