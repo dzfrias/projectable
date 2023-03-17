@@ -25,7 +25,7 @@ impl Default for Queue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppEvent {
     OpenPopup(PendingOperations),
     OpenFile(PathBuf),

@@ -16,7 +16,7 @@ use tui::{
     Frame,
 };
 
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub enum PendingOperations {
     DeleteFile(PathBuf),
     #[default]
