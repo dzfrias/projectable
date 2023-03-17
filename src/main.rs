@@ -65,15 +65,16 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
 
         terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
         let event = app.update()?;
-        match event {
-            TerminalEvent::OpenFile(path) => {
-                let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
-                Command::new(editor).arg(path).status()?;
-                let mut stdout = io::stdout();
-                execute!(stdout, EnterAlternateScreen)?;
-                terminal.clear()?;
+        if let Some(event) = event {
+            match event {
+                TerminalEvent::OpenFile(path) => {
+                    let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
+                    Command::new(editor).arg(path).status()?;
+                    let mut stdout = io::stdout();
+                    execute!(stdout, EnterAlternateScreen)?;
+                    terminal.clear()?;
+                }
             }
-            TerminalEvent::Nothing => {}
         }
 
         if app.should_quit() {

@@ -29,7 +29,6 @@ use tui::{
 #[derive(Debug)]
 pub enum TerminalEvent {
     OpenFile(PathBuf),
-    Nothing,
 }
 
 pub struct App {
@@ -56,11 +55,11 @@ impl App {
         Ok(app)
     }
 
-    pub fn update(&mut self) -> Result<TerminalEvent> {
+    pub fn update(&mut self) -> Result<Option<TerminalEvent>> {
         let app_event = if let Some(ev) = self.queue.pop() {
             ev
         } else {
-            return Ok(TerminalEvent::Nothing);
+            return Ok(None);
         };
 
         match app_event {
@@ -73,7 +72,7 @@ impl App {
                 }
                 self.tree.refresh()?;
             }
-            AppEvent::OpenFile(path) => return Ok(TerminalEvent::OpenFile(path)),
+            AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
             AppEvent::OpenInput(op) => self.input_box.operation = op,
             AppEvent::NewFile(path) => {
                 File::create(path)?;
@@ -84,7 +83,7 @@ impl App {
                 self.tree.refresh()?;
             }
         }
-        Ok(TerminalEvent::Nothing)
+        Ok(None)
     }
 
     pub fn handle_event(&mut self, ev: &ExternalEvent) -> Result<()> {
