@@ -1,19 +1,14 @@
 pub mod component;
-mod filetree;
-mod input_box;
-mod pending_popup;
-pub mod testing;
+mod components;
 
 use self::component::{Component, Drawable};
+pub use self::components::*;
 use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
-use filetree::Filetree;
-pub use input_box::*;
-pub use pending_popup::*;
 use std::{
     fs::{self, File},
     path::{Path, PathBuf},

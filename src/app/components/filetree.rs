@@ -1,7 +1,5 @@
-use super::{
-    component::{Component, Drawable},
-    InputOperation, PendingOperation,
-};
+use super::{InputOperation, PendingOperation};
+use crate::app::component::{Component, Drawable};
 use crate::dir::*;
 use crate::{
     external_event::ExternalEvent,
@@ -177,7 +175,7 @@ fn build_filetree(tree: &Dir) -> Vec<TreeItem> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::testing::*;
+    use crate::app::components::testing::*;
 
     #[test]
     fn last_of_path_only_gets_last_part() {

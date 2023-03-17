@@ -1,6 +1,6 @@
 use std::{cell::Cell, path::PathBuf};
 
-use super::component::{Component, Drawable};
+use crate::app::component::{Component, Drawable};
 use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
@@ -167,7 +167,7 @@ impl Drawable for PendingPopup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::testing::*;
+    use crate::app::components::testing::*;
 
     #[test]
     fn new_popup_selects_first_item() {

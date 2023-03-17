@@ -1,4 +1,4 @@
-use super::component::{Component, Drawable};
+use crate::app::component::{Component, Drawable};
 use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
