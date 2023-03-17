@@ -160,7 +160,7 @@ fn last_of_path(path: impl AsRef<Path>) -> String {
         .to_string()
 }
 
-fn build_filetree<'a>(tree: &Dir) -> Vec<TreeItem<'a>> {
+fn build_filetree(tree: &Dir) -> Vec<TreeItem> {
     let mut items = Vec::new();
     for item in tree {
         let tree_item = match item {
