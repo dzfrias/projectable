@@ -27,7 +27,7 @@ impl Default for PreviewFile {
     fn default() -> Self {
         Self {
             preview_command: if cfg!(target_os = "windows") {
-                "type {}".to_owned()
+                "cat {}".to_owned()
             } else {
                 "cat {}".to_owned()
             },
