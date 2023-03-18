@@ -11,7 +11,7 @@ macro_rules! input_event {
             state: KeyEventState::empty(),
         }))
     }};
-    ($key:expr, $mods:expr) => {{
+    ($key:expr; $mods:expr) => {{
         use ::crossterm::event::{
             Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
         };
@@ -28,9 +28,9 @@ pub(crate) use input_event;
 
 #[allow(unused_macros)]
 macro_rules! input_events {
-    ($($key:expr),+) => {
+    ($($key:expr$(; $mods:expr)?),+) => {
         {
-            [$(input_event!($key)),+]
+            [$(input_event!($key$(; $mods)?)),+]
         }
     };
 }

@@ -121,6 +121,7 @@ impl Component for PreviewFile {
                 }
                 KeyEvent {
                     code: KeyCode::Char('K'),
+                    modifiers: KeyModifiers::SHIFT,
                     ..
                 } => {
                     if self.scrolls != 0 {
@@ -129,6 +130,7 @@ impl Component for PreviewFile {
                 }
                 KeyEvent {
                     code: KeyCode::Char('J'),
+                    modifiers: KeyModifiers::SHIFT,
                     ..
                 } => {
                     let num_lines = self.contents.lines().count();
@@ -255,8 +257,8 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let up = input_event!(KeyCode::Char('K'));
-        let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
+        let up = input_event!(KeyCode::Char('K'); KeyModifiers::SHIFT);
+        let big_up = input_event!(KeyCode::Char('u'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
@@ -276,8 +278,8 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let down = input_event!(KeyCode::Char('J'));
-        let big_down = input_event!(KeyCode::Char('d'), KeyModifiers::CONTROL);
+        let down = input_event!(KeyCode::Char('J'); KeyModifiers::SHIFT);
+        let big_down = input_event!(KeyCode::Char('d'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
@@ -297,8 +299,8 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let down = input_event!(KeyCode::Char('J'));
-        let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
+        let down = input_event!(KeyCode::Char('J'); KeyModifiers::SHIFT);
+        let big_up = input_event!(KeyCode::Char('u'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
