@@ -355,7 +355,6 @@ mod tests {
             .expect("should be able to build dir");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
-        assert_eq!(path.join("test2"), dir.child(0).unwrap().path());
-        assert_eq!(path.join("test"), dir.child(1).unwrap().path());
+        assert_eq!(path.join("test.txt"), dir.children.last().unwrap().path());
     }
 }
