@@ -1,7 +1,7 @@
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use std::{cell::Cell, env, path::Path, process::Command};
+use std::{cell::Cell, path::Path};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -59,31 +59,21 @@ impl PreviewFile {
         self.cache = None.into();
         let replaced = {
             let replacement = if cfg!(target_os = "windows") {
-                file.as_ref().display().to_string().replace(" ", "\\` ")
+                file.as_ref().display().to_string()
             } else {
                 format!("'{}'", &file.as_ref().display().to_string())
             };
 
             self.preview_command.replace("{}", &replacement)
         };
-        self.contents = if cfg!(target_os = "windows") {
-            let out = Command::new("cmd").arg("/C").arg(&replaced).output()?;
-            let output = if out.stdout.is_empty() && !out.stderr.is_empty() {
-                out.stderr
+        self.contents = {
+            let output = execute::command(&replaced).output()?;
+            let out = if output.stdout.is_empty() && !output.stderr.is_empty() {
+                output.stderr
             } else {
-                out.stdout
+                output.stdout
             };
-            String::from_utf8_lossy(&output).to_string()
-        } else {
-            let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-                .arg("-c")
-                .arg(&replaced)
-                .output()?;
-            if out.stdout.is_empty() && !out.stderr.is_empty() {
-                String::from_utf8_lossy(&out.stderr).to_string()
-            } else {
-                String::from_utf8_lossy(&out.stdout).to_string()
-            }
+            String::from_utf8_lossy(&out).to_string()
         };
         Ok(())
     }
@@ -225,8 +215,6 @@ mod tests {
     }
 
     #[test]
-    // FIX: Doesn't pass on Windows...
-    #[cfg(not(target_os = "windows"))]
     fn works_with_file_with_spaces() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
