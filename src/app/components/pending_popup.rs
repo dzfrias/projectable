@@ -29,6 +29,18 @@ pub struct PendingPopup {
     queue: Queue,
 }
 
+impl Default for PendingPopup {
+    fn default() -> Self {
+        let mut state = ListState::default();
+        state.select(Some(0));
+        Self {
+            state: state.into(),
+            queue: Queue::default(),
+            operation: PendingOperation::default(),
+        }
+    }
+}
+
 impl PendingPopup {
     pub fn new(queue: Queue) -> Self {
         let mut state = ListState::default();
@@ -171,13 +183,13 @@ mod tests {
 
     #[test]
     fn new_popup_selects_first_item() {
-        let popup = PendingPopup::new(Queue::new());
+        let popup = PendingPopup::default();
         assert_eq!(0, popup.selected())
     }
 
     #[test]
     fn selecting_next_does_not_go_over_num_of_items() {
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.select_next();
         popup.select_next();
         popup.select_next();
@@ -186,7 +198,7 @@ mod tests {
 
     #[test]
     fn selecting_prev_does_not_go_below_num_of_items() {
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.select_prev();
         popup.select_prev();
         assert_eq!(0, popup.selected());
@@ -195,7 +207,7 @@ mod tests {
     #[test]
     fn receives_no_input_when_has_no_work() {
         let down = input_event!(KeyCode::Char('j'));
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.handle_event(&down).expect("should handle input");
         assert_eq!(0, popup.selected());
     }
@@ -204,7 +216,7 @@ mod tests {
     fn can_go_up_and_down() {
         let down = input_event!(KeyCode::Char('j'));
         let up = input_event!(KeyCode::Char('k'));
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.operation = PendingOperation::DeleteFile("/".into());
         popup.handle_event(&down).expect("should handle input");
         assert_eq!(1, popup.selected());
@@ -215,7 +227,7 @@ mod tests {
     #[test]
     fn sends_message_on_confirm() {
         let enter = input_event!(KeyCode::Enter);
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.operation = PendingOperation::DeleteFile("/".into());
         popup.handle_event(&enter).expect("should handle input");
         assert!(popup.queue.pop().is_some());
@@ -224,7 +236,7 @@ mod tests {
     #[test]
     fn sends_no_message_on_deny() {
         let events = input_events!(KeyCode::Char('j'), KeyCode::Enter);
-        let mut popup = PendingPopup::new(Queue::new());
+        let mut popup = PendingPopup::default();
         popup.operation = PendingOperation::DeleteFile("/".into());
         for event in events {
             popup.handle_event(&event).expect("should handle input");
