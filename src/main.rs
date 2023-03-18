@@ -7,6 +7,7 @@ use projectable::{
 use std::{
     env,
     io::{self, Stdout},
+    panic,
     process::Command,
 };
 
@@ -15,7 +16,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use scopeguard::defer;
+use scopeguard::defer_on_success;
 use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
@@ -25,21 +26,15 @@ fn main() -> Result<()> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
     // Restore terminal
-    defer! {
-        let mut stdout = io::stdout();
-        let leave_screen = execute!(stdout, LeaveAlternateScreen);
-        if let Err(err) = leave_screen {
-            eprintln!("could not leave screen:\n{err}");
-        }
-        let disable_raw_mode = disable_raw_mode();
-        if let Err(err) = disable_raw_mode {
-            eprintln!("could not disable raw mode:\n{err}");
-        }
-        let disable_mouse_capture = execute!(stdout, DisableMouseCapture);
-        if let Err(err) = disable_mouse_capture {
-            eprintln!("could not disable mouse capture:\n{err}");
-        }
+    defer_on_success! {
+        shut_down();
     }
+
+    panic::set_hook(Box::new(|info| {
+        shut_down();
+        eprintln!("panicked: {info}");
+        eprintln!("please report this issue on GitHub");
+    }));
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let mut app = App::new(".")?;
@@ -80,5 +75,21 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
         if app.should_quit() {
             return Ok(());
         }
+    }
+}
+
+fn shut_down() {
+    let mut stdout = io::stdout();
+    let leave_screen = execute!(stdout, LeaveAlternateScreen);
+    if let Err(err) = leave_screen {
+        eprintln!("could not leave screen:\n{err}");
+    }
+    let disable_raw_mode = disable_raw_mode();
+    if let Err(err) = disable_raw_mode {
+        eprintln!("could not disable raw mode:\n{err}");
+    }
+    let disable_mouse_capture = execute!(stdout, DisableMouseCapture);
+    if let Err(err) = disable_mouse_capture {
+        eprintln!("could not disable mouse capture:\n{err}");
     }
 }
