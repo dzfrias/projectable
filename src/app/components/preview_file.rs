@@ -57,9 +57,15 @@ impl PreviewFile {
         self.scrolls = 0;
         // Cache has to be reset
         self.cache = None.into();
-        let replaced = self
-            .preview_command
-            .replace("{}", &format!("'{}'", &file.as_ref().display().to_string()));
+        let replaced = {
+            let replacement = if cfg!(target_os = "windows") {
+                format!("\"{}\"", &file.as_ref().display().to_string())
+            } else {
+                format!("'{}'", &file.as_ref().display().to_string())
+            };
+
+            self.preview_command.replace("{}", &replacement)
+        };
         self.contents = if cfg!(target_os = "windows") {
             let out = Command::new("cmd").arg("/C").arg(&replaced).output()?;
             let output = if out.stdout.is_empty() && !out.stderr.is_empty() {
@@ -189,22 +195,6 @@ mod tests {
             .unwrap();
         let path = temp_dir.path().to_owned();
         let mut previewer = PreviewFile::new(preview_default());
-        previewer
-            .preview_file(path.join("test.txt"))
-            .expect("preview should work");
-        assert_eq!("should be previewed".to_owned(), previewer.contents);
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn preview_works_on_windows() {
-        let temp_dir = TempDir::new().expect("should be able to make temp dir");
-        temp_dir
-            .child("test.txt")
-            .write_str("should be previewed")
-            .unwrap();
-        let path = temp_dir.path().to_owned();
-        let mut previewer = PreviewFile::new("type {}".to_owned());
         previewer
             .preview_file(path.join("test.txt"))
             .expect("preview should work");
