@@ -15,10 +15,8 @@ use std::{
 };
 use tui::{
     backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
-    text::Span,
-    widgets::{Block, Borders, Paragraph, Wrap},
+    layout::{Constraint, Direction, Layout, Rect},
+    widgets::{Block, Borders},
     Frame,
 };
 
@@ -35,21 +33,21 @@ pub struct App {
     queue: Queue,
     pending: PendingPopup,
     input_box: InputBox,
+    previewer: PreviewFile,
 }
 
 impl App {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
         let queue = Queue::new();
-        let app = App {
+        Ok(App {
             path: path.as_ref().to_path_buf(),
             tree: Filetree::from_dir(&path, queue.clone())?,
             should_quit: false,
             pending: PendingPopup::new(queue.clone()),
             input_box: InputBox::new(queue.clone()),
+            previewer: PreviewFile::new("/bin/cat {}".to_owned()),
             queue,
-        };
-
-        Ok(app)
+        })
     }
 
     /// Returns None if no events should be sent to the terminal
@@ -70,6 +68,9 @@ impl App {
                     fs::remove_dir_all(path)?;
                 }
                 self.tree.refresh()?;
+                self.queue.add(AppEvent::PreviewFile(
+                    self.tree.get_selected().path().to_owned(),
+                ));
             }
             AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
             AppEvent::OpenInput(op) => self.input_box.operation = op,
@@ -81,6 +82,7 @@ impl App {
                 fs::create_dir(path)?;
                 self.tree.refresh()?;
             }
+            AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
         }
         Ok(None)
     }
@@ -89,10 +91,12 @@ impl App {
         let popup_open = self.pending.visible() || self.input_box.visible();
         // Do not give the Filetree focus if there are any popups open
         self.tree.focus(!popup_open);
+        self.previewer.focus(!popup_open);
 
         self.pending.handle_event(ev)?;
         self.input_box.handle_event(ev)?;
         self.tree.handle_event(ev)?;
+        self.previewer.handle_event(ev)?;
 
         if popup_open {
             return Ok(());
@@ -128,20 +132,11 @@ impl Drawable for App {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
             .split(main_layout[0]);
 
-        let text = vec![
-            Span::raw("hi").into(),
-            Span::styled("Second line", Style::default().fg(Color::Red)).into(),
-        ];
-        let p = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: true });
-
         let block = Block::default().title("Block").borders(Borders::ALL);
 
         self.tree.draw(f, left_hand_layout[0])?;
         f.render_widget(block, left_hand_layout[1]);
-        f.render_widget(p, main_layout[1]);
+        self.previewer.draw(f, main_layout[1])?;
         self.pending.draw(f, area)?;
         self.input_box.draw(f, area)?;
 

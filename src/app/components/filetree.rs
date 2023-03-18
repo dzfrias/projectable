@@ -6,7 +6,7 @@ use crate::{
     queue::{AppEvent, Queue},
 };
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{
     cell::Cell,
     path::{Path, PathBuf},
@@ -33,22 +33,32 @@ impl Filetree {
         let tree = DirBuilder::new(&path).dirs_first(true).build()?;
         let mut state = TreeState::default();
         state.select_first();
-        Ok(Filetree {
+        let tree = Filetree {
             root_path: path.as_ref().to_path_buf(),
             state: state.into(),
             is_focused: true,
-            queue,
+            queue: queue.clone(),
             dir: tree,
-        })
+        };
+        queue.add(AppEvent::PreviewFile(tree.get_selected().path().to_owned()));
+        Ok(tree)
     }
 
     pub fn refresh(&mut self) -> Result<()> {
         let tree = DirBuilder::new(&self.root_path).dirs_first(true).build()?;
         self.dir = tree;
+
+        if self
+            .dir
+            .nested_child(&self.state.get_mut().selected())
+            .is_none()
+        {
+            self.state.get_mut().select_first();
+        }
         Ok(())
     }
 
-    fn get_selected(&self) -> &Item {
+    pub fn get_selected(&self) -> &Item {
         let state = self.state.take();
         let item = self
             .dir
@@ -106,44 +116,56 @@ impl Component for Filetree {
 
         match ev {
             ExternalEvent::RefreshFiletree => self.refresh()?,
-            ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) => match code {
-                KeyCode::Char('g') => self.state.get_mut().select_first(),
-                KeyCode::Char('G') => self.state.get_mut().select_last(&items),
-                KeyCode::Char('j') => self.state.get_mut().key_down(&items),
-                KeyCode::Char('k') => self.state.get_mut().key_up(&items),
-                KeyCode::Char('d') => {
-                    self.queue
-                        .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
-                            self.get_selected().path().to_path_buf(),
-                        )))
+            ExternalEvent::Crossterm(Event::Key(KeyEvent {
+                code,
+                modifiers: KeyModifiers::SHIFT | KeyModifiers::NONE,
+                ..
+            })) => {
+                let mut refresh_preview = true;
+                match code {
+                    KeyCode::Char('g') => self.state.get_mut().select_first(),
+                    KeyCode::Char('G') => self.state.get_mut().select_last(&items),
+                    KeyCode::Char('j') => self.state.get_mut().key_down(&items),
+                    KeyCode::Char('k') => self.state.get_mut().key_up(&items),
+                    KeyCode::Char('d') => {
+                        self.queue
+                            .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
+                                self.get_selected().path().to_path_buf(),
+                            )))
+                    }
+                    KeyCode::Enter => match self.get_selected() {
+                        Item::Dir(_) => self.state.get_mut().toggle_selected(),
+                        Item::File(file) => self
+                            .queue
+                            .add(AppEvent::OpenFile(file.path().to_path_buf())),
+                    },
+                    KeyCode::Char(key) if *key == 'n' || *key == 'N' => {
+                        let opened = self.current_is_open();
+                        let add_path = match self.get_selected() {
+                            // Create new as a child of current selected directory
+                            Item::Dir(dir) if opened => dir.path(),
+                            // Create new as a siblilng of selected item
+                            item => item.path().parent().expect("item should have parent"),
+                        };
+                        let event = if *key == 'n' {
+                            AppEvent::OpenInput(InputOperation::NewFile {
+                                at: add_path.to_path_buf(),
+                            })
+                        } else {
+                            AppEvent::OpenInput(InputOperation::NewDir {
+                                at: add_path.to_path_buf(),
+                            })
+                        };
+                        self.queue.add(event);
+                    }
+                    _ => refresh_preview = false,
                 }
-                KeyCode::Enter => match self.get_selected() {
-                    Item::Dir(_) => self.state.get_mut().toggle_selected(),
-                    Item::File(file) => self
-                        .queue
-                        .add(AppEvent::OpenFile(file.path().to_path_buf())),
-                },
-                KeyCode::Char(key) if *key == 'n' || *key == 'N' => {
-                    let opened = self.current_is_open();
-                    let add_path = match self.get_selected() {
-                        // Create new as a child of current selected directory
-                        Item::Dir(dir) if opened => dir.path(),
-                        // Create new as a siblilng of selected item
-                        item => item.path().parent().expect("item should have parent"),
-                    };
-                    let event = if *key == 'n' {
-                        AppEvent::OpenInput(InputOperation::NewFile {
-                            at: add_path.to_path_buf(),
-                        })
-                    } else {
-                        AppEvent::OpenInput(InputOperation::NewDir {
-                            at: add_path.to_path_buf(),
-                        })
-                    };
-                    self.queue.add(event);
+                if !refresh_preview {
+                    return Ok(());
                 }
-                _ => {}
-            },
+                self.queue
+                    .add(AppEvent::PreviewFile(self.get_selected().path().to_owned()));
+            }
             _ => {}
         }
 
@@ -211,10 +233,11 @@ mod tests {
         filetree
             .handle_event(&d)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenPopup(PendingOperation::DeleteFile(path.join("test.txt"))),
-            filetree.queue.pop().unwrap()
-        );
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenPopup(PendingOperation::DeleteFile(
+                path.join("test.txt")
+            ))));
     }
 
     #[test]
@@ -229,19 +252,19 @@ mod tests {
         filetree
             .handle_event(&n)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenInput(InputOperation::NewFile { at: path.clone() }),
-            filetree.queue.pop().unwrap()
-        );
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::NewFile {
+                at: path.clone()
+            })));
 
         let caps_n = input_event!(KeyCode::Char('N'));
         filetree
             .handle_event(&caps_n)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenInput(InputOperation::NewDir { at: path }),
-            filetree.queue.pop().unwrap()
-        );
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::NewDir { at: path })));
     }
 
     #[test]
@@ -257,10 +280,9 @@ mod tests {
         filetree
             .handle_event(&n)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenInput(InputOperation::NewFile { at: path }),
-            filetree.queue.pop().unwrap()
-        );
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::NewFile { at: path })));
     }
 
     #[test]
@@ -276,12 +298,11 @@ mod tests {
         filetree
             .handle_event(&n)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenInput(InputOperation::NewFile {
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::NewFile {
                 at: path.join("test")
-            }),
-            filetree.queue.pop().unwrap()
-        );
+            })));
     }
 
     #[test]
@@ -310,9 +331,8 @@ mod tests {
         filetree
             .handle_event(&enter)
             .expect("should be able to handle keypress");
-        assert_eq!(
-            AppEvent::OpenFile(path.join("test.txt")),
-            filetree.queue.pop().unwrap()
-        );
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenFile(path.join("test.txt"))));
     }
 }

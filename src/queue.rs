@@ -12,11 +12,15 @@ impl Queue {
     }
 
     pub fn add(&self, event: AppEvent) {
-        self.0.borrow_mut().push_front(event);
+        self.0.borrow_mut().push_back(event);
     }
 
     pub fn pop(&self) -> Option<AppEvent> {
         self.0.borrow_mut().pop_front()
+    }
+
+    pub fn contains(&self, event: &AppEvent) -> bool {
+        self.0.borrow().contains(event)
     }
 }
 
@@ -34,4 +38,5 @@ pub enum AppEvent {
     OpenInput(InputOperation),
     NewFile(PathBuf),
     NewDir(PathBuf),
+    PreviewFile(PathBuf),
 }
