@@ -45,7 +45,7 @@ impl App {
             should_quit: false,
             pending: PendingPopup::new(queue.clone()),
             input_box: InputBox::new(queue.clone()),
-            previewer: PreviewFile::new("/bin/cat {}".to_owned()),
+            previewer: PreviewFile::default(),
             queue,
         })
     }

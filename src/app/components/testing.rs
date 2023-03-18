@@ -11,6 +11,17 @@ macro_rules! input_event {
             state: KeyEventState::empty(),
         }))
     }};
+    ($key:expr, $mods:expr) => {{
+        use ::crossterm::event::{
+            Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+        };
+        ExternalEvent::Crossterm(Event::Key(KeyEvent {
+            code: $key,
+            modifiers: $mods,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::empty(),
+        }))
+    }};
 }
 #[allow(unused_imports)]
 pub(crate) use input_event;

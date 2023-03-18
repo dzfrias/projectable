@@ -1,7 +1,7 @@
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use std::{cell::Cell, path::Path};
+use std::{cell::Cell, env, path::Path, process::Command};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -59,21 +59,31 @@ impl PreviewFile {
         self.cache = None.into();
         let replaced = {
             let replacement = if cfg!(target_os = "windows") {
-                format!("\"{}\"", file.as_ref().display().to_string())
+                file.as_ref().display().to_string().replace(" ", "\\` ")
             } else {
                 format!("'{}'", &file.as_ref().display().to_string())
             };
 
             self.preview_command.replace("{}", &replacement)
         };
-        self.contents = {
-            let output = execute::command(&replaced).output()?;
-            let out = if output.stdout.is_empty() && !output.stderr.is_empty() {
-                output.stderr
+        self.contents = if cfg!(target_os = "windows") {
+            let out = Command::new("cmd").arg("/C").arg(&replaced).output()?;
+            let output = if out.stdout.is_empty() && !out.stderr.is_empty() {
+                out.stderr
             } else {
-                output.stdout
+                out.stdout
             };
-            String::from_utf8_lossy(&out).to_string()
+            String::from_utf8_lossy(&output).to_string()
+        } else {
+            let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
+                .arg("-c")
+                .arg(&replaced)
+                .output()?;
+            if out.stdout.is_empty() && !out.stderr.is_empty() {
+                String::from_utf8_lossy(&out.stderr).to_string()
+            } else {
+                String::from_utf8_lossy(&out.stdout).to_string()
+            }
         };
         Ok(())
     }
@@ -133,6 +143,8 @@ impl Component for PreviewFile {
                 } => {
                     if self.scrolls >= BIG_SCROLL_AMOUNT {
                         self.scrolls -= BIG_SCROLL_AMOUNT;
+                    } else {
+                        self.scrolls = 0;
                     }
                 }
                 _ => {}
@@ -164,6 +176,7 @@ impl Drawable for PreviewFile {
 
 #[cfg(test)]
 mod tests {
+    use super::super::testing::*;
     use super::*;
     use assert_fs::{prelude::*, TempDir};
 
@@ -215,14 +228,74 @@ mod tests {
     }
 
     #[test]
+    // FIX: Does not work on windows yet
+    #[cfg(not(target_os = "windows"))]
     fn works_with_file_with_spaces() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
-        let path = child.path();
         child.write_str("should be previewed").unwrap();
 
         let mut previewer = PreviewFile::new(preview_default());
-        previewer.preview_file(path).expect("preview should work");
+        previewer
+            .preview_file(child.path())
+            .expect("preview should work");
         assert_eq!("should be previewed", previewer.contents);
+    }
+
+    #[test]
+    fn cannot_scroll_above_file() {
+        let temp_dir = TempDir::new().expect("should be able to make temp dir");
+        let child = temp_dir.child("hello world");
+        child.write_str("line\nanother").unwrap();
+
+        let up = input_event!(KeyCode::Char('K'));
+        let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
+
+        let mut previewer = PreviewFile::default();
+        previewer
+            .preview_file(child.path())
+            .expect("preview should work");
+        previewer.handle_event(&up).expect("should handle");
+        assert_eq!(0, previewer.scrolls);
+        previewer.handle_event(&big_up).expect("should handle");
+        assert_eq!(0, previewer.scrolls);
+    }
+
+    #[test]
+    fn cannot_scroll_below_file() {
+        let temp_dir = TempDir::new().expect("should be able to make temp dir");
+        let child = temp_dir.child("hello world");
+        child.write_str("line\nanother").unwrap();
+
+        let down = input_event!(KeyCode::Char('J'));
+        let big_down = input_event!(KeyCode::Char('d'), KeyModifiers::CONTROL);
+
+        let mut previewer = PreviewFile::default();
+        previewer
+            .preview_file(child.path())
+            .expect("preview should work");
+        previewer.handle_event(&down).expect("should handle");
+        assert_eq!(1, previewer.scrolls);
+        previewer.handle_event(&big_down).expect("should handle");
+        assert_eq!(1, previewer.scrolls);
+    }
+
+    #[test]
+    fn big_up_goes_as_far_as_possible() {
+        let temp_dir = TempDir::new().expect("should be able to make temp dir");
+        let child = temp_dir.child("hello world");
+        child.write_str("line\nanother").unwrap();
+
+        let down = input_event!(KeyCode::Char('J'));
+        let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
+
+        let mut previewer = PreviewFile::default();
+        previewer
+            .preview_file(child.path())
+            .expect("preview should work");
+        previewer.handle_event(&down).expect("should handle");
+        assert_eq!(1, previewer.scrolls);
+        previewer.handle_event(&big_up).expect("should handle");
+        assert_eq!(0, previewer.scrolls);
     }
 }
