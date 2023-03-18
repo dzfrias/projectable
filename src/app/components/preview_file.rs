@@ -27,7 +27,7 @@ impl Default for PreviewFile {
     fn default() -> Self {
         Self {
             preview_command: if cfg!(target_os = "windows") {
-                "cat {}".to_owned()
+                "type {}".to_owned()
             } else {
                 "cat {}".to_owned()
             },
@@ -59,7 +59,7 @@ impl PreviewFile {
         self.cache = None.into();
         let replaced = {
             let replacement = if cfg!(target_os = "windows") {
-                format!("\"{}\"", &file.as_ref().display().to_string())
+                file.as_ref().display().to_string()
             } else {
                 format!("'{}'", &file.as_ref().display().to_string())
             };
