@@ -8,9 +8,9 @@ use anyhow::Result;
 use std::path::{PathBuf, MAIN_SEPARATOR};
 use tui::{
     backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, Key, TextArea};
@@ -147,54 +147,25 @@ impl Drawable for InputBox {
         if !self.visible() {
             return Ok(());
         }
-        let area = ui::centered_rect(25, 20, area);
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Length(1),
-                    Constraint::Percentage(30),
-                    Constraint::Min(1),
-                    Constraint::Length(3),
-                ]
-                .as_ref(),
-            )
-            .horizontal_margin(2)
-            .vertical_margin(1)
-            .split(area);
+        let area = ui::centered_rect_absolute(50, 3, area);
         let mut textarea = TextArea::default();
         textarea.insert_str(&self.text);
-        textarea.set_block(Block::default().borders(Borders::ALL).border_style(
-            if self.has_valid_input().expect("should have operation") {
-                Style::default()
-            } else {
-                Style::default().fg(Color::Red)
-            },
-        ));
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("File name")
+                .title_alignment(Alignment::Center)
+                .border_style(if self.has_valid_input().expect("should have operation") {
+                    Style::default().fg(Color::LightGreen)
+                } else {
+                    Style::default().fg(Color::Red)
+                }),
+        );
         for _ in 0..self.cursor_offset {
             textarea.move_cursor(CursorMove::Back);
         }
-        let title = match self.operation {
-            InputOperation::NewDir { .. } => "Create Directory",
-            InputOperation::NewFile { .. } => "Create File",
-            InputOperation::NoOperations => unreachable!("has work, checked at top of method"),
-        };
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(title)
-            .title_alignment(Alignment::Center);
-        let text = match self.operation {
-            InputOperation::NewDir { .. } => "What would you like to name the directory?",
-            InputOperation::NewFile { .. } => "What would you like to name the file?",
-            InputOperation::NoOperations => unreachable!("has work, checked at top of method"),
-        };
-        let p = Paragraph::new(text)
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: true });
         f.render_widget(Clear, area);
-        f.render_widget(block, area);
-        f.render_widget(p, layout[1]);
-        f.render_widget(textarea.widget(), layout[3]);
+        f.render_widget(textarea.widget(), area);
         Ok(())
     }
 }
