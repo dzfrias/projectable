@@ -114,32 +114,52 @@ impl Component for Filetree {
 
         let items = build_filetree(&self.dir);
 
+        const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
             ExternalEvent::RefreshFiletree => self.refresh()?,
             ExternalEvent::Crossterm(Event::Key(KeyEvent {
-                code,
-                modifiers: KeyModifiers::SHIFT | KeyModifiers::NONE,
-                ..
+                code, modifiers, ..
             })) => {
                 let mut refresh_preview = true;
                 match code {
-                    KeyCode::Char('g') => self.state.get_mut().select_first(),
-                    KeyCode::Char('G') => self.state.get_mut().select_last(&items),
-                    KeyCode::Char('j') => self.state.get_mut().key_down(&items),
-                    KeyCode::Char('k') => self.state.get_mut().key_up(&items),
-                    KeyCode::Char('d') => {
+                    KeyCode::Char('g') if modifiers.is_empty() => {
+                        self.state.get_mut().select_first()
+                    }
+                    KeyCode::Char('G') if *modifiers == KeyModifiers::SHIFT => {
+                        self.state.get_mut().select_last(&items)
+                    }
+                    KeyCode::Char('j') if modifiers.is_empty() => {
+                        self.state.get_mut().key_down(&items)
+                    }
+                    KeyCode::Char('n') if *modifiers == KeyModifiers::CONTROL => {
+                        for _ in 0..JUMP_DOWN_AMOUNT {
+                            self.state.get_mut().key_down(&items);
+                        }
+                    }
+                    KeyCode::Char('p') if *modifiers == KeyModifiers::CONTROL => {
+                        for _ in 0..JUMP_DOWN_AMOUNT {
+                            self.state.get_mut().key_up(&items);
+                        }
+                    }
+                    KeyCode::Char('k') if modifiers.is_empty() => {
+                        self.state.get_mut().key_up(&items)
+                    }
+                    KeyCode::Char('d') if modifiers.is_empty() => {
                         self.queue
                             .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
                                 self.get_selected().path().to_path_buf(),
                             )))
                     }
-                    KeyCode::Enter => match self.get_selected() {
+                    KeyCode::Enter if modifiers.is_empty() => match self.get_selected() {
                         Item::Dir(_) => self.state.get_mut().toggle_selected(),
                         Item::File(file) => self
                             .queue
                             .add(AppEvent::OpenFile(file.path().to_path_buf())),
                     },
-                    KeyCode::Char(key) if *key == 'n' || *key == 'N' => {
+                    KeyCode::Char(key)
+                        if (*key == 'n' && modifiers.is_empty())
+                            || (*key == 'N' && *modifiers == KeyModifiers::SHIFT) =>
+                    {
                         let opened = self.current_is_open();
                         let add_path = match self.get_selected() {
                             // Create new as a child of current selected directory
@@ -258,7 +278,7 @@ mod tests {
                 at: path.clone()
             })));
 
-        let caps_n = input_event!(KeyCode::Char('N'));
+        let caps_n = input_event!(KeyCode::Char('N'); KeyModifiers::SHIFT);
         filetree
             .handle_event(&caps_n)
             .expect("should be able to handle keypress");
@@ -334,5 +354,35 @@ mod tests {
         assert!(filetree
             .queue
             .contains(&AppEvent::OpenFile(path.join("test.txt"))));
+    }
+
+    #[test]
+    fn can_jump_down_by_three() {
+        let temp = temp_files!("test.txt", "test2.txt", "test3.txt", "test4.txt");
+        let mut filetree =
+            Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let ctrl_n = input_event!(KeyCode::Char('n'); KeyModifiers::CONTROL);
+        filetree
+            .handle_event(&ctrl_n)
+            .expect("should be able to handle keypress");
+        assert_eq!(3, filetree.state.get_mut().selected()[0])
+    }
+
+    #[test]
+    fn can_jump_up_by_three() {
+        let temp = temp_files!("test.txt", "test2.txt", "test3.txt", "test4.txt");
+        let mut filetree =
+            Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let inputs = input_events!(KeyCode::Char('G'); KeyModifiers::SHIFT, KeyCode::Char('p'); KeyModifiers::CONTROL);
+        for input in inputs {
+            filetree
+                .handle_event(&input)
+                .expect("should be able to handle keypress");
+        }
+        assert_eq!(0, filetree.state.get_mut().selected()[0])
     }
 }
