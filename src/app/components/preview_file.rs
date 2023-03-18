@@ -59,7 +59,8 @@ impl PreviewFile {
         self.cache = None.into();
         let replaced = {
             let replacement = if cfg!(target_os = "windows") {
-                file.as_ref().display().to_string().replace(" ", "` ")
+                shell_escape::windows::escape(file.as_ref().display().to_string().into())
+                    .to_string()
             } else {
                 format!("'{}'", &file.as_ref().display().to_string())
             };
