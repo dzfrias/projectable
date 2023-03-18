@@ -131,6 +131,9 @@ impl Component for Filetree {
                     KeyCode::Char('j') if modifiers.is_empty() => {
                         self.state.get_mut().key_down(&items)
                     }
+                    KeyCode::Char('k') if modifiers.is_empty() => {
+                        self.state.get_mut().key_up(&items)
+                    }
                     KeyCode::Char('n') if *modifiers == KeyModifiers::CONTROL => {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_down(&items);
@@ -141,8 +144,10 @@ impl Component for Filetree {
                             self.state.get_mut().key_up(&items);
                         }
                     }
-                    KeyCode::Char('k') if modifiers.is_empty() => {
-                        self.state.get_mut().key_up(&items)
+                    KeyCode::Char('e') if modifiers.is_empty() => {
+                        self.queue.add(AppEvent::OpenInput(InputOperation::Command {
+                            to: self.get_selected().path().to_path_buf(),
+                        }))
                     }
                     KeyCode::Char('d') if modifiers.is_empty() => {
                         self.queue
@@ -384,5 +389,24 @@ mod tests {
                 .expect("should be able to handle keypress");
         }
         assert_eq!(0, filetree.state.get_mut().selected()[0])
+    }
+
+    #[test]
+    fn can_send_run_cmd() {
+        let temp = temp_files!("test.txt");
+        let mut filetree =
+            Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
+        let path = temp.to_path_buf();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let e = input_event!(KeyCode::Char('e'));
+        filetree
+            .handle_event(&e)
+            .expect("should be able to handle event");
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::Command {
+                to: path.join("test.txt")
+            })))
     }
 }

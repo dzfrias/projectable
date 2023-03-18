@@ -23,6 +23,9 @@ pub enum InputOperation {
     NewDir {
         at: PathBuf,
     },
+    Command {
+        to: PathBuf,
+    },
     #[default]
     NoOperations,
 }
@@ -82,6 +85,7 @@ impl InputBox {
                     Some(!self.text.contains('/'))
                 }
             }
+            InputOperation::Command { .. } => Some(true),
             InputOperation::NoOperations => None,
         }
     }
@@ -118,6 +122,11 @@ impl Component for InputBox {
                         InputOperation::NewDir { at } => self
                             .queue
                             .add(AppEvent::NewDir(at.join(self.text.as_str()))),
+                        InputOperation::Command { to } => {
+                            // Perform string substitution for path
+                            let cmd = self.text.replace("{}", &to.display().to_string());
+                            self.queue.add(AppEvent::RunCommand(cmd))
+                        }
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };
                     self.reset();
@@ -149,12 +158,18 @@ impl Drawable for InputBox {
             return Ok(());
         }
         let area = ui::centered_rect_absolute(50, 3, area);
+        let title = match self.operation {
+            InputOperation::Command { .. } => "Run Command",
+            InputOperation::NewDir { .. } => "New Directory",
+            InputOperation::NewFile { .. } => "New File",
+            InputOperation::NoOperations => unreachable!("checked at top of method"),
+        };
         let mut textarea = TextArea::default();
         textarea.insert_str(&self.text);
         textarea.set_block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("File name")
+                .title(title)
                 .title_alignment(Alignment::Center)
                 .border_style(if self.has_valid_input().expect("should have operation") {
                     Style::default().fg(Color::LightGreen)
@@ -345,5 +360,20 @@ mod tests {
             input_box.cursor_left();
         }
         assert_eq!(4, input_box.cursor_offset);
+    }
+
+    #[test]
+    fn can_send_execute_command_to_queue() {
+        let enter = input_event!(KeyCode::Enter);
+
+        let mut input_box = InputBox::default();
+        input_box.text = "testing {}".to_owned();
+        input_box.operation = InputOperation::Command { to: "/".into() };
+        input_box.handle_event(&enter).unwrap();
+
+        assert_eq!(
+            AppEvent::RunCommand("testing /".to_owned()),
+            input_box.queue.pop().unwrap()
+        );
     }
 }

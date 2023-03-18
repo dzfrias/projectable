@@ -39,4 +39,5 @@ pub enum AppEvent {
     NewFile(PathBuf),
     NewDir(PathBuf),
     PreviewFile(PathBuf),
+    RunCommand(String),
 }

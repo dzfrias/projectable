@@ -10,8 +10,10 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use std::{
+    env,
     fs::{self, File},
     path::{Path, PathBuf},
+    process::Command,
 };
 use tui::{
     backend::Backend,
@@ -83,6 +85,20 @@ impl App {
                 self.tree.refresh()?;
             }
             AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
+            AppEvent::RunCommand(cmd) => {
+                if cfg!(target_os = "windows") {
+                    let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
+                    // TODO: Make output actually do something
+                    dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                } else {
+                    let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
+                        .arg("-c")
+                        .arg(&cmd)
+                        .output()?;
+                    // TODO: Make output actually do something
+                    dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                }
+            }
         }
         Ok(None)
     }
