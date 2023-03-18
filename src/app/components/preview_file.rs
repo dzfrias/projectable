@@ -189,6 +189,11 @@ mod tests {
         program.to_owned()
     }
 
+    #[cfg(windows)]
+    const LINE_ENDING: &'static str = "\r\n";
+    #[cfg(not(windows))]
+    const LINE_ENDING: &'static str = "\n";
+
     #[test]
     fn can_get_file_contents() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
@@ -246,7 +251,9 @@ mod tests {
     fn cannot_scroll_above_file() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
-        child.write_str("line\nanother").unwrap();
+        child
+            .write_str(&format!("line{}another", LINE_ENDING))
+            .unwrap();
 
         let up = input_event!(KeyCode::Char('K'));
         let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
@@ -265,7 +272,9 @@ mod tests {
     fn cannot_scroll_below_file() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
-        child.write_str("line\nanother").unwrap();
+        child
+            .write_str(&format!("line{}another", LINE_ENDING))
+            .unwrap();
 
         let down = input_event!(KeyCode::Char('J'));
         let big_down = input_event!(KeyCode::Char('d'), KeyModifiers::CONTROL);
@@ -284,7 +293,9 @@ mod tests {
     fn big_up_goes_as_far_as_possible() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
-        child.write_str("line\nanother").unwrap();
+        child
+            .write_str(&format!("line{}another", LINE_ENDING))
+            .unwrap();
 
         let down = input_event!(KeyCode::Char('J'));
         let big_up = input_event!(KeyCode::Char('u'), KeyModifiers::CONTROL);
