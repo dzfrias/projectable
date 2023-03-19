@@ -37,6 +37,7 @@ pub struct DirBuilder {
     path: PathBuf,
     ignore: Vec<PathBuf>,
     dirs_first: bool,
+    only_include: Option<Vec<PathBuf>>,
 }
 
 impl DirBuilder {
@@ -45,6 +46,7 @@ impl DirBuilder {
             path: path.as_ref().to_path_buf(),
             ignore: Vec::new(),
             dirs_first: false,
+            only_include: None,
         }
     }
 
@@ -58,8 +60,18 @@ impl DirBuilder {
         self
     }
 
+    pub fn only_include(mut self, only_include: Vec<PathBuf>) -> Self {
+        self.only_include = Some(only_include);
+        self
+    }
+
     pub fn build(self) -> Result<Dir> {
-        let dir = build_tree(self.path, &self.ignore, self.dirs_first)?;
+        let dir = build_tree(
+            self.path,
+            &self.ignore,
+            self.dirs_first,
+            self.only_include.as_deref(),
+        )?;
         Ok(dir)
     }
 }
@@ -169,16 +181,30 @@ impl File {
     }
 }
 
-fn build_tree(path: impl AsRef<Path>, ignore: &[PathBuf], dirs_first: bool) -> Result<Dir> {
+fn build_tree(
+    path: impl AsRef<Path>,
+    ignore: &[PathBuf],
+    dirs_first: bool,
+    only_include: Option<&[PathBuf]>,
+) -> Result<Dir> {
     let mut children = Vec::new();
     for entry in fs::read_dir(&path)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| !ignore.contains(&entry.path()))
     {
         let path = entry.path();
+        if let Some(include) = only_include {
+            if !include.iter().any(|include_path| {
+                include_path.ancestors().any(|p| p == path)
+                    || path.ancestors().any(|p| p == include_path)
+            }) {
+                // Skip past entry if it's not in `only_include`
+                continue;
+            }
+        }
         let file_type = entry.file_type()?;
         if file_type.is_dir() {
-            let dir = build_tree(path, ignore, dirs_first)?;
+            let dir = build_tree(path, ignore, dirs_first, only_include)?;
             if dirs_first {
                 children.insert(0, Item::Dir(dir));
             } else {
@@ -356,5 +382,55 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         assert_eq!(path.join("test.txt"), dir.children.last().unwrap().path());
+    }
+
+    #[test]
+    fn can_only_include_certain_files() {
+        let temp = temp_files!("test.txt", "test2.txt", "test3.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path())
+            .only_include(vec![path.join("test.txt")])
+            .build()
+            .expect("should be able to build dir");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(1, dir.iter().len());
+        assert_eq!(path.join("test.txt"), dir.child(0).unwrap().path());
+    }
+
+    #[test]
+    fn only_including_a_dir_keeps_children() {
+        let temp = temp_files!("test/test.txt", "ignore.txt", "test/test2.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path())
+            .only_include(vec![path.join("test")])
+            .build()
+            .expect("should be able to build dir");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(1, dir.iter().len());
+        assert_eq!(path.join("test"), dir.child(0).unwrap().path());
+        if let Item::Dir(dir) = dir.child(0).unwrap() {
+            assert_eq!(2, dir.iter().len());
+        } else {
+            panic!("item should be a dir");
+        }
+    }
+
+    #[test]
+    fn only_including_nested_file_keeps_ancestors() {
+        let temp = temp_files!("test/keep/keep.txt", "test.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path())
+            .only_include(vec![path.join("test/keep/keep.txt")])
+            .build()
+            .expect("should be able to build dir");
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(1, dir.iter().len());
+        assert_eq!(
+            path.join("test/keep/keep.txt"),
+            dir.nested_child(&[0, 0, 0]).unwrap().path()
+        )
     }
 }

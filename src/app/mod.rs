@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use rust_search::SearchBuilder;
 use std::{
     env,
     fs::{self, File},
@@ -71,7 +72,7 @@ impl App {
                 }
                 self.tree.refresh()?;
                 self.queue.add(AppEvent::PreviewFile(
-                    self.tree.get_selected().path().to_owned(),
+                    self.tree.get_selected().unwrap().path().to_owned(),
                 ));
             }
             AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
@@ -98,6 +99,21 @@ impl App {
                     // TODO: Make output actually do something
                     dbg!(String::from_utf8_lossy(&output.stdout).to_string());
                 }
+            }
+            AppEvent::SearchFiles(search) => {
+                let results = SearchBuilder::default()
+                    .location(".")
+                    .search_input(search)
+                    .ignore_case()
+                    .hidden()
+                    .build()
+                    .collect::<Vec<_>>();
+                self.tree.only_include(
+                    results
+                        .into_iter()
+                        .map(|path| path.into())
+                        .collect::<Vec<_>>(),
+                )?;
             }
         }
         Ok(None)

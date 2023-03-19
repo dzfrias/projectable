@@ -13,9 +13,9 @@ use std::{
 };
 use tui::{
     backend::Backend,
-    layout::Rect,
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
-    widgets::{Block, Borders},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -26,6 +26,7 @@ pub struct Filetree {
     dir: Dir,
     root_path: PathBuf,
     queue: Queue,
+    only_included: bool,
 }
 
 impl Filetree {
@@ -39,33 +40,47 @@ impl Filetree {
             is_focused: true,
             queue: queue.clone(),
             dir: tree,
+            only_included: false,
         };
-        queue.add(AppEvent::PreviewFile(tree.get_selected().path().to_owned()));
+        if let Some(item) = tree.get_selected() {
+            queue.add(AppEvent::PreviewFile(item.path().to_owned()));
+        }
         Ok(tree)
     }
 
     pub fn refresh(&mut self) -> Result<()> {
         let tree = DirBuilder::new(&self.root_path).dirs_first(true).build()?;
         self.dir = tree;
+        self.only_included = false;
 
-        if self
-            .dir
-            .nested_child(&self.state.get_mut().selected())
-            .is_none()
-        {
+        if self.get_selected().is_none() {
             self.state.get_mut().select_first();
         }
         Ok(())
     }
 
-    pub fn get_selected(&self) -> &Item {
+    pub fn get_selected(&self) -> Option<&Item> {
         let state = self.state.take();
-        let item = self
-            .dir
-            .nested_child(&state.selected())
-            .expect("selected item should be in tree");
+        let item = self.dir.nested_child(&state.selected())?;
         self.state.set(state);
-        item
+        Some(item)
+    }
+
+    pub fn only_include(&mut self, include: Vec<PathBuf>) -> Result<()> {
+        self.dir = DirBuilder::new(&self.root_path)
+            .dirs_first(true)
+            .only_include(include)
+            .build()?;
+        self.only_included = true;
+
+        if self.get_selected().is_none() {
+            self.state.get_mut().select_first();
+        }
+        if let Some(selected) = self.get_selected() {
+            self.queue
+                .add(AppEvent::PreviewFile(selected.path().to_owned()));
+        }
+        Ok(())
     }
 
     fn current_is_open(&mut self) -> bool {
@@ -83,12 +98,35 @@ impl Filetree {
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
         let items = build_filetree(&self.dir);
-        let tree = Tree::new(items)
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
-
         let mut state = self.state.take();
-        f.render_stateful_widget(tree, area, &mut state);
+
+        if self.only_included {
+            let layout = Layout::default()
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                ])
+                .margin(1)
+                .split(area);
+            let block = Block::default().borders(Borders::ALL);
+            let tree = Tree::new(items)
+                .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+            let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: true })
+                .style(Style::default().fg(Color::Yellow));
+
+            f.render_widget(block, area);
+            f.render_widget(p, layout[0]);
+            f.render_stateful_widget(tree, layout[2], &mut state);
+        } else {
+            let tree = Tree::new(items)
+                .block(Block::default().borders(Borders::ALL))
+                .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+            f.render_stateful_widget(tree, area, &mut state);
+        }
+
         self.state.set(state);
 
         Ok(())
@@ -128,38 +166,52 @@ impl Component for Filetree {
                     KeyCode::Char('G') if *modifiers == KeyModifiers::SHIFT => {
                         self.state.get_mut().select_last(&items)
                     }
-                    KeyCode::Char('j') if modifiers.is_empty() => {
+                    KeyCode::Char('j') if modifiers.is_empty() && !items.is_empty() => {
                         self.state.get_mut().key_down(&items)
                     }
-                    KeyCode::Char('k') if modifiers.is_empty() => {
+                    KeyCode::Char('k') if modifiers.is_empty() && !items.is_empty() => {
                         self.state.get_mut().key_up(&items)
                     }
-                    KeyCode::Char('n') if *modifiers == KeyModifiers::CONTROL => {
+                    KeyCode::Char('n')
+                        if *modifiers == KeyModifiers::CONTROL && !items.is_empty() =>
+                    {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_down(&items);
                         }
                     }
-                    KeyCode::Char('p') if *modifiers == KeyModifiers::CONTROL => {
+                    KeyCode::Char('p')
+                        if *modifiers == KeyModifiers::CONTROL && !items.is_empty() =>
+                    {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_up(&items);
                         }
                     }
                     KeyCode::Char('e') if modifiers.is_empty() => {
-                        self.queue.add(AppEvent::OpenInput(InputOperation::Command {
-                            to: self.get_selected().path().to_path_buf(),
-                        }))
+                        if let Some(item) = self.get_selected() {
+                            self.queue.add(AppEvent::OpenInput(InputOperation::Command {
+                                to: item.path().to_path_buf(),
+                            }))
+                        }
                     }
                     KeyCode::Char('d') if modifiers.is_empty() => {
-                        self.queue
-                            .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
-                                self.get_selected().path().to_path_buf(),
-                            )))
+                        if let Some(item) = self.get_selected() {
+                            self.queue
+                                .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
+                                    item.path().to_path_buf(),
+                                )))
+                        }
                     }
+                    KeyCode::Char('/') if modifiers.is_empty() => self
+                        .queue
+                        .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
+                    KeyCode::Char('\\') if modifiers.is_empty() => self.refresh()?,
+
                     KeyCode::Enter if modifiers.is_empty() => match self.get_selected() {
-                        Item::Dir(_) => self.state.get_mut().toggle_selected(),
-                        Item::File(file) => self
+                        Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),
+                        Some(Item::File(file)) => self
                             .queue
                             .add(AppEvent::OpenFile(file.path().to_path_buf())),
+                        None => {}
                     },
                     KeyCode::Char(key)
                         if (*key == 'n' && modifiers.is_empty())
@@ -168,9 +220,10 @@ impl Component for Filetree {
                         let opened = self.current_is_open();
                         let add_path = match self.get_selected() {
                             // Create new as a child of current selected directory
-                            Item::Dir(dir) if opened => dir.path(),
-                            // Create new as a siblilng of selected item
-                            item => item.path().parent().expect("item should have parent"),
+                            Some(Item::Dir(dir)) if opened => dir.path(),
+                            // Create new as a sibling of selected item
+                            Some(item) => item.path().parent().expect("item should have parent"),
+                            None => return Ok(()),
                         };
                         let event = if *key == 'n' {
                             AppEvent::OpenInput(InputOperation::NewFile {
@@ -188,8 +241,10 @@ impl Component for Filetree {
                 if !refresh_preview {
                     return Ok(());
                 }
-                self.queue
-                    .add(AppEvent::PreviewFile(self.get_selected().path().to_owned()));
+                if let Some(item) = self.get_selected() {
+                    self.queue
+                        .add(AppEvent::PreviewFile(item.path().to_owned()));
+                }
             }
             _ => {}
         }
@@ -243,7 +298,10 @@ mod tests {
         let filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        assert_eq!(path.join("test.txt"), filetree.get_selected().path())
+        assert_eq!(
+            path.join("test.txt"),
+            filetree.get_selected().unwrap().path()
+        )
     }
 
     #[test]
@@ -299,7 +357,7 @@ mod tests {
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        assert_eq!(path.join("test"), filetree.get_selected().path());
+        assert_eq!(path.join("test"), filetree.get_selected().unwrap().path());
 
         let n = input_event!(KeyCode::Char('n'));
         filetree
@@ -408,5 +466,32 @@ mod tests {
             .contains(&AppEvent::OpenInput(InputOperation::Command {
                 to: path.join("test.txt")
             })))
+    }
+
+    #[test]
+    fn can_send_search_cmd() {
+        let temp = temp_files!();
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let slash = input_event!(KeyCode::Char('/'));
+        filetree
+            .handle_event(&slash)
+            .expect("should be able to handle event");
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::SearchFiles)))
+    }
+
+    #[test]
+    fn can_only_include() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+
+        assert!(filetree
+            .only_include(vec![temp.path().join("test.txt")])
+            .is_ok());
+        assert_eq!(1, filetree.dir.iter().len());
+        temp.close().unwrap();
     }
 }

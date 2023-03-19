@@ -40,4 +40,5 @@ pub enum AppEvent {
     NewDir(PathBuf),
     PreviewFile(PathBuf),
     RunCommand(String),
+    SearchFiles(String),
 }

@@ -26,6 +26,7 @@ pub enum InputOperation {
     Command {
         to: PathBuf,
     },
+    SearchFiles,
     #[default]
     NoOperations,
 }
@@ -85,8 +86,8 @@ impl InputBox {
                     Some(!self.text.contains('/'))
                 }
             }
-            InputOperation::Command { .. } => Some(true),
             InputOperation::NoOperations => None,
+            _ => Some(true),
         }
     }
 }
@@ -127,6 +128,10 @@ impl Component for InputBox {
                             let cmd = self.text.replace("{}", &to.display().to_string());
                             self.queue.add(AppEvent::RunCommand(cmd))
                         }
+                        InputOperation::SearchFiles => {
+                            self.queue.add(AppEvent::SearchFiles(self.text.to_owned()))
+                        }
+
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };
                     self.reset();
@@ -162,6 +167,7 @@ impl Drawable for InputBox {
             InputOperation::Command { .. } => "Run Command",
             InputOperation::NewDir { .. } => "New Directory",
             InputOperation::NewFile { .. } => "New File",
+            InputOperation::SearchFiles => "Search",
             InputOperation::NoOperations => unreachable!("checked at top of method"),
         };
         let mut textarea = TextArea::default();
