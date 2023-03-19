@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use git2::{Repository, Status, Statuses};
 use std::{
     cell::Cell,
     path::{Path, PathBuf},
@@ -27,6 +28,7 @@ pub struct Filetree {
     root_path: PathBuf,
     queue: Queue,
     only_included: bool,
+    repo: Option<Repository>,
 }
 
 impl Filetree {
@@ -41,6 +43,8 @@ impl Filetree {
             queue: queue.clone(),
             dir: tree,
             only_included: false,
+            // TODO: Eventually replace with "." when project root is passed in
+            repo: Repository::discover(path).ok(),
         };
         if let Some(item) = tree.get_selected() {
             queue.add(AppEvent::PreviewFile(item.path().to_owned()));
@@ -97,7 +101,13 @@ impl Filetree {
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let items = build_filetree(&self.dir);
+        let items = build_filetree(
+            &self.dir,
+            self.repo
+                .as_ref()
+                .and_then(|repo| repo.statuses(None).ok())
+                .as_ref(),
+        );
         let mut state = self.state.take();
 
         if self.only_included {
@@ -150,7 +160,7 @@ impl Component for Filetree {
             return Ok(());
         }
 
-        let items = build_filetree(&self.dir);
+        let items = build_filetree(&self.dir, None);
 
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
@@ -262,12 +272,39 @@ fn last_of_path(path: impl AsRef<Path>) -> String {
         .to_string()
 }
 
-fn build_filetree(tree: &Dir) -> Vec<TreeItem> {
+fn build_filetree<'a>(tree: &'a Dir, statuses: Option<&Statuses>) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
+        let style = statuses
+            .map(|statuses| {
+                statuses
+                    .iter()
+                    .find(|status| {
+                        status
+                            .path()
+                            .map(|path| PathBuf::from(format!("./{path}")) == item.path())
+                            // NOTE: Should this be handled differently?
+                            .unwrap_or(false)
+                    })
+                    .map_or(Style::default(), |status| {
+                        let status = status.status();
+                        match status {
+                            Status::WT_NEW => Style::default().fg(Color::Red),
+                            Status::WT_MODIFIED => Style::default().fg(Color::Blue),
+                            Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+                                Style::default().fg(Color::Green)
+                            }
+                            _ => Style::default(),
+                        }
+                    })
+            })
+            // Default style for items, with no git
+            .unwrap_or(Style::default());
         let tree_item = match item {
-            Item::Dir(dir) => TreeItem::new(last_of_path(dir.path()), build_filetree(dir)),
-            Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())),
+            Item::Dir(dir) => {
+                TreeItem::new(last_of_path(dir.path()), build_filetree(dir, statuses)).style(style)
+            }
+            Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
         };
         items.push(tree_item);
     }
