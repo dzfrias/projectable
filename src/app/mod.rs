@@ -55,68 +55,65 @@ impl App {
 
     /// Returns None if no events should be sent to the terminal
     pub fn update(&mut self) -> Result<Option<TerminalEvent>> {
-        let app_event = if let Some(ev) = self.queue.pop() {
-            ev
-        } else {
-            return Ok(None);
-        };
-
-        // Handle events from queue
-        match app_event {
-            AppEvent::OpenPopup(operation) => self.pending.operation = operation,
-            AppEvent::DeleteFile(path) => {
-                if path.is_file() {
-                    fs::remove_file(path)?;
-                } else {
-                    fs::remove_dir_all(path)?;
+        while let Some(app_event) = self.queue.pop() {
+            // Handle events from queue
+            match app_event {
+                AppEvent::OpenPopup(operation) => self.pending.operation = operation,
+                AppEvent::DeleteFile(path) => {
+                    if path.is_file() {
+                        fs::remove_file(path)?;
+                    } else {
+                        fs::remove_dir_all(path)?;
+                    }
+                    self.tree.refresh()?;
+                    self.queue.add(AppEvent::PreviewFile(
+                        self.tree.get_selected().unwrap().path().to_owned(),
+                    ));
                 }
-                self.tree.refresh()?;
-                self.queue.add(AppEvent::PreviewFile(
-                    self.tree.get_selected().unwrap().path().to_owned(),
-                ));
-            }
-            AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
-            AppEvent::OpenInput(op) => self.input_box.operation = op,
-            AppEvent::NewFile(path) => {
-                File::create(path)?;
-                self.tree.refresh()?;
-            }
-            AppEvent::NewDir(path) => {
-                fs::create_dir(path)?;
-                self.tree.refresh()?;
-            }
-            AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
-            AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
-            AppEvent::RunCommand(cmd) => {
-                if cfg!(target_os = "windows") {
-                    let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
-                    // TODO: Make output actually do something
-                    dbg!(String::from_utf8_lossy(&output.stdout).to_string());
-                } else {
-                    let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-                        .arg("-c")
-                        .arg(&cmd)
-                        .output()?;
-                    // TODO: Make output actually do something
-                    dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
+                AppEvent::OpenInput(op) => self.input_box.operation = op,
+                AppEvent::NewFile(path) => {
+                    File::create(path)?;
+                    self.tree.refresh()?;
                 }
-            }
-            AppEvent::SearchFiles(search) => {
-                let results = SearchBuilder::default()
-                    .location(".")
-                    .search_input(search)
-                    .ignore_case()
-                    .hidden()
-                    .build()
-                    .collect::<Vec<_>>();
-                self.tree.only_include(
-                    results
-                        .into_iter()
-                        .map(|path| path.into())
-                        .collect::<Vec<_>>(),
-                )?;
+                AppEvent::NewDir(path) => {
+                    fs::create_dir(path)?;
+                    self.tree.refresh()?;
+                }
+                AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
+                AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
+                AppEvent::RunCommand(cmd) => {
+                    if cfg!(target_os = "windows") {
+                        let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
+                        // TODO: Make output actually do something
+                        dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                    } else {
+                        let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
+                            .arg("-c")
+                            .arg(&cmd)
+                            .output()?;
+                        // TODO: Make output actually do something
+                        dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                    }
+                }
+                AppEvent::SearchFiles(search) => {
+                    let results = SearchBuilder::default()
+                        .location(".")
+                        .search_input(search)
+                        .ignore_case()
+                        .hidden()
+                        .build()
+                        .collect::<Vec<_>>();
+                    self.tree.only_include(
+                        results
+                            .into_iter()
+                            .map(|path| path.into())
+                            .collect::<Vec<_>>(),
+                    )?;
+                }
             }
         }
+
         Ok(None)
     }
 
