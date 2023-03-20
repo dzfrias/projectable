@@ -5,7 +5,7 @@ use std::{thread, time::Duration};
 
 /// Watch for crossterm events in a separate thread, sending results to `event_sender`
 pub fn crossterm_watch(event_sender: Sender<ExternalEvent>) {
-    const POLL_TIME: u64 = 300;
+    const POLL_TIME: u64 = 100;
 
     thread::spawn(move || loop {
         // Non-blocking event read
