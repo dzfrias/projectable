@@ -97,12 +97,7 @@ impl Filetree {
             repo.statuses(None).ok().map(|statuses| {
                 statuses
                     .iter()
-                    .map(|status| {
-                        (
-                            format!("./{}", status.path().unwrap()).into(),
-                            status.status(),
-                        )
-                    })
+                    .map(|status| (self.root_path.join(status.path().unwrap()), status.status()))
                     .collect::<HashMap<PathBuf, Status>>()
             })
         });

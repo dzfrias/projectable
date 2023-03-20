@@ -1,13 +1,14 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use crossbeam_channel::unbounded;
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     external_event,
 };
 use std::{
-    env,
+    env, fs,
     io::{self, Stdout},
     panic,
+    path::PathBuf,
     process::Command,
 };
 
@@ -37,10 +38,19 @@ fn main() -> Result<()> {
     }));
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
-    let mut app = App::new(".")?;
+    let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
+    let mut app = App::new(root)?;
     run_app(&mut terminal, &mut app)?;
 
     Ok(())
+}
+
+fn find_project_root() -> Option<PathBuf> {
+    let start = fs::canonicalize(".").expect("should be valid path");
+    start
+        .ancestors()
+        .find(|path| path.join(".git").is_dir())
+        .map(|path| path.to_path_buf())
 }
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> Result<()> {
