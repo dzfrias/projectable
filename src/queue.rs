@@ -41,4 +41,5 @@ pub enum AppEvent {
     PreviewFile(PathBuf),
     RunCommand(String),
     SearchFiles(String),
+    TogglePreviewMode,
 }

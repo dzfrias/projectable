@@ -15,8 +15,17 @@ use crate::{
     external_event::ExternalEvent,
 };
 
+#[derive(Default, PartialEq, Eq, Clone, Debug)]
+enum Mode {
+    #[default]
+    Preview,
+    Diff,
+}
+
 pub struct PreviewFile {
     pub preview_command: String,
+    pub diff_command: String,
+    mode: Mode,
     contents: String,
     scrolls: u16,
     focused: bool,
@@ -31,27 +40,31 @@ impl Default for PreviewFile {
             } else {
                 "cat {}".to_owned()
             },
+            diff_command: "git diff {}".to_owned(),
             contents: String::new(),
             scrolls: 0,
             focused: true,
             cache: None.into(),
+            mode: Mode::default(),
         }
     }
 }
 
 impl PreviewFile {
-    pub fn new(preview_command: String) -> Self {
+    pub fn new(preview_command: String, diff_command: String) -> Self {
         Self {
             contents: String::new(),
             preview_command,
+            diff_command,
             scrolls: 0,
             focused: true,
             cache: None.into(),
+            mode: Mode::default(),
         }
     }
 
     pub fn preview_file(&mut self, file: impl AsRef<Path>) -> Result<()> {
-        if self.preview_command.is_empty() {
+        if self.preview_command.is_empty() || self.diff_command.is_empty() {
             bail!("should have command");
         }
         self.scrolls = 0;
@@ -64,7 +77,11 @@ impl PreviewFile {
                 format!("'{}'", &file.as_ref().display().to_string())
             };
 
-            self.preview_command.replace("{}", &replacement)
+            if self.mode == Mode::Preview {
+                self.preview_command.replace("{}", &replacement)
+            } else {
+                self.diff_command.replace("{}", &replacement)
+            }
         };
         self.contents = if cfg!(target_os = "windows") {
             let out = Command::new("cmd").arg("/C").arg(&replaced).output()?;
@@ -86,6 +103,14 @@ impl PreviewFile {
             }
         };
         Ok(())
+    }
+
+    pub fn toggle_mode(&mut self) {
+        if self.mode == Mode::Preview {
+            self.mode = Mode::Diff;
+        } else {
+            self.mode = Mode::Preview;
+        }
     }
 }
 
@@ -204,7 +229,7 @@ mod tests {
             .write_str("should be previewed")
             .unwrap();
         let path = temp_dir.path().to_owned();
-        let mut previewer = PreviewFile::new(preview_default());
+        let mut previewer = PreviewFile::default();
         previewer
             .preview_file(path.join("test.txt"))
             .expect("preview should work");
@@ -218,7 +243,10 @@ mod tests {
             .child("test.txt")
             .write_str("should be previewed")
             .unwrap();
-        let mut previewer = PreviewFile::new("".to_owned());
+
+        let mut previewer = PreviewFile::new(String::new(), "test".to_owned());
+        assert!(previewer.preview_file(temp_dir.join("test.txt")).is_err());
+        let mut previewer = PreviewFile::new("test".to_owned(), String::new());
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_err());
     }
 
@@ -229,8 +257,10 @@ mod tests {
             .child("test.txt")
             .write_str("should be previewed")
             .unwrap();
-        let mut previewer =
-            PreviewFile::new(preview_default().strip_suffix(" {}").unwrap().to_owned());
+        let mut previewer = PreviewFile::new(
+            preview_default().strip_suffix(" {}").unwrap().to_owned(),
+            "nothing".to_owned(),
+        );
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_ok());
     }
 
@@ -242,7 +272,7 @@ mod tests {
         let child = temp_dir.child("hello world");
         child.write_str("should be previewed").unwrap();
 
-        let mut previewer = PreviewFile::new(preview_default());
+        let mut previewer = PreviewFile::default();
         previewer
             .preview_file(child.path())
             .expect("preview should work");

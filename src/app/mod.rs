@@ -86,6 +86,7 @@ impl App {
                 self.tree.refresh()?;
             }
             AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
+            AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
             AppEvent::RunCommand(cmd) => {
                 if cfg!(target_os = "windows") {
                     let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;

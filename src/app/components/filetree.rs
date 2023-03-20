@@ -211,6 +211,10 @@ impl Component for Filetree {
                                 )))
                         }
                     }
+                    KeyCode::Char('t') if modifiers.is_empty() => {
+                        self.queue.add(AppEvent::TogglePreviewMode)
+                    }
+
                     KeyCode::Char('/') if modifiers.is_empty() => self
                         .queue
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
@@ -530,5 +534,18 @@ mod tests {
             .is_ok());
         assert_eq!(1, filetree.dir.iter().len());
         temp.close().unwrap();
+    }
+
+    #[test]
+    fn can_send_toggle_preview_cmd() {
+        let temp = temp_files!();
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let slash = input_event!(KeyCode::Char('t'));
+        filetree
+            .handle_event(&slash)
+            .expect("should be able to handle event");
+        assert!(filetree.queue.contains(&AppEvent::TogglePreviewMode));
     }
 }
