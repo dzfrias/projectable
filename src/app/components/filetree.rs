@@ -7,7 +7,8 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use git2::{Repository, Status, Statuses};
+use git2::{Repository, Status};
+use std::collections::HashMap;
 use std::{
     cell::Cell,
     path::{Path, PathBuf},
@@ -29,6 +30,7 @@ pub struct Filetree {
     queue: Queue,
     only_included: bool,
     repo: Option<Repository>,
+    status_cache: Option<HashMap<PathBuf, Status>>,
 }
 
 impl Filetree {
@@ -36,7 +38,7 @@ impl Filetree {
         let tree = DirBuilder::new(&path).dirs_first(true).build()?;
         let mut state = TreeState::default();
         state.select_first();
-        let tree = Filetree {
+        let mut tree = Filetree {
             root_path: path.as_ref().to_path_buf(),
             state: state.into(),
             is_focused: true,
@@ -45,7 +47,9 @@ impl Filetree {
             only_included: false,
             // TODO: Eventually replace with "." when project root is passed in
             repo: Repository::discover(path).ok(),
+            status_cache: None,
         };
+        tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
             queue.add(AppEvent::PreviewFile(item.path().to_owned()));
         }
@@ -56,6 +60,7 @@ impl Filetree {
         let tree = DirBuilder::new(&self.root_path).dirs_first(true).build()?;
         self.dir = tree;
         self.only_included = false;
+        self.populate_status_cache();
 
         if self.get_selected().is_none() {
             self.state.get_mut().select_first();
@@ -87,6 +92,22 @@ impl Filetree {
         Ok(())
     }
 
+    pub fn populate_status_cache(&mut self) {
+        self.status_cache = self.repo.as_ref().and_then(|repo| {
+            repo.statuses(None).ok().map(|statuses| {
+                statuses
+                    .iter()
+                    .map(|status| {
+                        (
+                            format!("./{}", status.path().unwrap()).into(),
+                            status.status(),
+                        )
+                    })
+                    .collect::<HashMap<PathBuf, Status>>()
+            })
+        });
+    }
+
     fn current_is_open(&mut self) -> bool {
         let selected = self.state.get_mut().selected();
         // Will return true if it was already closed
@@ -101,13 +122,7 @@ impl Filetree {
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let items = build_filetree(
-            &self.dir,
-            self.repo
-                .as_ref()
-                .and_then(|repo| repo.statuses(None).ok())
-                .as_ref(),
-        );
+        let items = build_filetree(&self.dir, self.status_cache.as_ref());
         let mut state = self.state.take();
 
         if self.only_included {
@@ -276,33 +291,26 @@ fn last_of_path(path: impl AsRef<Path>) -> String {
         .to_string()
 }
 
-fn build_filetree<'a>(tree: &'a Dir, statuses: Option<&Statuses>) -> Vec<TreeItem<'a>> {
+fn build_filetree<'a>(
+    tree: &'a Dir,
+    statuses: Option<&HashMap<PathBuf, Status>>,
+) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
         let style = statuses
             .map(|statuses| {
                 statuses
-                    .iter()
-                    .find(|status| {
-                        status
-                            .path()
-                            .map(|path| PathBuf::from(format!("./{path}")) == item.path())
-                            // NOTE: Should this be handled differently?
-                            .unwrap_or(false)
-                    })
-                    .map_or(Style::default(), |status| {
-                        let status = status.status();
-                        match status {
-                            Status::WT_NEW => Style::default().fg(Color::Red),
-                            Status::WT_MODIFIED => Style::default().fg(Color::Blue),
-                            Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-                                Style::default().fg(Color::Green)
-                            }
-                            _ => Style::default(),
+                    .get(item.path())
+                    .map(|status| match *status {
+                        Status::WT_NEW => Style::default().fg(Color::Red),
+                        Status::WT_MODIFIED => Style::default().fg(Color::Blue),
+                        Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+                            Style::default().fg(Color::Green)
                         }
+                        _ => Style::default(),
                     })
+                    .unwrap_or(Style::default())
             })
-            // Default style for items, with no git
             .unwrap_or(Style::default());
         let tree_item = match item {
             Item::Dir(dir) => {
