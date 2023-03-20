@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use crossbeam_channel::unbounded;
+use log::{error, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     external_event,
@@ -21,6 +22,9 @@ use scopeguard::defer_on_success;
 use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
+    tui_logger::init_logger(LevelFilter::Info).unwrap();
+    tui_logger::set_default_level(LevelFilter::Trace);
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -66,15 +70,16 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
         } else {
             match event_recv.recv() {
                 Ok(event) => {
-                    app.handle_event(&event)?;
+                    if let Err(err) = app.handle_event(&event) {
+                        error!(" {}", err);
+                    }
                 }
                 Err(err) => bail!(err),
             }
         }
 
-        let event = app.update()?;
-        if let Some(event) = event {
-            match event {
+        match app.update() {
+            Ok(Some(event)) => match event {
                 TerminalEvent::OpenFile(path) => {
                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
                     Command::new(editor).arg(path).status()?;
@@ -82,7 +87,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                     execute!(stdout, EnterAlternateScreen)?;
                     terminal.clear()?;
                 }
+            },
+            Err(err) => {
+                error!(" {}", err);
             }
+            Ok(None) => {}
         }
         terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
 

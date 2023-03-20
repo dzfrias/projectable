@@ -8,6 +8,7 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use git2::{Repository, Status};
+use log::info;
 use std::collections::HashMap;
 use std::{
     cell::Cell,
@@ -227,7 +228,10 @@ impl Component for Filetree {
                     KeyCode::Char('/') if modifiers.is_empty() => self
                         .queue
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
-                    KeyCode::Char('\\') if modifiers.is_empty() => self.refresh()?,
+                    KeyCode::Char('\\') if modifiers.is_empty() => {
+                        info!(" rebuilt filetree");
+                        self.refresh()?;
+                    }
 
                     KeyCode::Enter if modifiers.is_empty() => match self.get_selected() {
                         Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),

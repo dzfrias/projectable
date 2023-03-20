@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use log::{info, warn};
 use rust_search::SearchBuilder;
 use std::{
     env,
@@ -19,9 +20,11 @@ use std::{
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
     widgets::{Block, Borders},
     Frame,
 };
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 /// Event that is sent back up to main.rs
 #[derive(Debug)]
@@ -61,23 +64,30 @@ impl App {
                 AppEvent::OpenPopup(operation) => self.pending.operation = operation,
                 AppEvent::DeleteFile(path) => {
                     if path.is_file() {
-                        fs::remove_file(path)?;
+                        fs::remove_file(&path)?;
+                        info!(" deleted file \"{}\"", path.display());
                     } else {
-                        fs::remove_dir_all(path)?;
+                        fs::remove_dir_all(&path)?;
+                        info!(" deleted directory \"{}\"", path.display());
                     }
                     self.tree.refresh()?;
                     self.queue.add(AppEvent::PreviewFile(
                         self.tree.get_selected().unwrap().path().to_owned(),
                     ));
                 }
-                AppEvent::OpenFile(path) => return Ok(Some(TerminalEvent::OpenFile(path))),
+                AppEvent::OpenFile(path) => {
+                    info!(" opening file \"{}\"", path.display());
+                    return Ok(Some(TerminalEvent::OpenFile(path)));
+                }
                 AppEvent::OpenInput(op) => self.input_box.operation = op,
                 AppEvent::NewFile(path) => {
-                    File::create(path)?;
+                    File::create(&path)?;
+                    info!(" created file \"{}\"", path.display());
                     self.tree.refresh()?;
                 }
                 AppEvent::NewDir(path) => {
-                    fs::create_dir(path)?;
+                    fs::create_dir(&path)?;
+                    info!(" created directory \"{}\"", path.display());
                     self.tree.refresh()?;
                 }
                 AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
@@ -85,25 +95,27 @@ impl App {
                 AppEvent::RunCommand(cmd) => {
                     if cfg!(target_os = "windows") {
                         let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
-                        // TODO: Make output actually do something
-                        dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                        info!("\n{}", String::from_utf8_lossy(&output.stdout));
                     } else {
                         let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
                             .arg("-c")
                             .arg(&cmd)
                             .output()?;
-                        // TODO: Make output actually do something
-                        dbg!(String::from_utf8_lossy(&output.stdout).to_string());
+                        info!("\n{}", String::from_utf8_lossy(&output.stdout));
                     }
                 }
                 AppEvent::SearchFiles(search) => {
+                    info!(" searching for: \"{}\"", search);
                     let results = SearchBuilder::default()
-                        .location(".")
+                        .location(&self.path)
                         .search_input(search)
                         .ignore_case()
                         .hidden()
                         .build()
                         .collect::<Vec<_>>();
+                    if results.is_empty() {
+                        warn!(" no files found when searching");
+                    }
                     self.tree.only_include(
                         results
                             .into_iter()
@@ -162,10 +174,21 @@ impl Drawable for App {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
             .split(main_layout[0]);
 
-        let block = Block::default().title("Block").borders(Borders::ALL);
+        let logger = TuiLoggerWidget::default()
+            .style_error(Style::default().fg(Color::Red))
+            .style_debug(Style::default().fg(Color::Green))
+            .style_warn(Style::default().fg(Color::Yellow))
+            .style_trace(Style::default().fg(Color::Magenta))
+            .style_info(Style::default().fg(Color::Cyan))
+            .output_level(Some(TuiLoggerLevelOutput::Long))
+            .output_target(false)
+            .output_file(false)
+            .output_line(false)
+            .block(Block::default().borders(Borders::ALL).title("Log"))
+            .state(&TuiWidgetState::new());
 
         self.tree.draw(f, left_hand_layout[0])?;
-        f.render_widget(block, left_hand_layout[1]);
+        f.render_widget(logger, left_hand_layout[1]);
         self.previewer.draw(f, main_layout[1])?;
         self.pending.draw(f, area)?;
         self.input_box.draw(f, area)?;
