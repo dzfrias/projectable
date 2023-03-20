@@ -142,25 +142,8 @@ impl Component for PreviewFile {
                     let num_lines = self.contents.lines().count();
                     if ((self.scrolls + BIG_SCROLL_AMOUNT) as usize) < num_lines {
                         self.scrolls += BIG_SCROLL_AMOUNT;
-                    }
-                }
-                KeyEvent {
-                    code: KeyCode::Char('K'),
-                    modifiers: KeyModifiers::SHIFT,
-                    ..
-                } => {
-                    if self.scrolls != 0 {
-                        self.scrolls -= 1;
-                    }
-                }
-                KeyEvent {
-                    code: KeyCode::Char('J'),
-                    modifiers: KeyModifiers::SHIFT,
-                    ..
-                } => {
-                    let num_lines = self.contents.lines().count();
-                    if ((self.scrolls + 1) as usize) < num_lines {
-                        self.scrolls += 1;
+                    } else {
+                        self.scrolls = num_lines as u16 - 1;
                     }
                 }
                 KeyEvent {
@@ -287,15 +270,12 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let up = input_event!(KeyCode::Char('K'); KeyModifiers::SHIFT);
         let big_up = input_event!(KeyCode::Char('u'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
             .preview_file(child.path())
             .expect("preview should work");
-        previewer.handle_event(&up).expect("should handle");
-        assert_eq!(0, previewer.scrolls);
         previewer.handle_event(&big_up).expect("should handle");
         assert_eq!(0, previewer.scrolls);
     }
@@ -310,15 +290,12 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let down = input_event!(KeyCode::Char('J'); KeyModifiers::SHIFT);
         let big_down = input_event!(KeyCode::Char('d'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
             .preview_file(child.path())
             .expect("preview should work");
-        previewer.handle_event(&down).expect("should handle");
-        assert_eq!(1, previewer.scrolls);
         previewer.handle_event(&big_down).expect("should handle");
         assert_eq!(1, previewer.scrolls);
     }
@@ -333,15 +310,12 @@ mod tests {
             .write_str(&format!("line{}another", LINE_ENDING))
             .unwrap();
 
-        let down = input_event!(KeyCode::Char('J'); KeyModifiers::SHIFT);
         let big_up = input_event!(KeyCode::Char('u'); KeyModifiers::CONTROL);
 
         let mut previewer = PreviewFile::default();
         previewer
             .preview_file(child.path())
             .expect("preview should work");
-        previewer.handle_event(&down).expect("should handle");
-        assert_eq!(1, previewer.scrolls);
         previewer.handle_event(&big_up).expect("should handle");
         assert_eq!(0, previewer.scrolls);
     }
