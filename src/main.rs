@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use crossbeam_channel::{unbounded, TryRecvError};
+use crossbeam_channel::unbounded;
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     external_event,
@@ -49,16 +49,19 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
     external_event::fs_watch(app.path(), event_send.clone())?;
     external_event::crossterm_watch(event_send);
 
+    let mut first_run = true;
     loop {
-        match event_recv.try_recv() {
-            Ok(event) => {
-                app.handle_event(&event)?;
+        if first_run {
+            first_run = false;
+        } else {
+            match event_recv.recv() {
+                Ok(event) => {
+                    app.handle_event(&event)?;
+                }
+                Err(err) => bail!(err),
             }
-            Err(TryRecvError::Empty) => {}
-            Err(err) => bail!(err),
         }
 
-        terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
         let event = app.update()?;
         if let Some(event) = event {
             match event {
@@ -71,6 +74,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> 
                 }
             }
         }
+        terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
 
         if app.should_quit() {
             return Ok(());
