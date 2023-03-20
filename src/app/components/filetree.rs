@@ -45,8 +45,7 @@ impl Filetree {
             queue: queue.clone(),
             dir: tree,
             only_included: false,
-            // TODO: Eventually replace with "." when project root is passed in
-            repo: Repository::discover(path).ok(),
+            repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
         };
         tree.populate_status_cache();
