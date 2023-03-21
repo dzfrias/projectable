@@ -44,11 +44,13 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(path: impl AsRef<Path>, cwd: impl AsRef<Path>) -> Result<Self> {
         let queue = Queue::new();
+        let mut tree = Filetree::from_dir(&path, queue.clone())?;
+        tree.open_path(cwd)?;
         Ok(App {
             path: path.as_ref().to_path_buf(),
-            tree: Filetree::from_dir(&path, queue.clone())?,
+            tree,
             should_quit: false,
             pending: PendingPopup::new(queue.clone()),
             input_box: InputBox::new(queue.clone()),

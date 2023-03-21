@@ -127,6 +127,34 @@ impl Dir {
         Some(item)
     }
 
+    pub fn location_by_path(&self, path: impl AsRef<Path>) -> Option<Vec<usize>> {
+        if path.as_ref() == self.path() {
+            return Some(Vec::new());
+        }
+
+        let idx = self
+            .children
+            .iter()
+            .position(|item| path.as_ref().starts_with(item.path()))?;
+        let mut item = self.child(idx).expect("index should be in dir");
+        let mut location = vec![idx];
+        while item.path() != path.as_ref() {
+            match item {
+                Item::Dir(dir) => {
+                    let idx = dir
+                        .children
+                        .iter()
+                        .position(|item| path.as_ref().starts_with(item.path()))?;
+                    item = dir.child(idx).expect("index should be in dir");
+                    location.push(idx);
+                }
+                Item::File(_) => unreachable!("should not be possible"),
+            }
+        }
+
+        Some(location)
+    }
+
     pub fn child(&self, index: usize) -> Option<&Item> {
         self.children.get(index)
     }
@@ -431,6 +459,42 @@ mod tests {
         assert_eq!(
             path.join("test/keep/keep.txt"),
             dir.nested_child(&[0, 0, 0]).unwrap().path()
+        )
+    }
+
+    #[test]
+    fn can_get_location_by_path() {
+        let temp = temp_files!("test/test/test.txt", "test.txt", "test2/testing.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path()).build().unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(
+            Some(vec![0, 0, 0]),
+            dir.location_by_path(path.join("test/test/test.txt"))
+        )
+    }
+
+    #[test]
+    fn location_by_path_returns_empty_when_root_path_is_given() {
+        let temp = temp_files!();
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path()).build().unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(Some(Vec::new()), dir.location_by_path(path))
+    }
+
+    #[test]
+    fn location_by_path_returns_dir_when_locating_dir() {
+        let temp = temp_files!("test/test/test.txt");
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path()).build().unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(
+            Some(vec![0, 0]),
+            dir.location_by_path(path.join("test/test"))
         )
     }
 }

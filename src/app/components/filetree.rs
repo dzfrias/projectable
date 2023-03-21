@@ -5,7 +5,7 @@ use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use git2::{Repository, Status};
 use log::info;
@@ -101,6 +101,27 @@ impl Filetree {
                     .collect::<HashMap<PathBuf, Status>>()
             })
         });
+    }
+
+    pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        let mut location = self
+            .dir
+            .location_by_path(path)
+            .ok_or(anyhow!("path not found"))?;
+        if location.is_empty() {
+            return Ok(());
+        }
+        self.state.get_mut().select(location.as_ref());
+        while !location.is_empty() {
+            let next_location = location
+                .split_last()
+                .expect("location should not be empty")
+                .1
+                .to_vec();
+            self.state.get_mut().open(location);
+            location = next_location;
+        }
+        Ok(())
     }
 
     fn current_is_open(&mut self) -> bool {
@@ -553,5 +574,16 @@ mod tests {
             .handle_event(&slash)
             .expect("should be able to handle event");
         assert!(filetree.queue.contains(&AppEvent::TogglePreviewMode));
+    }
+
+    #[test]
+    fn can_open_path() {
+        let temp = temp_files!("test/test.txt");
+        let path = temp.path().to_owned();
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert!(filetree.open_path(path.join("test")).is_ok());
+        assert_eq!(1, filetree.state.get_mut().get_all_opened().len())
     }
 }

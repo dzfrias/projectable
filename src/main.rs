@@ -43,7 +43,7 @@ fn main() -> Result<()> {
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
-    let mut app = App::new(root)?;
+    let mut app = App::new(root, env::current_dir()?)?;
     run_app(&mut terminal, &mut app)?;
 
     Ok(())
