@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn can_get_location_by_path() {
-        let temp = temp_files!("test/test/test.txt", "test.txt", "test2/testing.txt");
+        let temp = temp_files!("test/test/test.txt");
         let path = temp.path().to_owned();
         let dir = DirBuilder::new(temp.path()).build().unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
