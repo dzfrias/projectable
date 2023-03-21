@@ -22,9 +22,9 @@ dependencies = [
 
 [[package]]
 name = "ansi-to-tui"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19422bfc8b16c2f3cac6f485cdbfe7de50ec97d61e1554efc58766824ff13d02"
+checksum = "157b8ef4c7fba7b84d87853fae0de026f1856e69dbf8b8247fd6c526a4b78350"
 dependencies = [
  "nom",
  "thiserror",

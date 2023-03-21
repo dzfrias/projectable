@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ansi-to-tui = "2.0.1"
+ansi-to-tui = "2.0.2"
 anyhow = "1.0.69"
 crossbeam-channel = "0.5.7"
 crossterm = "0.25"

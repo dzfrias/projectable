@@ -171,7 +171,7 @@ impl Drawable for PreviewFile {
             cache
         } else {
             // Remove bold modifier, it was causing problems
-            self.contents.replace("[1m", "").into_text()?
+            self.contents.into_text()?
         };
         self.cache.set(Some(text.clone()));
 
