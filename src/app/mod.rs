@@ -40,6 +40,7 @@ pub struct App {
     pending: PendingPopup,
     input_box: InputBox,
     previewer: PreviewFile,
+    text_popup: Popup,
 }
 
 impl App {
@@ -52,6 +53,7 @@ impl App {
             pending: PendingPopup::new(queue.clone()),
             input_box: InputBox::new(queue.clone()),
             previewer: PreviewFile::default(),
+            text_popup: Popup::default(),
             queue,
         })
     }
@@ -130,8 +132,9 @@ impl App {
     }
 
     pub fn handle_event(&mut self, ev: &ExternalEvent) -> Result<()> {
-        let popup_open = self.pending.visible() || self.input_box.visible();
-        // Do not give the Filetree focus if there are any popups open
+        let popup_open =
+            self.pending.visible() || self.input_box.visible() || self.text_popup.visible();
+        // Do not give the Filetree or previewer focus if there are any popups open
         self.tree.focus(!popup_open);
         self.previewer.focus(!popup_open);
 
@@ -139,16 +142,17 @@ impl App {
         self.input_box.handle_event(ev)?;
         self.tree.handle_event(ev)?;
         self.previewer.handle_event(ev)?;
+        self.text_popup.handle_event(ev)?;
 
         if popup_open {
             return Ok(());
         }
-        match ev {
-            ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) => match code {
+        if let ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) = ev {
+            match code {
                 KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
+                KeyCode::Char('?') => self.text_popup.preset = Preset::Help,
                 _ => {}
-            },
-            _ => {}
+            }
         }
         Ok(())
     }
@@ -192,6 +196,7 @@ impl Drawable for App {
         self.previewer.draw(f, main_layout[1])?;
         self.pending.draw(f, area)?;
         self.input_box.draw(f, area)?;
+        self.text_popup.draw(f, area)?;
 
         Ok(())
     }
