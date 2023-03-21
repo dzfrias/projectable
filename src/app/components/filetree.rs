@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use git2::{Repository, Status};
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::{
     cell::Cell,
@@ -245,12 +245,19 @@ impl Component for Filetree {
                     KeyCode::Char('t') if modifiers.is_empty() => {
                         self.queue.add(AppEvent::TogglePreviewMode)
                     }
-
+                    KeyCode::Char('T') if *modifiers == KeyModifiers::SHIFT => {
+                        if let Some(cache) = self.status_cache.as_ref() {
+                            info!(" filtered for modified files");
+                            self.only_include(cache.keys().cloned().collect())?;
+                        } else {
+                            warn!(" no git status to filter for");
+                        };
+                    }
                     KeyCode::Char('/') if modifiers.is_empty() => self
                         .queue
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
                     KeyCode::Char('\\') if modifiers.is_empty() => {
-                        info!(" rebuilt filetree");
+                        info!(" refreshed filetree");
                         self.refresh()?;
                     }
 

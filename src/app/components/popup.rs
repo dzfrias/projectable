@@ -97,6 +97,7 @@ impl Drawable for Popup {
                     ("Ctrl-d", "Preview down"),
                     ("Ctrl-u", "Preview up"),
                     ("t", "Toggle diff view"),
+                    ("T", "Filter for files with new git changes"),
                     ("e", "Execute command"),
                 ];
                 let longest_key_len = keybinds
