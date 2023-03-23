@@ -1,7 +1,7 @@
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Result};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use std::{cell::Cell, env, path::Path, process::Command};
+use crossterm::event::Event;
+use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -12,6 +12,7 @@ use tui::{
 
 use crate::{
     app::component::{Component, Drawable},
+    config::Config,
     external_event::ExternalEvent,
 };
 
@@ -23,48 +24,61 @@ enum Mode {
 }
 
 pub struct PreviewFile {
-    pub preview_command: String,
-    pub diff_command: String,
+    git_cmd: String,
     mode: Mode,
     contents: String,
     scrolls: u16,
     focused: bool,
     cache: Cell<Option<Text<'static>>>,
+    config: Rc<Config>,
 }
 
 impl Default for PreviewFile {
     fn default() -> Self {
         Self {
-            preview_command: if cfg!(target_os = "windows") {
-                "type {}".to_owned()
-            } else {
-                "cat {}".to_owned()
-            },
-            diff_command: "git diff {}".to_owned(),
             contents: String::new(),
             scrolls: 0,
             focused: true,
             cache: None.into(),
             mode: Mode::default(),
+            config: Rc::new(Config::default()),
+            git_cmd: "git diff {}".to_owned(),
         }
     }
 }
 
 impl PreviewFile {
-    pub fn new(preview_command: String, diff_command: String) -> Self {
+    pub fn new() -> Self {
         Self {
             contents: String::new(),
-            preview_command,
-            diff_command,
             scrolls: 0,
             focused: true,
             cache: None.into(),
             mode: Mode::default(),
+            config: Rc::new(Config::default()),
+            git_cmd: "git diff {}".to_owned(),
+        }
+    }
+
+    pub fn with_config(config: Rc<Config>) -> Self {
+        Self {
+            contents: String::new(),
+            scrolls: 0,
+            focused: true,
+            cache: None.into(),
+            mode: Mode::default(),
+            config: Rc::clone(&config),
+            git_cmd: config
+                .preview
+                .git_pager
+                .as_ref()
+                .map(|cmd| format!("git diff {{}} | {}", cmd))
+                .unwrap_or("git diff {}".to_owned()),
         }
     }
 
     pub fn preview_file(&mut self, file: impl AsRef<Path>) -> Result<()> {
-        if self.preview_command.is_empty() || self.diff_command.is_empty() {
+        if self.config.preview.preview_cmd.is_empty() || self.git_cmd.is_empty() {
             bail!("should have command");
         }
         self.scrolls = 0;
@@ -78,9 +92,9 @@ impl PreviewFile {
             };
 
             if self.mode == Mode::Preview {
-                self.preview_command.replace("{}", &replacement)
+                self.config.preview.preview_cmd.replace("{}", &replacement)
             } else {
-                self.diff_command.replace("{}", &replacement)
+                self.git_cmd.replace("{}", &replacement)
             }
         };
         self.contents = if cfg!(target_os = "windows") {
@@ -133,31 +147,19 @@ impl Component for PreviewFile {
 
         const BIG_SCROLL_AMOUNT: u16 = 10;
         if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
-            match key {
-                KeyEvent {
-                    code: KeyCode::Char('d'),
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                } => {
-                    let num_lines = self.contents.lines().count();
-                    if ((self.scrolls + BIG_SCROLL_AMOUNT) as usize) < num_lines {
-                        self.scrolls += BIG_SCROLL_AMOUNT;
-                    } else {
-                        self.scrolls = num_lines as u16 - 1;
-                    }
+            if self.config.preview.down_key == key {
+                let num_lines = self.contents.lines().count();
+                if ((self.scrolls + BIG_SCROLL_AMOUNT) as usize) < num_lines {
+                    self.scrolls += BIG_SCROLL_AMOUNT;
+                } else {
+                    self.scrolls = num_lines as u16 - 1;
                 }
-                KeyEvent {
-                    code: KeyCode::Char('u'),
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                } => {
-                    if self.scrolls >= BIG_SCROLL_AMOUNT {
-                        self.scrolls -= BIG_SCROLL_AMOUNT;
-                    } else {
-                        self.scrolls = 0;
-                    }
+            } else if self.config.preview.up_key == key {
+                if self.scrolls >= BIG_SCROLL_AMOUNT {
+                    self.scrolls -= BIG_SCROLL_AMOUNT;
+                } else {
+                    self.scrolls = 0;
                 }
-                _ => {}
             }
         }
 
@@ -176,7 +178,11 @@ impl Drawable for PreviewFile {
         self.cache.set(Some(text.clone()));
 
         let paragraph = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(self.config.preview.border_color.into()),
+            )
             .scroll((self.scrolls, 0));
         f.render_widget(paragraph, area);
 
@@ -227,9 +233,15 @@ mod tests {
             .write_str("should be previewed")
             .unwrap();
 
-        let mut previewer = PreviewFile::new(String::new(), "test".to_owned());
+        let mut config = Config::default();
+        config.preview.preview_cmd = String::new();
+        config.preview.git_pager = Some("test".to_owned());
+        let mut previewer = PreviewFile::with_config(Rc::new(config));
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_err());
-        let mut previewer = PreviewFile::new("test".to_owned(), String::new());
+        let mut config = Config::default();
+        config.preview.preview_cmd = String::new();
+        config.preview.git_pager = Some("test".to_owned());
+        let mut previewer = PreviewFile::with_config(Rc::new(config));
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_err());
     }
 
@@ -240,10 +252,9 @@ mod tests {
             .child("test.txt")
             .write_str("should be previewed")
             .unwrap();
-        let mut previewer = PreviewFile::new(
-            preview_default().strip_suffix(" {}").unwrap().to_owned(),
-            "nothing".to_owned(),
-        );
+        let mut config = Config::default();
+        config.preview.preview_cmd = preview_default().strip_suffix(" {}").unwrap().to_owned();
+        let mut previewer = PreviewFile::with_config(Rc::new(config));
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_ok());
     }
 

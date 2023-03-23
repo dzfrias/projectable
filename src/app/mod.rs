@@ -4,11 +4,13 @@ mod components;
 use self::component::{Component, Drawable};
 pub use self::components::*;
 use crate::{
+    config::Config,
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
+    switch,
 };
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::Event;
 use log::{info, warn};
 use rust_search::SearchBuilder;
 use std::{
@@ -16,6 +18,7 @@ use std::{
     fs::{self, File},
     path::{Path, PathBuf},
     process::Command,
+    rc::Rc,
 };
 use tui::{
     backend::Backend,
@@ -41,12 +44,13 @@ pub struct App {
     input_box: InputBox,
     previewer: PreviewFile,
     text_popup: Popup,
+    config: Rc<Config>,
 }
 
 impl App {
-    pub fn new(path: impl AsRef<Path>, cwd: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(path: impl AsRef<Path>, cwd: impl AsRef<Path>, config: Rc<Config>) -> Result<Self> {
         let queue = Queue::new();
-        let mut tree = Filetree::from_dir(&path, queue.clone())?;
+        let mut tree = Filetree::from_dir_with_config(&path, queue.clone(), Rc::clone(&config))?;
         tree.open_path(cwd)?;
         Ok(App {
             path: path.as_ref().to_path_buf(),
@@ -54,8 +58,9 @@ impl App {
             should_quit: false,
             pending: PendingPopup::new(queue.clone()),
             input_box: InputBox::new(queue.clone()),
-            previewer: PreviewFile::default(),
+            previewer: PreviewFile::with_config(Rc::clone(&config)),
             text_popup: Popup::default(),
+            config: Rc::clone(&config),
             queue,
         })
     }
@@ -149,11 +154,10 @@ impl App {
         if popup_open {
             return Ok(());
         }
-        if let ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) = ev {
-            match code {
-                KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-                KeyCode::Char('?') => self.text_popup.preset = Preset::Help,
-                _ => {}
+        if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
+            switch! { key;
+                self.config.quit => self.should_quit = true,
+                self.config.help => self.text_popup.preset = Preset::Help,
             }
         }
         Ok(())

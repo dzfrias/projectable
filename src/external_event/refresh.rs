@@ -6,12 +6,10 @@ use anyhow::Result;
 use notify::RecursiveMode;
 
 /// Watch for changes to the filesystem at `path`, sending results to `event_sender`
-pub fn fs_watch(path: &Path, event_sender: Sender<ExternalEvent>) -> Result<()> {
-    const REFRESH_TIME_SECS: u64 = 1;
-
+pub fn fs_watch(path: &Path, event_sender: Sender<ExternalEvent>, refresh_time: u64) -> Result<()> {
     let (tx, rx) = unbounded();
     let mut bouncer =
-        notify_debouncer_mini::new_debouncer(Duration::from_secs(REFRESH_TIME_SECS), None, tx)?;
+        notify_debouncer_mini::new_debouncer(Duration::from_millis(refresh_time), None, tx)?;
     bouncer.watcher().watch(path, RecursiveMode::Recursive)?;
     std::mem::forget(bouncer);
 

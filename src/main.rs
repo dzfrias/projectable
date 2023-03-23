@@ -3,6 +3,7 @@ use crossbeam_channel::unbounded;
 use log::{error, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
+    config::{self, Config},
     external_event,
 };
 use std::{
@@ -11,6 +12,7 @@ use std::{
     panic,
     path::PathBuf,
     process::Command,
+    rc::Rc,
 };
 
 use crossterm::{
@@ -41,10 +43,22 @@ fn main() -> Result<()> {
         eprintln!("please report this issue on GitHub");
     }));
 
+    let config = Rc::new(
+        config::get_config_home()
+            .map(|path| -> Result<Option<Config>> {
+                if !path.join("config.toml").exists() {
+                    return Ok(None);
+                }
+                let contents = fs::read_to_string(path.join("config.toml"))?;
+                Ok(Some(toml::from_str::<Config>(&contents)?))
+            })
+            .unwrap_or(Ok(Some(Config::default())))?
+            .unwrap_or(Config::default()),
+    );
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
-    let mut app = App::new(root, env::current_dir()?)?;
-    run_app(&mut terminal, &mut app)?;
+    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config))?;
+    run_app(&mut terminal, &mut app, Rc::clone(&config))?;
 
     Ok(())
 }
@@ -57,10 +71,14 @@ fn find_project_root() -> Option<PathBuf> {
         .map(|path| path.to_path_buf())
 }
 
-fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut App) -> Result<()> {
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    app: &mut App,
+    config: Rc<Config>,
+) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = unbounded();
-    external_event::fs_watch(app.path(), event_send.clone())?;
+    external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
     external_event::crossterm_watch(event_send);
 
     let mut first_run = true;

@@ -1,23 +1,25 @@
-use super::{InputOperation, PendingOperation};
-use crate::app::component::{Component, Drawable};
-use crate::dir::*;
 use crate::{
+    app::{component::*, InputOperation, PendingOperation},
+    config::Config,
+    dir::*,
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
+    switch,
 };
 use anyhow::{anyhow, Result};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::Event;
 use git2::{Repository, Status};
 use log::{info, warn};
-use std::collections::HashMap;
 use std::{
     cell::Cell,
+    collections::HashMap,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::Style,
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
@@ -32,6 +34,7 @@ pub struct Filetree {
     only_included: bool,
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
+    config: Rc<Config>,
 }
 
 impl Filetree {
@@ -48,6 +51,7 @@ impl Filetree {
             only_included: false,
             repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
+            config: Rc::new(Config::default()),
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -56,8 +60,27 @@ impl Filetree {
         Ok(tree)
     }
 
+    pub fn from_dir_with_config(
+        path: impl AsRef<Path>,
+        queue: Queue,
+        config: Rc<Config>,
+    ) -> Result<Self> {
+        Ok(Filetree {
+            repo: if config.filetree.use_git {
+                Repository::open(path.as_ref().join(".git")).ok()
+            } else {
+                None
+            },
+            config: Rc::clone(&config),
+            ..Self::from_dir(path, queue)?
+        })
+    }
+
     pub fn refresh(&mut self) -> Result<()> {
-        let tree = DirBuilder::new(&self.root_path).dirs_first(true).build()?;
+        let tree = DirBuilder::new(&self.root_path)
+            .dirs_first(true)
+            .ignore(self.config.filetree.ignore.clone())
+            .build()?;
         self.dir = tree;
         self.only_included = false;
         self.populate_status_cache();
@@ -138,7 +161,11 @@ impl Filetree {
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let items = build_filetree(&self.dir, self.status_cache.as_ref());
+        let items = build_filetree(
+            &self.dir,
+            self.status_cache.as_ref(),
+            Rc::clone(&self.config),
+        );
         let mut state = self.state.take();
 
         if self.only_included {
@@ -150,21 +177,26 @@ impl Drawable for Filetree {
                 ])
                 .margin(1)
                 .split(area);
-            let block = Block::default().borders(Borders::ALL);
-            let tree = Tree::new(items)
-                .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(self.config.filetree.border_color.into());
+            let tree = Tree::new(items).highlight_style(self.config.filetree.selected.into());
             let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
                 .alignment(Alignment::Center)
                 .wrap(Wrap { trim: true })
-                .style(Style::default().fg(Color::Yellow));
+                .style(self.config.filetree.filtered_out_message.into());
 
             f.render_widget(block, area);
             f.render_widget(p, layout[0]);
             f.render_stateful_widget(tree, layout[2], &mut state);
         } else {
             let tree = Tree::new(items)
-                .block(Block::default().borders(Borders::ALL))
-                .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(self.config.filetree.border_color.into()),
+                )
+                .highlight_style(self.config.filetree.selected.into());
             f.render_stateful_widget(tree, area, &mut state);
         }
 
@@ -191,106 +223,87 @@ impl Component for Filetree {
             return Ok(());
         }
 
-        let items = build_filetree(&self.dir, None);
+        let items = build_filetree(&self.dir, None, Rc::clone(&self.config));
 
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
             ExternalEvent::RefreshFiletree => self.refresh()?,
-            ExternalEvent::Crossterm(Event::Key(KeyEvent {
-                code, modifiers, ..
-            })) => {
+            ExternalEvent::Crossterm(Event::Key(key)) => {
                 let mut refresh_preview = true;
-                match code {
-                    KeyCode::Char('g') if modifiers.is_empty() => {
-                        self.state.get_mut().select_first()
-                    }
-                    KeyCode::Char('G') if *modifiers == KeyModifiers::SHIFT => {
-                        self.state.get_mut().select_last(&items)
-                    }
-                    KeyCode::Char('j') if modifiers.is_empty() && !items.is_empty() => {
-                        self.state.get_mut().key_down(&items)
-                    }
-                    KeyCode::Char('k') if modifiers.is_empty() && !items.is_empty() => {
-                        self.state.get_mut().key_up(&items)
-                    }
-                    KeyCode::Char('n')
-                        if *modifiers == KeyModifiers::CONTROL && !items.is_empty() =>
-                    {
+                let not_empty = !items.is_empty();
+                switch! { key;
+                    self.config.filetree.all_up => self.state.get_mut().select_first(),
+                    self.config.filetree.all_down => self.state.get_mut().select_last(&items),
+                    self.config.filetree.down, not_empty => self.state.get_mut().key_down(&items),
+                    self.config.filetree.up, not_empty => self.state.get_mut().key_up(&items),
+                    self.config.filetree.down_three, not_empty => {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_down(&items);
                         }
-                    }
-                    KeyCode::Char('p')
-                        if *modifiers == KeyModifiers::CONTROL && !items.is_empty() =>
-                    {
+                    },
+                    self.config.filetree.up_three, not_empty => {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_up(&items);
                         }
-                    }
-                    KeyCode::Char('e') if modifiers.is_empty() => {
+                    },
+                    self.config.filetree.exec_cmd, not_empty => {
                         if let Some(item) = self.get_selected() {
-                            self.queue.add(AppEvent::OpenInput(InputOperation::Command {
-                                to: item.path().to_path_buf(),
-                            }))
-                        }
-                    }
-                    KeyCode::Char('d') if modifiers.is_empty() => {
+                             self.queue.add(AppEvent::OpenInput(InputOperation::Command {
+                                 to: item.path().to_path_buf(),
+                             }));
+                         }
+                    },
+                    self.config.filetree.delete => {
                         if let Some(item) = self.get_selected() {
                             self.queue
                                 .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
                                     item.path().to_path_buf(),
-                                )))
+                            )));
                         }
-                    }
-                    KeyCode::Char('t') if modifiers.is_empty() => {
-                        self.queue.add(AppEvent::TogglePreviewMode)
-                    }
-                    KeyCode::Char('T') if *modifiers == KeyModifiers::SHIFT => {
+                    },
+                    self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
+                    self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
                             info!(" filtered for modified files");
                             self.only_include(cache.keys().cloned().collect())?;
                         } else {
                             warn!(" no git status to filter for");
-                        };
-                    }
-                    KeyCode::Char('/') if modifiers.is_empty() => self
+                        }
+                    },
+                    self.config.filetree.search => self
                         .queue
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
-                    KeyCode::Char('\\') if modifiers.is_empty() => {
+                    self.config.filetree.clear => {
                         info!(" refreshed filetree");
                         self.refresh()?;
-                    }
-
-                    KeyCode::Enter if modifiers.is_empty() => match self.get_selected() {
+                    },
+                    self.config.filetree.open => match self.get_selected() {
                         Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),
                         Some(Item::File(file)) => self
                             .queue
                             .add(AppEvent::OpenFile(file.path().to_path_buf())),
                         None => {}
                     },
-                    KeyCode::Char(key)
-                        if (*key == 'n' && modifiers.is_empty())
-                            || (*key == 'N' && *modifiers == KeyModifiers::SHIFT) =>
-                    {
+                    self.config.filetree.new_file => {
                         let opened = self.current_is_open();
                         let add_path = match self.get_selected() {
-                            // Create new as a child of current selected directory
                             Some(Item::Dir(dir)) if opened => dir.path(),
-                            // Create new as a sibling of selected item
                             Some(item) => item.path().parent().expect("item should have parent"),
                             None => return Ok(()),
                         };
-                        let event = if *key == 'n' {
-                            AppEvent::OpenInput(InputOperation::NewFile {
-                                at: add_path.to_path_buf(),
-                            })
-                        } else {
-                            AppEvent::OpenInput(InputOperation::NewDir {
-                                at: add_path.to_path_buf(),
-                            })
+                        self.queue
+                            .add(AppEvent::OpenInput(InputOperation::NewFile { at: add_path.to_path_buf() }));
+                    },
+                    self.config.filetree.new_dir => {
+                        let opened = self.current_is_open();
+                        let add_path = match self.get_selected() {
+                            Some(Item::Dir(dir)) if opened => dir.path(),
+                            Some(item) => item.path().parent().expect("item should have parent"),
+                            None => return Ok(()),
                         };
-                        self.queue.add(event);
-                    }
+                        self.queue
+                            .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
+                    },
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
@@ -320,6 +333,7 @@ fn last_of_path(path: impl AsRef<Path>) -> String {
 fn build_filetree<'a>(
     tree: &'a Dir,
     statuses: Option<&HashMap<PathBuf, Status>>,
+    config: Rc<Config>,
 ) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
@@ -328,10 +342,10 @@ fn build_filetree<'a>(
                 statuses
                     .get(item.path())
                     .map(|status| match *status {
-                        Status::WT_NEW => Style::default().fg(Color::Red),
-                        Status::WT_MODIFIED => Style::default().fg(Color::Blue),
+                        Status::WT_NEW => Style::from(config.filetree.git_new_style),
+                        Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
                         Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-                            Style::default().fg(Color::Green)
+                            Style::from(config.filetree.git_modified_style)
                         }
                         _ => Style::default(),
                     })
@@ -339,9 +353,11 @@ fn build_filetree<'a>(
             })
             .unwrap_or(Style::default());
         let tree_item = match item {
-            Item::Dir(dir) => {
-                TreeItem::new(last_of_path(dir.path()), build_filetree(dir, statuses)).style(style)
-            }
+            Item::Dir(dir) => TreeItem::new(
+                last_of_path(dir.path()),
+                build_filetree(dir, statuses, Rc::clone(&config)),
+            )
+            .style(style),
             Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
         };
         items.push(tree_item);
