@@ -420,3 +420,70 @@ impl<'de> Deserialize<'de> for Key {
         deserializer.deserialize_str(KeyVisitor)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyEventKind, KeyEventState};
+
+    #[test]
+    fn parse_rgb_from_color_string() {
+        let color = "rgb(1, 2, 3)";
+        assert_eq!(Color::Rgb(1, 2, 3), color.parse().unwrap());
+    }
+
+    #[test]
+    fn parsing_rgb_ignores_whitespace() {
+        let color = "  rgb     ( 1  , 3 , 10    )  ";
+        assert_eq!(Color::Rgb(1, 3, 10), color.parse().unwrap());
+    }
+
+    #[test]
+    fn get_config_home_gets_right_config_dir_on_all_platforms() {
+        #[cfg(target_os = "linux")]
+        let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
+        #[cfg(target_os = "windows")]
+        let correct_path = dirs_next::home_dir().unwrap().join("AppData/Roaming");
+        #[cfg(target_os = "macos")]
+        let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
+
+        assert_eq!(correct_path, get_config_home().unwrap())
+    }
+
+    #[test]
+    fn uses_env_var_for_config_home_if_set() {
+        env::set_var("PROJECTABLE_CONFIG_DIR", "path");
+
+        assert_eq!(
+            PathBuf::from("path/projectable"),
+            get_config_home().unwrap()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn use_xdg_config_home_on_mac() {
+        env::set_var("XDG_CONFIG_HOME", "path");
+
+        assert_eq!(
+            PathBuf::from("path/projectable"),
+            get_config_home().unwrap()
+        );
+    }
+
+    #[test]
+    fn comparing_key_event_and_key_properly_recognizes_uppercase() {
+        let key = Key {
+            code: KeyCode::Char('D'),
+            mods: KeyModifiers::empty(),
+        };
+        let key_event = KeyEvent {
+            code: KeyCode::Char('D'),
+            modifiers: KeyModifiers::SHIFT,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::empty(),
+        };
+
+        assert_eq!(key, key_event);
+    }
+}
