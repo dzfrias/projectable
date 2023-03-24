@@ -279,6 +279,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "easy_switch"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c71669f63bbb536f9ef3c7d4a24b257c4cda4f97d6df6f9ff28d2911abc0cd3f"
+
+[[package]]
 name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -854,6 +860,7 @@ dependencies = [
  "crossbeam-channel",
  "crossterm",
  "dirs-next",
+ "easy_switch",
  "git2",
  "log",
  "notify",

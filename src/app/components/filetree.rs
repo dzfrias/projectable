@@ -4,10 +4,10 @@ use crate::{
     dir::*,
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
-    switch,
 };
 use anyhow::{anyhow, Result};
 use crossterm::event::Event;
+use easy_switch::switch;
 use git2::{Repository, Status};
 use log::{info, warn};
 use std::{

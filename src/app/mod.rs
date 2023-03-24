@@ -7,10 +7,10 @@ use crate::{
     config::Config,
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
-    switch,
 };
 use anyhow::Result;
 use crossterm::event::Event;
+use easy_switch::switch;
 use log::{info, warn};
 use rust_search::SearchBuilder;
 use std::{
