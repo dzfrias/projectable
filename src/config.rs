@@ -443,7 +443,9 @@ mod tests {
         #[cfg(target_os = "linux")]
         let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
         #[cfg(target_os = "windows")]
-        let correct_path = dirs_next::home_dir().unwrap().join("AppData/Roaming");
+        let correct_path = dirs_next::home_dir()
+            .unwrap()
+            .join("AppData\\Roaming\\projectable");
         #[cfg(target_os = "macos")]
         let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
 
