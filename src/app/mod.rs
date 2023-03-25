@@ -80,7 +80,7 @@ impl App {
                         fs::remove_dir_all(&path)?;
                         info!(" deleted directory \"{}\"", path.display());
                     }
-                    self.tree.refresh()?;
+                    self.tree.partial_refresh(RefreshData::Delete(path))?;
                     self.queue.add(AppEvent::PreviewFile(
                         self.tree.get_selected().unwrap().path().to_owned(),
                     ));
@@ -93,12 +93,12 @@ impl App {
                 AppEvent::NewFile(path) => {
                     File::create(&path)?;
                     info!(" created file \"{}\"", path.display());
-                    self.tree.refresh()?;
+                    self.tree.partial_refresh(RefreshData::Add(path))?;
                 }
                 AppEvent::NewDir(path) => {
                     fs::create_dir(&path)?;
                     info!(" created directory \"{}\"", path.display());
-                    self.tree.refresh()?;
+                    self.tree.partial_refresh(RefreshData::Add(path))?;
                 }
                 AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),

@@ -26,6 +26,12 @@ use tui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RefreshData {
+    Delete(PathBuf),
+    Add(PathBuf),
+}
+
 pub struct Filetree {
     state: Cell<TreeState>,
     is_focused: bool,
@@ -92,6 +98,20 @@ impl Filetree {
         Ok(())
     }
 
+    pub fn partial_refresh(&mut self, refresh_data: RefreshData) -> Result<()> {
+        match refresh_data {
+            RefreshData::Delete(path) => drop(self.dir.remove(path)?),
+            RefreshData::Add(path) => self.dir.add(path)?,
+        }
+        self.populate_status_cache();
+
+        if self.get_selected().is_none() {
+            self.state.get_mut().select_first();
+        }
+
+        Ok(())
+    }
+
     pub fn get_selected(&self) -> Option<&Item> {
         let state = self.state.take();
         let item = self.dir.nested_child(&state.selected())?;
@@ -116,7 +136,7 @@ impl Filetree {
         Ok(())
     }
 
-    pub fn populate_status_cache(&mut self) {
+    fn populate_status_cache(&mut self) {
         self.status_cache = self.repo.as_ref().and_then(|repo| {
             repo.statuses(None).ok().map(|statuses| {
                 statuses

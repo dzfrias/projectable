@@ -1,10 +1,9 @@
+use anyhow::{anyhow, Result};
 use std::{
     fs::{self, File as FsFile},
     path::{Path, PathBuf},
     slice,
 };
-
-use anyhow::Result;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
@@ -96,6 +95,60 @@ impl Dir {
             Item::Dir(dir) => fs::remove_dir_all(dir.path())?,
         }
         Ok(item)
+    }
+
+    pub fn remove(&mut self, path: impl AsRef<Path>) -> Result<Item> {
+        let location = self
+            .location_by_path(path)
+            .ok_or(anyhow!("invalid remove target"))?;
+
+        if location.len() == 1 {
+            return Ok(self.children.remove(location[0]));
+        }
+
+        let item = if let Some((_, parent_loc)) = location.split_last() {
+            let Item::Dir(parent) = self
+                .nested_child_mut(parent_loc)
+                .expect("parent should exist") else { unreachable!() };
+            parent
+                .children
+                .remove(*location.last().expect("should have last item"))
+        } else {
+            panic!("cannot remove self");
+        };
+        Ok(item)
+    }
+
+    pub fn add(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        fn push_child(path: PathBuf, items: &mut Vec<Item>) {
+            if items.iter().any(|item| item.path() == path) {
+                return;
+            }
+            if path.is_dir() {
+                items.push(Item::Dir(Dir {
+                    path,
+                    children: Vec::new(),
+                }));
+            } else {
+                items.push(Item::File(File { path }));
+            }
+        }
+
+        let parent = path.as_ref().parent().unwrap();
+        if parent == self.path {
+            push_child(path.as_ref().to_path_buf(), &mut self.children);
+            return Ok(());
+        }
+
+        let location = self
+            .location_by_path(parent)
+            .ok_or(anyhow!("invalid remove target"))?;
+
+        let Item::Dir(parent) = self
+            .nested_child_mut(&location)
+            .expect("parent should exist") else { unreachable!() };
+        push_child(path.as_ref().to_path_buf(), &mut parent.children);
+        Ok(())
     }
 
     pub fn nested_child(&self, location: &[usize]) -> Option<&Item> {
