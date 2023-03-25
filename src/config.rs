@@ -1,6 +1,5 @@
 use anyhow::{anyhow, bail, Error};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use itertools::Itertools;
 use serde::{
     de::{self, Visitor},
     Deserialize,
@@ -229,11 +228,10 @@ impl FromStr for Color {
                     .ok_or(anyhow!(MESSAGE))?
                     .strip_suffix(')')
                     .ok_or(anyhow!(MESSAGE))?;
-                let [red, green, blue] = &string
-                    .split(',')
-                    .filter_map(|v| v.parse::<u8>().ok())
-                    .collect_vec()[..] else { bail!(MESSAGE) };
-                Self::Rgb(*red, *green, *blue)
+                let mut rgb_vec = Vec::with_capacity(3);
+                rgb_vec.extend(string.split(',').filter_map(|v| v.parse::<u8>().ok()));
+                let [red, green, blue] = rgb_vec[..] else { bail!(MESSAGE) };
+                Self::Rgb(red, green, blue)
             }
         })
     }
@@ -357,15 +355,10 @@ impl<'de> Visitor<'de> for KeyVisitor {
                 KeyCode::Char(k.chars().next().expect("should have at least on char"))
             }
         };
-        let mods = split.fold(Ok(KeyModifiers::NONE), |acc, modifier| {
-            let Ok(acc) = acc else {
-                return Err(E::custom("invalid modifier"));
-            };
-            match modifier {
-                "ctrl" => Ok(acc | KeyModifiers::CONTROL),
-                "alt" => Ok(acc | KeyModifiers::ALT),
-                _ => Err(E::custom("invalid modifier")),
-            }
+        let mods = split.try_fold(KeyModifiers::NONE, |acc, modifier| match modifier {
+            "ctrl" => Ok(acc | KeyModifiers::CONTROL),
+            "alt" => Ok(acc | KeyModifiers::ALT),
+            _ => Err(E::custom("invalid modifier")),
         })?;
 
         Ok(Key { code, mods })
