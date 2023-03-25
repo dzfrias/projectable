@@ -74,6 +74,10 @@ impl InputBox {
         self.cursor_offset -= 1;
     }
 
+    fn cursor_pos(&self) -> usize {
+        self.text.len() - self.cursor_offset as usize
+    }
+
     fn has_valid_input(&self) -> Option<bool> {
         if self.text.is_empty() {
             return Some(false);
@@ -140,16 +144,18 @@ impl Component for InputBox {
                     key: Key::Char('u'),
                     ctrl: true,
                     ..
-                } => self.text.clear(),
+                } => drop(self.text.drain(..self.cursor_pos())),
                 Input {
                     key: Key::Delete | Key::Backspace,
                     ..
-                } => drop(self.text.pop()),
+                } if self.text.len() as u32 > self.cursor_offset => {
+                    self.text
+                        .remove((self.text.len() - self.cursor_offset as usize) - 1);
+                }
                 Input {
                     key: Key::Char(k), ..
-                } => {
-                    self.text.push(k);
-                }
+                } => self.text.insert(self.cursor_pos(), k),
+
                 _ => {}
             }
         }
@@ -381,5 +387,41 @@ mod tests {
             AppEvent::RunCommand("testing /".to_owned()),
             input_box.queue.pop().unwrap()
         );
+    }
+
+    #[test]
+    fn deletes_where_cursor_is() {
+        let mut input_box = InputBox::default();
+        input_box.text = "testing".to_owned();
+        input_box.operation = InputOperation::Command { to: "/".into() };
+
+        let events = input_events!(KeyCode::Left, KeyCode::Delete);
+        input_box.handle_event(&events[0]).unwrap();
+        input_box.handle_event(&events[1]).unwrap();
+        assert_eq!("testig".to_owned(), input_box.text);
+    }
+
+    #[test]
+    fn inserts_where_cursor_is() {
+        let mut input_box = InputBox::default();
+        input_box.text = "testing".to_owned();
+        input_box.operation = InputOperation::Command { to: "/".into() };
+
+        let events = input_events!(KeyCode::Left, KeyCode::Char('n'));
+        input_box.handle_event(&events[0]).unwrap();
+        input_box.handle_event(&events[1]).unwrap();
+        assert_eq!("testinng".to_owned(), input_box.text);
+    }
+
+    #[test]
+    fn deletes_line_where_cursor_is() {
+        let mut input_box = InputBox::default();
+        input_box.text = "testing".to_owned();
+        input_box.operation = InputOperation::Command { to: "/".into() };
+
+        let events = input_events!(KeyCode::Left, KeyCode::Char('u'); KeyModifiers::CONTROL);
+        input_box.handle_event(&events[0]).unwrap();
+        input_box.handle_event(&events[1]).unwrap();
+        assert_eq!("g".to_owned(), input_box.text);
     }
 }
