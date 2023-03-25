@@ -39,8 +39,10 @@ fn main() -> Result<()> {
 
     panic::set_hook(Box::new(|info| {
         shut_down();
-        eprintln!("panicked: {info}");
-        eprintln!("please report this issue on GitHub");
+        let meta = human_panic::metadata!();
+        let file_path = human_panic::handle_dump(&meta, info);
+        human_panic::print_msg(file_path, &meta)
+            .expect("human-panic: printing error message to console failed");
     }));
 
     let config = Rc::new(
