@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Error};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use itertools::Itertools;
 use serde::{
     de::{self, Visitor},
     Deserialize,
@@ -231,7 +232,7 @@ impl FromStr for Color {
                 let [red, green, blue] = &string
                     .split(',')
                     .filter_map(|v| v.parse::<u8>().ok())
-                    .collect::<Vec<u8>>()[..] else { bail!(MESSAGE) };
+                    .collect_vec()[..] else { bail!(MESSAGE) };
                 Self::Rgb(*red, *green, *blue)
             }
         })

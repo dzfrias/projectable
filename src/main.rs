@@ -67,8 +67,7 @@ fn find_project_root() -> Option<PathBuf> {
     let start = fs::canonicalize(".").expect("should be valid path");
     start
         .ancestors()
-        .find(|path| path.join(".git").is_dir())
-        .map(|path| path.to_path_buf())
+        .find_map(|path| path.join(".git").is_dir().then(|| path.to_path_buf()))
 }
 
 fn run_app(

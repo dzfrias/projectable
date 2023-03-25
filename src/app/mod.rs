@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::Event;
 use easy_switch::switch;
+use itertools::Itertools;
 use log::{info, warn};
 use rust_search::SearchBuilder;
 use std::{
@@ -121,16 +122,12 @@ impl App {
                         .ignore_case()
                         .hidden()
                         .build()
-                        .collect::<Vec<_>>();
+                        .map_into()
+                        .collect_vec();
                     if results.is_empty() {
                         warn!(" no files found when searching");
                     }
-                    self.tree.only_include(
-                        results
-                            .into_iter()
-                            .map(|path| path.into())
-                            .collect::<Vec<_>>(),
-                    )?;
+                    self.tree.only_include(results.as_ref())?;
                 }
             }
         }

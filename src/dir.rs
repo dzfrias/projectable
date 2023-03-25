@@ -33,18 +33,18 @@ pub struct Dir {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct DirBuilder {
-    path: PathBuf,
-    ignore: Vec<PathBuf>,
+pub struct DirBuilder<'a> {
+    path: &'a Path,
+    ignore: &'a [PathBuf],
     dirs_first: bool,
-    only_include: Option<Vec<PathBuf>>,
+    only_include: Option<&'a [PathBuf]>,
 }
 
-impl DirBuilder {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+impl<'a> DirBuilder<'a> {
+    pub fn new(path: &'a Path) -> Self {
         DirBuilder {
-            path: path.as_ref().to_path_buf(),
-            ignore: Vec::new(),
+            path,
+            ignore: &[],
             dirs_first: false,
             only_include: None,
         }
@@ -55,23 +55,18 @@ impl DirBuilder {
         self
     }
 
-    pub fn ignore(mut self, ignore: Vec<PathBuf>) -> Self {
+    pub fn ignore(mut self, ignore: &'a [PathBuf]) -> Self {
         self.ignore = ignore;
         self
     }
 
-    pub fn only_include(mut self, only_include: Vec<PathBuf>) -> Self {
+    pub fn only_include(mut self, only_include: &'a [PathBuf]) -> Self {
         self.only_include = Some(only_include);
         self
     }
 
     pub fn build(self) -> Result<Dir> {
-        let dir = build_tree(
-            self.path,
-            &self.ignore,
-            self.dirs_first,
-            self.only_include.as_deref(),
-        )?;
+        let dir = build_tree(self.path, self.ignore, self.dirs_first, self.only_include)?;
         Ok(dir)
     }
 }
@@ -387,7 +382,7 @@ mod tests {
     fn dir_can_ignore() {
         let temp = temp_files!("test.txt", "ignore.txt");
         let dir = DirBuilder::new(temp.path())
-            .ignore(vec![temp.path().join("ignore.txt")])
+            .ignore(&[temp.path().join("ignore.txt")])
             .build()
             .unwrap();
         assert_eq!(
@@ -417,7 +412,7 @@ mod tests {
         let temp = temp_files!("test.txt", "test2.txt", "test3.txt");
         let path = temp.path().to_owned();
         let dir = DirBuilder::new(temp.path())
-            .only_include(vec![path.join("test.txt")])
+            .only_include(&[path.join("test.txt")])
             .build()
             .expect("should be able to build dir");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
@@ -431,7 +426,7 @@ mod tests {
         let temp = temp_files!("test/test.txt", "ignore.txt", "test/test2.txt");
         let path = temp.path().to_owned();
         let dir = DirBuilder::new(temp.path())
-            .only_include(vec![path.join("test")])
+            .only_include(&[path.join("test")])
             .build()
             .expect("should be able to build dir");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
@@ -450,7 +445,7 @@ mod tests {
         let temp = temp_files!("test/keep/keep.txt", "test.txt");
         let path = temp.path().to_owned();
         let dir = DirBuilder::new(temp.path())
-            .only_include(vec![path.join("test/keep/keep.txt")])
+            .only_include(&[path.join("test/keep/keep.txt")])
             .build()
             .expect("should be able to build dir");
         scopeguard::guard(temp, |temp| temp.close().unwrap());

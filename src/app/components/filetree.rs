@@ -9,6 +9,7 @@ use anyhow::{anyhow, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
+use itertools::Itertools;
 use log::{info, warn};
 use std::{
     cell::Cell,
@@ -39,7 +40,7 @@ pub struct Filetree {
 
 impl Filetree {
     pub fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
-        let tree = DirBuilder::new(&path).dirs_first(true).build()?;
+        let tree = DirBuilder::new(path.as_ref()).dirs_first(true).build()?;
         let mut state = TreeState::default();
         state.select_first();
         let mut tree = Filetree {
@@ -79,7 +80,7 @@ impl Filetree {
     pub fn refresh(&mut self) -> Result<()> {
         let tree = DirBuilder::new(&self.root_path)
             .dirs_first(true)
-            .ignore(self.config.filetree.ignore.clone())
+            .ignore(&self.config.filetree.ignore)
             .build()?;
         self.dir = tree;
         self.only_included = false;
@@ -98,7 +99,7 @@ impl Filetree {
         Some(item)
     }
 
-    pub fn only_include(&mut self, include: Vec<PathBuf>) -> Result<()> {
+    pub fn only_include(&mut self, include: &[PathBuf]) -> Result<()> {
         self.dir = DirBuilder::new(&self.root_path)
             .dirs_first(true)
             .only_include(include)
@@ -265,7 +266,7 @@ impl Component for Filetree {
                     self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
                             info!(" filtered for modified files");
-                            self.only_include(cache.keys().cloned().collect())?;
+                            self.only_include(cache.keys().cloned().collect_vec().as_ref())?;
                         } else {
                             warn!(" no git status to filter for");
                         }
@@ -580,7 +581,7 @@ mod tests {
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
 
         assert!(filetree
-            .only_include(vec![temp.path().join("test.txt")])
+            .only_include(&[temp.path().join("test.txt")])
             .is_ok());
         assert_eq!(1, filetree.dir.iter().len());
         temp.close().unwrap();

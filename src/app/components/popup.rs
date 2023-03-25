@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use itertools::Itertools;
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -120,7 +121,7 @@ impl Drawable for Popup {
                                 Span::raw(description),
                             ])
                         })
-                        .collect::<Vec<Spans>>(),
+                        .collect_vec(),
                     "Help",
                     keybinds.len() as u16,
                 )
