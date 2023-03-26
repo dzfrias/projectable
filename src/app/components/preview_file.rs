@@ -1,6 +1,6 @@
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Result};
-use crossterm::event::Event;
+use crossterm::event::{Event, MouseEventKind};
 use easy_switch::switch;
 use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
 use tui::{
@@ -143,10 +143,20 @@ impl Component for PreviewFile {
             return Ok(());
         }
 
-        if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
-            switch! { key;
-                self.config.preview.down_key => self.state.get_mut().down_by(self.config.preview.scroll_amount),
-                self.config.preview.up_key => self.state.get_mut().up_by(self.config.preview.scroll_amount),
+        if let ExternalEvent::Crossterm(event) = ev {
+            match event {
+                Event::Key(key) => {
+                    switch! { key;
+                        self.config.preview.down_key => self.state.get_mut().down_by(self.config.preview.scroll_amount),
+                        self.config.preview.up_key => self.state.get_mut().up_by(self.config.preview.scroll_amount),
+                    }
+                }
+                Event::Mouse(mouse) => match mouse.kind {
+                    MouseEventKind::ScrollDown => self.state.get_mut().down(),
+                    MouseEventKind::ScrollUp => self.state.get_mut().up(),
+                    _ => {}
+                },
+                _ => {}
             }
         }
 
