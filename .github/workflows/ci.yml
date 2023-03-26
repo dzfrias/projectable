@@ -8,6 +8,7 @@ on:
 
 env:
   RUST_BACKTRACE: 1
+  RUST_LOG: trace
 
 jobs:
   test:
