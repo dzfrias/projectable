@@ -52,7 +52,10 @@ pub struct PreviewConfig {
     pub git_pager: Option<String>,
     pub down_key: Key,
     pub up_key: Key,
+    pub scroll_amount: u16,
     pub border_color: Style,
+    pub scroll_bar_color: Style,
+    pub unreached_bar_color: Style,
 }
 
 impl Default for PreviewConfig {
@@ -68,7 +71,10 @@ impl Default for PreviewConfig {
                 code: KeyCode::Char('u'),
                 mods: KeyModifiers::CONTROL,
             },
+            scroll_amount: 10,
             border_color: Style::default(),
+            scroll_bar_color: Style::default(),
+            unreached_bar_color: Style::default(),
         }
     }
 }

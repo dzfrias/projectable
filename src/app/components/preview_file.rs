@@ -143,11 +143,10 @@ impl Component for PreviewFile {
             return Ok(());
         }
 
-        const BIG_SCROLL_AMOUNT: u16 = 10;
         if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
             switch! { key;
-                self.config.preview.down_key => self.state.get_mut().down_by(BIG_SCROLL_AMOUNT),
-                self.config.preview.up_key => self.state.get_mut().up_by(BIG_SCROLL_AMOUNT),
+                self.config.preview.down_key => self.state.get_mut().down_by(self.config.preview.scroll_amount),
+                self.config.preview.up_key => self.state.get_mut().up_by(self.config.preview.scroll_amount),
             }
         }
 
@@ -160,16 +159,18 @@ impl Drawable for PreviewFile {
         let text = if let Some(cache) = self.cache.take() {
             cache
         } else {
-            // Remove bold modifier, it was causing problems
             self.contents.into_text()?
         };
         self.cache.set(Some(text.clone()));
 
-        let paragraph = ScrollParagraph::new(text).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(self.config.preview.border_color.into()),
-        );
+        let paragraph = ScrollParagraph::new(text)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(self.config.preview.border_color.into()),
+            )
+            .bar_style(self.config.preview.scroll_bar_color.into())
+            .unreached_bar_style(self.config.preview.unreached_bar_color.into());
         let mut state = self.state.take();
         f.render_stateful_widget(paragraph, area, &mut state);
         self.state.set(state);
