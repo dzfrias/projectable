@@ -429,6 +429,7 @@ impl<'de> Deserialize<'de> for Key {
 mod tests {
     use super::*;
     use crossterm::event::{KeyEventKind, KeyEventState};
+    use test_log::test;
 
     #[test]
     fn parse_rgb_from_color_string() {

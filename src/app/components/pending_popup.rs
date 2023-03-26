@@ -180,6 +180,7 @@ impl Drawable for PendingPopup {
 mod tests {
     use super::*;
     use crate::app::components::testing::*;
+    use test_log::test;
 
     #[test]
     fn new_popup_selects_first_item() {

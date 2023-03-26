@@ -432,6 +432,7 @@ fn build_filetree<'a>(
 mod tests {
     use super::*;
     use crate::app::components::testing::*;
+    use test_log::test;
 
     #[test]
     fn last_of_path_only_gets_last_part() {

@@ -44,7 +44,7 @@ impl<'a> IgnoreBuilder<'a> {
             }
             let (gitignore, err) = gitignore_builder.build_global();
             if let Some(err) = err {
-                warn!("problem building gitignore: {err}")
+                warn!("problem building gitignore: {err}");
             }
             Some(gitignore)
         } else {
@@ -103,6 +103,7 @@ mod tests {
     use super::*;
     use crate::dir::temp_files;
     use assert_fs::prelude::{FileWriteStr, PathChild};
+    use test_log::test;
 
     #[test]
     fn ignores_nothing_with_no_gitignore() {

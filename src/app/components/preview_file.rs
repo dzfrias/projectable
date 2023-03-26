@@ -183,6 +183,7 @@ impl Drawable for PreviewFile {
 mod tests {
     use super::*;
     use assert_fs::{prelude::*, TempDir};
+    use test_log::test;
 
     fn preview_default() -> String {
         let program = if cfg!(target_os = "windows") {

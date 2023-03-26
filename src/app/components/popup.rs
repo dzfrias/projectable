@@ -154,6 +154,7 @@ impl Drawable for Popup {
 mod tests {
     use super::*;
     use crate::app::components::testing::*;
+    use test_log::test;
 
     #[test]
     fn visible_with_preset() {

@@ -200,9 +200,9 @@ impl Drawable for InputBox {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-
     use super::{super::testing::*, *};
+    use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+    use test_log::test;
 
     #[test]
     fn giving_operation_gives_work() {

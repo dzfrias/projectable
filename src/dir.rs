@@ -335,6 +335,7 @@ mod tests {
         prelude::{FileWriteStr, PathChild},
         TempDir,
     };
+    use test_log::test;
 
     #[test]
     #[ignore]
