@@ -1,3 +1,6 @@
+mod scroll_paragraph;
+
+pub use scroll_paragraph::*;
 use tui::layout::{Constraint, Direction, Layout, Rect};
 
 /// Center a `Rect` with a height and width as a percentage of `r`
