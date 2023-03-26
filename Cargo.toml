@@ -17,7 +17,6 @@ ignore = "0.4.20"
 itertools = "0.10.5"
 log = "0.4.17"
 notify = "5.1.0"
-notify-debouncer-mini = "0.2.1"
 rust_search = "2.1.0"
 scopeguard = "1.1.0"
 serde = { version = "1.0.158", features = ["derive"] }
