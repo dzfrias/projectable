@@ -1,86 +1,10 @@
+use crate::ignore::{Ignore, IgnoreBuilder};
 use anyhow::{anyhow, Result};
-use ignore::{
-    gitignore::{Gitignore, GitignoreBuilder},
-    overrides::{Override, OverrideBuilder},
-    Match,
-};
-use log::warn;
 use std::{
     fs::{self, File as FsFile},
     path::{Path, PathBuf},
     slice,
 };
-
-#[derive(Debug, Clone)]
-struct IgnoreBuilder<'a> {
-    root: &'a Path,
-    use_gitignore: bool,
-    ignore: &'a [String],
-}
-
-impl<'a> IgnoreBuilder<'a> {
-    pub fn new(path: &'a Path) -> Self {
-        IgnoreBuilder {
-            root: path,
-            use_gitignore: true,
-            ignore: &[],
-        }
-    }
-
-    #[must_use]
-    pub fn ignore(mut self, globs: &'a [String]) -> Self {
-        self.ignore = globs;
-        self
-    }
-
-    #[must_use]
-    pub fn use_gitignore(mut self, yes: bool) -> Self {
-        self.use_gitignore = yes;
-        self
-    }
-
-    pub fn build(self) -> Result<Ignore> {
-        let mut gitignore_builder = GitignoreBuilder::new(self.root);
-        if self.use_gitignore {
-            if let Some(err) = gitignore_builder.add(self.root.join(".gitignore")) {
-                warn!("problem adding gitignore line: {err}");
-            }
-        }
-        let mut override_builder = OverrideBuilder::new(self.root);
-        for pat in self.ignore {
-            override_builder.add(&format!("!{pat}"))?;
-        }
-        Ok(Ignore {
-            gitignore: gitignore_builder.build().ok(),
-            overrides: override_builder.build().unwrap(),
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Ignore {
-    gitignore: Option<Gitignore>,
-    overrides: Override,
-}
-
-impl Ignore {
-    pub fn is_ignored(&self, path: impl AsRef<Path>) -> bool {
-        if !matches!(
-            self.overrides.matched(&path, path.as_ref().is_dir()),
-            Match::None
-        ) {
-            true
-        } else {
-            self.gitignore
-                .as_ref()
-                .map(|ignore| {
-                    let matched = ignore.matched_path_or_any_parents(&path, path.as_ref().is_dir());
-                    matches!(matched, Match::Ignore(_))
-                })
-                .unwrap_or_default()
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
@@ -111,7 +35,7 @@ pub struct Dir {
 #[derive(Debug, Clone)]
 pub struct DirBuilder<'a> {
     path: &'a Path,
-    ignore: IgnoreBuilder<'a>,
+    ignore: Option<&'a Ignore>,
     dirs_first: bool,
     only_include: Option<&'a [PathBuf]>,
 }
@@ -120,16 +44,10 @@ impl<'a> DirBuilder<'a> {
     pub fn new(path: &'a Path) -> Self {
         DirBuilder {
             path,
-            ignore: IgnoreBuilder::new(path),
+            ignore: None,
             dirs_first: false,
             only_include: None,
         }
-    }
-
-    #[must_use]
-    pub fn use_gitignore(mut self, yes: bool) -> Self {
-        self.ignore = self.ignore.use_gitignore(yes);
-        self
     }
 
     #[must_use]
@@ -139,8 +57,8 @@ impl<'a> DirBuilder<'a> {
     }
 
     #[must_use]
-    pub fn ignore(mut self, ignore: &'a [String]) -> Self {
-        self.ignore = self.ignore.ignore(ignore);
+    pub fn ignore(mut self, ignore: &'a Ignore) -> Self {
+        self.ignore = Some(ignore);
         self
     }
 
@@ -151,8 +69,16 @@ impl<'a> DirBuilder<'a> {
     }
 
     pub fn build(self) -> Result<Dir> {
-        let ignore = self.ignore.build()?;
-        let dir = build_tree(self.path, &ignore, self.dirs_first, self.only_include)?;
+        let dir = if let Some(ignore) = self.ignore {
+            build_tree(self.path, ignore, self.dirs_first, self.only_include)?
+        } else {
+            build_tree(
+                self.path,
+                &IgnoreBuilder::new(self.path).build()?,
+                self.dirs_first,
+                self.only_include,
+            )?
+        };
         Ok(dir)
     }
 }
@@ -524,8 +450,12 @@ mod tests {
     #[test]
     fn dir_can_ignore() {
         let temp = temp_files!("test.txt", "ignore.txt");
-        let dir = DirBuilder::new(temp.path())
+        let ignore = IgnoreBuilder::new(temp.path())
             .ignore(&["/ignore.txt".to_owned()])
+            .build()
+            .unwrap();
+        let dir = DirBuilder::new(temp.path())
+            .ignore(&ignore)
             .build()
             .unwrap();
         assert_eq!(1, dir.children.len());
@@ -645,8 +575,12 @@ mod tests {
     fn can_opt_out_of_gitignore() {
         let temp = temp_files!("test1.txt", "test2.txt");
         temp.child(".gitignore").write_str("*").unwrap();
-        let dir = DirBuilder::new(temp.path())
+        let ignore = IgnoreBuilder::new(temp.path())
             .use_gitignore(false)
+            .build()
+            .unwrap();
+        let dir = DirBuilder::new(temp.path())
+            .ignore(&ignore)
             .build()
             .unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());

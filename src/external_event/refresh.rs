@@ -1,4 +1,4 @@
-use super::ExternalEvent;
+use super::{ExternalEvent, RefreshData};
 use anyhow::Result;
 use crossbeam_channel::{unbounded, Sender};
 use notify::{recommended_watcher, Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -16,14 +16,34 @@ pub fn fs_watch(
     watcher.watch(path, RecursiveMode::Recursive)?;
     thread::spawn(move || {
         for res in rx {
-            match res {
+            let send_result: Result<()> = match res {
                 Ok(event) => match event.kind {
-                    EventKind::Create(_) | EventKind::Remove(_) => {
-                        event_sender.send(ExternalEvent::RefreshFiletree).unwrap()
-                    }
-                    _ => {}
+                    EventKind::Create(_) => event_sender
+                        .send(ExternalEvent::PartialRefresh(
+                            event
+                                .paths
+                                .into_iter()
+                                .map(|path| RefreshData::Add(path))
+                                .collect(),
+                        ))
+                        .map_err(Into::into),
+                    EventKind::Remove(_) => event_sender
+                        .send(ExternalEvent::PartialRefresh(
+                            event
+                                .paths
+                                .into_iter()
+                                .map(|path| RefreshData::Delete(path))
+                                .collect(),
+                        ))
+                        .map_err(Into::into),
+                    _ => Ok(()),
                 },
-                Err(e) => println!("watch error: {:?}", e),
+                Err(e) => Err(e.into()),
+            };
+            if let Err(err) = send_result {
+                event_sender
+                    .send(ExternalEvent::Error(err))
+                    .expect("sender should not have deallocated");
             }
         }
     });

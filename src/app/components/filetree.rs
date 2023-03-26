@@ -2,7 +2,8 @@ use crate::{
     app::{component::*, InputOperation, PendingOperation},
     config::Config,
     dir::*,
-    external_event::ExternalEvent,
+    external_event::{ExternalEvent, RefreshData},
+    ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
 use anyhow::{anyhow, Result};
@@ -26,12 +27,6 @@ use tui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RefreshData {
-    Delete(PathBuf),
-    Add(PathBuf),
-}
-
 pub struct Filetree {
     state: Cell<TreeState>,
     is_focused: bool,
@@ -42,10 +37,11 @@ pub struct Filetree {
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
+    ignore: Ignore,
 }
 
 impl Filetree {
-    pub fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
+    fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
         let tree = DirBuilder::new(path.as_ref()).dirs_first(true).build()?;
         let mut state = TreeState::default();
         state.select_first();
@@ -59,6 +55,7 @@ impl Filetree {
             repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
             config: Rc::new(Config::default()),
+            ignore: Ignore::default(),
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -72,9 +69,13 @@ impl Filetree {
         queue: Queue,
         config: Rc<Config>,
     ) -> Result<Self> {
+        let ignore = IgnoreBuilder::new(path.as_ref())
+            .ignore(&config.filetree.ignore)
+            .use_gitignore(config.filetree.use_gitignore)
+            .build()?;
         let tree = DirBuilder::new(path.as_ref())
             .dirs_first(config.filetree.dirs_first)
-            .use_gitignore(config.filetree.use_gitignore)
+            .ignore(&ignore)
             .build()?;
         Ok(Filetree {
             repo: if config.filetree.use_git {
@@ -82,6 +83,7 @@ impl Filetree {
             } else {
                 None
             },
+            ignore,
             dir: tree,
             config: Rc::clone(&config),
             ..Self::from_dir(path, queue)?
@@ -90,8 +92,8 @@ impl Filetree {
 
     pub fn refresh(&mut self) -> Result<()> {
         let tree = DirBuilder::new(&self.root_path)
-            .dirs_first(true)
-            .ignore(&self.config.filetree.ignore)
+            .dirs_first(self.config.filetree.dirs_first)
+            .ignore(&self.ignore)
             .build()?;
         self.dir = tree;
         self.only_included = false;
@@ -103,9 +105,13 @@ impl Filetree {
         Ok(())
     }
 
-    pub fn partial_refresh(&mut self, refresh_data: RefreshData) -> Result<()> {
-        match &refresh_data {
+    pub fn partial_refresh(&mut self, refresh_data: &RefreshData) -> Result<()> {
+        match refresh_data {
             RefreshData::Delete(path) => {
+                if self.ignore.is_ignored(path) {
+                    return Ok(());
+                }
+
                 self.dir.remove(path)?;
 
                 let mut selected = self.state.get_mut().selected();
@@ -131,6 +137,10 @@ impl Filetree {
                 }
             }
             RefreshData::Add(path) => {
+                if self.ignore.is_ignored(path) {
+                    return Ok(());
+                }
+
                 self.dir.add(path)?;
                 self.populate_status_cache();
             }
@@ -276,6 +286,11 @@ impl Component for Filetree {
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
             ExternalEvent::RefreshFiletree => self.refresh()?,
+            ExternalEvent::PartialRefresh(data) => {
+                for refresh_data in data {
+                    self.partial_refresh(refresh_data)?;
+                }
+            }
             ExternalEvent::Crossterm(Event::Key(key)) => {
                 let mut refresh_preview = true;
                 let not_empty = !items.is_empty();
@@ -665,7 +680,7 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.state.get_mut().select(vec![0, 1]);
         filetree
-            .partial_refresh(RefreshData::Delete(
+            .partial_refresh(&RefreshData::Delete(
                 filetree.get_selected().unwrap().path().to_path_buf(),
             ))
             .unwrap();
@@ -679,7 +694,7 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.state.get_mut().select(vec![0, 0]);
         filetree
-            .partial_refresh(RefreshData::Delete(
+            .partial_refresh(&RefreshData::Delete(
                 filetree.get_selected().unwrap().path().to_path_buf(),
             ))
             .unwrap();
