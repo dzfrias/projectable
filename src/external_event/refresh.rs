@@ -1,28 +1,32 @@
 use crossbeam_channel::{unbounded, Sender};
-use std::{path::Path, thread, time::Duration};
+use std::{path::Path, thread};
 
 use super::ExternalEvent;
 use anyhow::Result;
-use notify::RecursiveMode;
+use notify::{recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 /// Watch for changes to the filesystem at `path`, sending results to `event_sender`
-pub fn fs_watch(path: &Path, event_sender: Sender<ExternalEvent>, refresh_time: u64) -> Result<()> {
+pub fn fs_watch(
+    path: &Path,
+    event_sender: Sender<ExternalEvent>,
+    _refresh_time: u64,
+) -> Result<RecommendedWatcher> {
     let (tx, rx) = unbounded();
-    let mut bouncer =
-        notify_debouncer_mini::new_debouncer(Duration::from_millis(refresh_time), None, tx)?;
-    bouncer.watcher().watch(path, RecursiveMode::Recursive)?;
-    std::mem::forget(bouncer);
-
-    thread::spawn(move || loop {
-        let ev = rx.recv().expect("sender should not have deallocated");
-        if let Ok(ev) = ev {
-            if !ev.is_empty() {
-                event_sender
-                    .send(ExternalEvent::RefreshFiletree)
-                    .expect("receiver should not have been deallocated");
+    let mut watcher = recommended_watcher(tx)?;
+    watcher.watch(path, RecursiveMode::Recursive)?;
+    thread::spawn(move || {
+        for res in rx {
+            match res {
+                Ok(event) => match event.kind {
+                    EventKind::Create(_) | EventKind::Remove(_) => {
+                        event_sender.send(ExternalEvent::RefreshFiletree).unwrap()
+                    }
+                    _ => {}
+                },
+                Err(e) => println!("watch error: {:?}", e),
             }
-        };
+        }
     });
 
-    Ok(())
+    Ok(watcher)
 }

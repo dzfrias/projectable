@@ -79,7 +79,8 @@ fn run_app(
 ) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = unbounded();
-    external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
+    let _watcher =
+        external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
     external_event::crossterm_watch(event_send);
 
     let mut first_run = true;
