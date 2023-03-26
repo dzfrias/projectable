@@ -42,24 +42,21 @@ impl<'a> IgnoreBuilder<'a> {
                 // Partial errors can occur, so do not cancel the build, just warn
                 warn!("problem adding gitignore file: {err}");
             }
-            let (gitignore, err) = gitignore_builder.build_global();
-            if let Some(err) = err {
-                warn!("problem building gitignore: {err}");
-            }
+            let gitignore = gitignore_builder.build()?;
             debug!("built gitignore with {} matches", gitignore.len());
             Some(gitignore)
         } else {
-            match gitignore_builder.build() {
-                Ok(gitignore) => {
-                    debug!("built gitignore with no matches");
-                    Some(gitignore)
-                }
-                Err(err) => {
-                    // Swallow errors creating gitignore: not relevant if user chooses not to use it
-                    debug!("problem building gitignore: {err}");
-                    None
-                }
+            None
+        };
+        let global_gitignore = if self.use_gitignore {
+            let (gitignore, err) = gitignore_builder.build_global();
+            if let Some(err) = err {
+                warn!("problem making global gitignore: {err}");
             }
+            debug!("built global gitignore with {} matches", gitignore.len());
+            Some(gitignore)
+        } else {
+            None
         };
         let mut override_builder = OverrideBuilder::new(self.root);
         for pat in self.ignore {
@@ -72,6 +69,7 @@ impl<'a> IgnoreBuilder<'a> {
         let overrides = override_builder.build()?;
         debug!("built overrides with {} matches", overrides.num_ignores());
         Ok(Ignore {
+            global_gitignore,
             gitignore,
             overrides,
         })
@@ -82,24 +80,32 @@ impl<'a> IgnoreBuilder<'a> {
 pub struct Ignore {
     gitignore: Option<Gitignore>,
     overrides: Override,
+    global_gitignore: Option<Gitignore>,
 }
 
 impl Ignore {
     pub fn is_ignored(&self, path: impl AsRef<Path>) -> bool {
-        if !matches!(
+        return !matches!(
             self.overrides.matched(&path, path.as_ref().is_dir()),
             Match::None
-        ) {
-            true
-        } else {
-            self.gitignore
+        ) || self
+            .gitignore
+            .as_ref()
+            .map(|ignore| {
+                !ignore
+                    .matched_path_or_any_parents(&path, path.as_ref().is_dir())
+                    .is_none()
+            })
+            .unwrap_or_default()
+            || self
+                .global_gitignore
                 .as_ref()
                 .map(|ignore| {
-                    let matched = ignore.matched_path_or_any_parents(&path, path.as_ref().is_dir());
-                    matches!(matched, Match::Ignore(_))
+                    !ignore
+                        .matched_path_or_any_parents(&path, path.as_ref().is_dir())
+                        .is_none()
                 })
-                .unwrap_or_default()
-        }
+                .unwrap_or_default();
     }
 }
 
@@ -108,6 +114,7 @@ impl Default for Ignore {
         Self {
             gitignore: None,
             overrides: Override::empty(),
+            global_gitignore: None,
         }
     }
 }
