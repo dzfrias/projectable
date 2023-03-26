@@ -72,12 +72,17 @@ impl Filetree {
         queue: Queue,
         config: Rc<Config>,
     ) -> Result<Self> {
+        let tree = DirBuilder::new(path.as_ref())
+            .dirs_first(config.filetree.dirs_first)
+            .use_gitignore(config.filetree.use_gitignore)
+            .build()?;
         Ok(Filetree {
             repo: if config.filetree.use_git {
                 Repository::open(path.as_ref().join(".git")).ok()
             } else {
                 None
             },
+            dir: tree,
             config: Rc::clone(&config),
             ..Self::from_dir(path, queue)?
         })

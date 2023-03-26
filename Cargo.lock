@@ -1024,6 +1024,7 @@ dependencies = [
  "easy_switch",
  "git2",
  "human-panic",
+ "ignore",
  "itertools",
  "log",
  "notify",

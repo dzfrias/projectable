@@ -83,8 +83,10 @@ impl Default for PreviewConfig {
 #[serde(deny_unknown_fields, default)]
 pub struct FiletreeConfig {
     pub use_git: bool,
-    pub ignore: Vec<PathBuf>,
+    pub ignore: Vec<String>,
+    pub use_gitignore: bool,
     pub refresh_time: u64,
+    pub dirs_first: bool,
 
     pub selected: Style,
     pub filtered_out_message: Style,
@@ -114,6 +116,8 @@ impl Default for FiletreeConfig {
     fn default() -> Self {
         Self {
             use_git: true,
+            use_gitignore: true,
+            dirs_first: true,
             ignore: Vec::new(),
             refresh_time: 1000,
             down: Key::normal('j'),
