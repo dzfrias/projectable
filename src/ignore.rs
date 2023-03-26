@@ -4,7 +4,7 @@ use ignore::{
     overrides::{Override, OverrideBuilder},
     Match,
 };
-use log::warn;
+use log::{debug, trace, warn};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -46,20 +46,34 @@ impl<'a> IgnoreBuilder<'a> {
             if let Some(err) = err {
                 warn!("problem building gitignore: {err}");
             }
+            debug!("built gitignore with {} matches", gitignore.len());
             Some(gitignore)
         } else {
-            // Swallow errors creating gitignore: not relevant if user chooses not to use it
-            gitignore_builder.build().ok()
+            match gitignore_builder.build() {
+                Ok(gitignore) => {
+                    debug!("built gitignore with no matches");
+                    Some(gitignore)
+                }
+                Err(err) => {
+                    // Swallow errors creating gitignore: not relevant if user chooses not to use it
+                    debug!("problem building gitignore: {err}");
+                    None
+                }
+            }
         };
         let mut override_builder = OverrideBuilder::new(self.root);
         for pat in self.ignore {
             // ! because overrides normally act like only-inclusive ignores
             override_builder.add(&format!("!{pat}"))?;
+            trace!("added {pat} to ignore");
         }
         override_builder.add("!/.git")?;
+        trace!("added .git to ignore");
+        let overrides = override_builder.build()?;
+        debug!("built overrides with {} matches", overrides.num_ignores());
         Ok(Ignore {
             gitignore,
-            overrides: override_builder.build().unwrap(),
+            overrides,
         })
     }
 }
