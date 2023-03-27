@@ -23,12 +23,15 @@ pub fn get_config_home() -> Option<PathBuf> {
     Some(dir.join("projectable"))
 }
 
-pub trait Merge {
-    fn merge(&mut self, other: Self);
+pub trait Merge<Other = Self> {
+    fn merge(&mut self, other: Other);
 }
 
-impl<T> Merge for Vec<T> {
-    fn merge(&mut self, other: Self) {
+impl<T, U> Merge<U> for Vec<T>
+where
+    U: IntoIterator<Item = T>,
+{
+    fn merge(&mut self, other: U) {
         self.extend(other);
     }
 }
@@ -569,5 +572,51 @@ mod tests {
         };
 
         assert_eq!(key, key_event);
+    }
+
+    #[test]
+    fn merge_keeps_lhs_when_rhs_is_default() {
+        let mut lhs = Config::default();
+        lhs.quit = Key::normal('z');
+        let rhs = Config::default();
+        lhs.merge(rhs);
+        assert_eq!(Key::normal('z'), lhs.quit);
+    }
+
+    #[test]
+    fn merge_has_rhs_take_precedence_over_lhs() {
+        let mut lhs = Config::default();
+        lhs.quit = Key::normal('z');
+        let mut rhs = Config::default();
+        rhs.quit = Key::normal('v');
+        lhs.merge(rhs);
+        assert_eq!(Key::normal('v'), lhs.quit);
+    }
+
+    #[test]
+    fn merge_has_rhs_override_lhs_when_lhs_is_default() {
+        let mut lhs = Config::default();
+        let mut rhs = Config::default();
+        rhs.quit = Key::normal('v');
+        lhs.merge(rhs);
+        assert_eq!(Key::normal('v'), lhs.quit);
+    }
+
+    #[test]
+    fn merging_filetree_config_extends_ignore_vec() {
+        let mut lhs = Config::default();
+        lhs.filetree.ignore = vec!["test".to_owned(), "test2".to_owned()];
+        let mut rhs = Config::default();
+        rhs.filetree.ignore = vec!["test3".to_owned(), "test4".to_owned()];
+        lhs.merge(rhs);
+        assert_eq!(
+            vec![
+                "test".to_owned(),
+                "test2".to_owned(),
+                "test3".to_owned(),
+                "test4".to_owned()
+            ],
+            lhs.filetree.ignore
+        );
     }
 }
