@@ -114,14 +114,11 @@ impl<'a> StatefulWidget for ScrollParagraph<'a> {
         // Thanks to https://github.com/extrawurst/gitui/blob/v0.22.1/src/ui/scrollbar.rs for a lot
         // of the rendering of the scrollbar
 
-        let area = match self.block.take() {
-            Some(b) => {
-                let inner_area = b.inner(area);
-                b.render(area, buf);
-                inner_area
-            }
-            None => area,
-        };
+        let area = self.block.take().map_or(area, |b| {
+            let inner_area = b.inner(area);
+            b.render(area, buf);
+            inner_area
+        });
 
         let len = self.text.lines.len() as u16;
         state.offset_top = state.offset_top.min(len - 1);

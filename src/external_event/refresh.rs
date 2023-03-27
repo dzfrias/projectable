@@ -20,20 +20,12 @@ pub fn fs_watch(
                 Ok(event) => match event.kind {
                     EventKind::Create(_) => event_sender
                         .send(ExternalEvent::PartialRefresh(
-                            event
-                                .paths
-                                .into_iter()
-                                .map(|path| RefreshData::Add(path))
-                                .collect(),
+                            event.paths.into_iter().map(RefreshData::Add).collect(),
                         ))
                         .map_err(Into::into),
                     EventKind::Remove(_) => event_sender
                         .send(ExternalEvent::PartialRefresh(
-                            event
-                                .paths
-                                .into_iter()
-                                .map(|path| RefreshData::Delete(path))
-                                .collect(),
+                            event.paths.into_iter().map(RefreshData::Delete).collect(),
                         ))
                         .map_err(Into::into),
                     _ => Ok(()),

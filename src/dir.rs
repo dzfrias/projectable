@@ -279,7 +279,7 @@ fn build_tree(
     let mut children = Vec::new();
     for entry in fs::read_dir(&path)?
         .filter_map(|entry| entry.ok())
-        .filter(|entry| !ignore.is_ignored(&entry.path()))
+        .filter(|entry| !ignore.is_ignored(entry.path()))
     {
         let path = entry.path();
         if let Some(include) = only_include {
@@ -300,7 +300,7 @@ fn build_tree(
                 children.push(Item::Dir(dir));
             }
         } else {
-            children.push(Item::File(File { path }))
+            children.push(Item::File(File { path }));
         }
     }
     Ok(Dir {

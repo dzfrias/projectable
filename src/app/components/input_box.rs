@@ -130,10 +130,10 @@ impl Component for InputBox {
                         InputOperation::Command { to } => {
                             // Perform string substitution for path
                             let cmd = self.text.replace("{}", &to.display().to_string());
-                            self.queue.add(AppEvent::RunCommand(cmd))
+                            self.queue.add(AppEvent::RunCommand(cmd));
                         }
                         InputOperation::SearchFiles => {
-                            self.queue.add(AppEvent::SearchFiles(self.text.to_owned()))
+                            self.queue.add(AppEvent::SearchFiles(self.text.clone()));
                         }
 
                         InputOperation::NoOperations => unreachable!("checked in match guard"),

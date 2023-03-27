@@ -125,7 +125,7 @@ impl Component for PendingPopup {
                         return Ok(());
                     }
                     let event = match &self.operation {
-                        PendingOperation::DeleteFile(path) => AppEvent::DeleteFile(path.to_owned()),
+                        PendingOperation::DeleteFile(path) => AppEvent::DeleteFile(path.clone()),
                         PendingOperation::NoPending => {
                             unreachable!("has work, checked at top of method")
                         }

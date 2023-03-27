@@ -124,8 +124,8 @@ impl Filetree {
                     let prev_item = {
                         if *selected.last().expect("length should be greater than 0") == 0 {
                             selected.pop();
-                        } else {
-                            selected.last_mut().map(|last| *last -= 1);
+                        } else if let Some(last) = selected.last_mut() {
+                            *last -= 1;
                         }
                         selected
                     };
@@ -400,21 +400,18 @@ fn build_filetree<'a>(
 ) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
-        let style = statuses
-            .map(|statuses| {
-                statuses
-                    .get(item.path())
-                    .map(|status| match *status {
-                        Status::WT_NEW => Style::from(config.filetree.git_new_style),
-                        Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
-                        Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-                            Style::from(config.filetree.git_modified_style)
-                        }
-                        _ => Style::default(),
-                    })
-                    .unwrap_or(Style::default())
-            })
-            .unwrap_or(Style::default());
+        let style = statuses.map_or(Style::default(), |statuses| {
+            statuses
+                .get(item.path())
+                .map_or(Style::default(), |status| match *status {
+                    Status::WT_NEW => Style::from(config.filetree.git_new_style),
+                    Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
+                    Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+                        Style::from(config.filetree.git_modified_style)
+                    }
+                    _ => Style::default(),
+                })
+        });
         let tree_item = match item {
             Item::Dir(dir) => TreeItem::new(
                 last_of_path(dir.path()),

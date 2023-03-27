@@ -69,8 +69,9 @@ impl PreviewFile {
                 .preview
                 .git_pager
                 .as_ref()
-                .map(|cmd| format!("git diff {{}} | {}", cmd))
-                .unwrap_or("git diff {}".to_owned()),
+                .map_or("git diff {}".to_owned(), |cmd| {
+                    format!("git diff {{}} | {}", cmd)
+                }),
             ..Self::new()
         }
     }
