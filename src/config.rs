@@ -23,6 +23,25 @@ pub fn get_config_home() -> Option<PathBuf> {
     Some(dir.join("projectable"))
 }
 
+pub trait Merge {
+    fn merge(&mut self, other: Self);
+}
+
+impl<T> Merge for Vec<T> {
+    fn merge(&mut self, other: Self) {
+        self.extend(other);
+    }
+}
+
+macro_rules! merge {
+    ($first:expr, $second:expr; $($field:ident),+) => {{
+        let base = Self::default();
+        $(if $second.$field != base.$field {
+            $first.$field = $second.$field;
+        })+
+    }};
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -31,6 +50,14 @@ pub struct Config {
 
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
+}
+
+impl Merge for Config {
+    fn merge(&mut self, other: Self) {
+        merge!(self, other; quit, help);
+        self.preview.merge(other.preview);
+        self.filetree.merge(other.filetree);
+    }
 }
 
 impl Default for Config {
@@ -76,6 +103,23 @@ impl Default for PreviewConfig {
             scroll_bar_color: Style::default(),
             unreached_bar_color: Style::default(),
         }
+    }
+}
+
+impl Merge for PreviewConfig {
+    fn merge(&mut self, other: Self) {
+        merge!(
+            self, other;
+            preview_cmd,
+            git_pager,
+            down_key,
+            up_key,
+            scroll_bar_color,
+            scroll_amount,
+            border_color,
+            scroll_bar_color,
+            unreached_bar_color
+        );
     }
 }
 
@@ -146,6 +190,39 @@ impl Default for FiletreeConfig {
             git_new_style: Style::color(Color::Red),
             git_modified_style: Style::color(Color::Blue),
         }
+    }
+}
+
+impl Merge for FiletreeConfig {
+    fn merge(&mut self, other: Self) {
+        self.ignore.merge(other.ignore);
+        merge!(
+            self, other;
+            use_git,
+            use_gitignore,
+            dirs_first,
+            refresh_time,
+            down,
+            up,
+            all_up,
+            all_down,
+            down_three,
+            up_three,
+            exec_cmd,
+            delete,
+            search,
+            clear,
+            open,
+            new_dir,
+            git_filter,
+            diff_mode,
+            selected,
+            filtered_out_message,
+            border_color,
+            added_style,
+            git_new_style,
+            git_modified_style
+        );
     }
 }
 

@@ -3,7 +3,7 @@ use crossbeam_channel::unbounded;
 use log::{error, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
-    config::{self, Config},
+    config::{self, Config, Merge},
     external_event,
 };
 use std::{
@@ -45,18 +45,22 @@ fn main() -> Result<()> {
             .expect("human-panic: printing error message to console failed");
     }));
 
-    let config = Rc::new(
-        config::get_config_home()
-            .map(|path| -> Result<Option<Config>> {
-                if !path.join("config.toml").exists() {
-                    return Ok(None);
-                }
-                let contents = fs::read_to_string(path.join("config.toml"))?;
-                Ok(Some(toml::from_str::<Config>(&contents)?))
-            })
-            .unwrap_or(Ok(Some(Config::default())))?
-            .unwrap_or(Config::default()),
-    );
+    let mut config = config::get_config_home()
+        .map(|path| -> Result<Option<Config>> {
+            if !path.join("config.toml").exists() {
+                return Ok(None);
+            }
+            let contents = fs::read_to_string(path.join("config.toml"))?;
+            Ok(Some(toml::from_str::<Config>(&contents)?))
+        })
+        .unwrap_or(Ok(Some(Config::default())))?
+        .unwrap_or(Config::default());
+    if let Some(local_config) = find_local_config() {
+        let contents = fs::read_to_string(local_config)?;
+        let local_config = toml::from_str(&contents)?;
+        config.merge(local_config);
+    }
+    let config = Rc::new(config);
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
     let mut app = App::new(root, env::current_dir()?, Rc::clone(&config))?;
@@ -70,6 +74,18 @@ fn find_project_root() -> Option<PathBuf> {
     start
         .ancestors()
         .find_map(|path| path.join(".git").is_dir().then(|| path.to_path_buf()))
+}
+
+fn find_local_config() -> Option<PathBuf> {
+    let start = fs::canonicalize(".").expect("should be valid path");
+    start.ancestors().find_map(|path| {
+        let new_path = path.join(".projectable.toml");
+        if new_path.exists() {
+            Some(new_path)
+        } else {
+            None
+        }
+    })
 }
 
 fn run_app(
