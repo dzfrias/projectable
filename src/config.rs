@@ -743,4 +743,39 @@ mod tests {
             lhs.filetree.ignore
         );
     }
+
+    #[test]
+    fn properly_reports_keybind_conflicts() {
+        let mut config = Config::default();
+        config.help = Key::normal('q');
+        config.filetree.down = Key::normal('q');
+        assert_eq!(
+            vec![KeyConflict {
+                on: &Key::normal('q'),
+                conflictors: vec![Action::Quit, Action::Help, Action::FiletreeDown]
+            }],
+            config.check_conflicts()
+        );
+    }
+
+    #[test]
+    fn stringifies_keys_properly_with_no_mods() {
+        let key = Key::normal('j');
+        assert_eq!("j", &key.to_string());
+    }
+
+    #[test]
+    fn stringifies_keys_properly_with_multiple_mods() {
+        let key = Key {
+            code: KeyCode::Char('d'),
+            mods: KeyModifiers::CONTROL | KeyModifiers::ALT,
+        };
+        assert_eq!("ctrl-alt-d", &key.to_string());
+    }
+
+    #[test]
+    fn stringifies_keys_properly_with_one_mod() {
+        let key = Key::ctrl('j');
+        assert_eq!("ctrl-j", &key.to_string());
+    }
 }
