@@ -1,10 +1,18 @@
 use anyhow::{anyhow, bail, Error};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use itertools::Itertools;
 use serde::{
     de::{self, Visitor},
     Deserialize,
 };
-use std::{env, fmt, path::PathBuf, str::FromStr};
+use std::{
+    collections::HashMap,
+    env,
+    fmt::{self, Display},
+    path::PathBuf,
+    str::FromStr,
+};
+use strum::Display;
 use tui::style::{Color as TuiColor, Modifier as TuiModifier, Style as TuiStyle};
 
 pub fn get_config_home() -> Option<PathBuf> {
@@ -45,6 +53,30 @@ macro_rules! merge {
     }};
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum Action {
+    Quit,
+    Help,
+    PreviewDown,
+    PreviewUp,
+    FiletreeDown,
+    FiletreeUp,
+    FiletreeAllUp,
+    FiletreeAllDown,
+    FiletreeDownThree,
+    FiletreeUpThree,
+    FiletreeExecCmd,
+    FiletreeDelete,
+    FiletreeSearch,
+    FiletreeClear,
+    FiletreeOpen,
+    FiletreeNewFile,
+    FiletreeNewDir,
+    FiletreeGitFilter,
+    FiletreeDiffMode,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -53,6 +85,52 @@ pub struct Config {
 
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
+}
+
+impl Config {
+    pub fn check_conflicts(&self) -> Vec<KeyConflict> {
+        let keys = [
+            (Action::Quit, &self.quit),
+            (Action::Help, &self.help),
+            (Action::PreviewDown, &self.preview.down_key),
+            (Action::PreviewUp, &self.preview.up_key),
+            (Action::FiletreeUp, &self.filetree.up),
+            (Action::FiletreeDown, &self.filetree.down),
+            (Action::FiletreeAllUp, &self.filetree.all_up),
+            (Action::FiletreeAllDown, &self.filetree.all_down),
+            (Action::FiletreeUpThree, &self.filetree.up_three),
+            (Action::FiletreeDownThree, &self.filetree.down_three),
+            (Action::FiletreeExecCmd, &self.filetree.exec_cmd),
+            (Action::FiletreeDelete, &self.filetree.delete),
+            (Action::FiletreeSearch, &self.filetree.search),
+            (Action::FiletreeClear, &self.filetree.clear),
+            (Action::FiletreeOpen, &self.filetree.open),
+            (Action::FiletreeNewFile, &self.filetree.new_file),
+            (Action::FiletreeNewDir, &self.filetree.new_dir),
+            (Action::FiletreeGitFilter, &self.filetree.git_filter),
+            (Action::FiletreeDiffMode, &self.filetree.diff_mode),
+        ];
+        let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
+
+        for (name, key) in keys {
+            // Update uses
+            uses.entry(key)
+                .and_modify(|actions| actions.push(name))
+                .or_insert_with(|| vec![name]);
+        }
+
+        uses.into_iter()
+            .filter_map(|(key, actions)| {
+                if actions.len() == 1 {
+                    return None;
+                }
+                Some(KeyConflict {
+                    on: key,
+                    conflictors: actions,
+                })
+            })
+            .collect()
+    }
 }
 
 impl Merge for Config {
@@ -75,6 +153,36 @@ impl Default for Config {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyConflict<'a> {
+    on: &'a Key,
+    conflictors: Vec<Action>,
+}
+
+impl Display for KeyConflict<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "key conflict on \"{}\" with associated actions: {}",
+            self.on,
+            self.conflictors
+                .iter()
+                .map(|item| format!("\"{item}\""))
+                .join(", ")
+        )
+    }
+}
+
+impl KeyConflict<'_> {
+    pub fn on(&self) -> &Key {
+        self.on
+    }
+
+    pub fn conflictors(&self) -> &[Action] {
+        self.conflictors.as_ref()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct PreviewConfig {
@@ -93,14 +201,8 @@ impl Default for PreviewConfig {
         Self {
             preview_cmd: "cat {}".to_owned(),
             git_pager: None,
-            down_key: Key {
-                code: KeyCode::Char('d'),
-                mods: KeyModifiers::CONTROL,
-            },
-            up_key: Key {
-                code: KeyCode::Char('u'),
-                mods: KeyModifiers::CONTROL,
-            },
+            down_key: Key::ctrl('d'),
+            up_key: Key::ctrl('u'),
             scroll_amount: 10,
             border_color: Style::default(),
             scroll_bar_color: Style::default(),
@@ -455,10 +557,32 @@ impl<'de> Visitor<'de> for KeyVisitor {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Key {
     pub code: KeyCode,
     pub mods: KeyModifiers,
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut key_parts = String::new();
+        if self.mods.intersects(KeyModifiers::CONTROL) {
+            key_parts.push_str("ctrl-");
+        }
+        if self.mods.intersects(KeyModifiers::ALT) {
+            key_parts.push_str("alt-");
+        }
+        match self.code {
+            KeyCode::Char(c) => key_parts.push(c),
+            KeyCode::Up => key_parts.push_str("up"),
+            KeyCode::Down => key_parts.push_str("down"),
+            KeyCode::Right => key_parts.push_str("right"),
+            KeyCode::Left => key_parts.push_str("left"),
+            _ => unreachable!(),
+        }
+
+        write!(f, "{key_parts}")
+    }
 }
 
 impl Key {

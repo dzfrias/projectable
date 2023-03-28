@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use crossbeam_channel::unbounded;
-use log::{error, LevelFilter};
+use log::{error, warn, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, Merge},
@@ -61,6 +61,10 @@ fn main() -> Result<()> {
         config.merge(local_config);
     }
     let config = Rc::new(config);
+    let conflicts = config.check_conflicts();
+    for conflict in conflicts {
+        warn!("{conflict}");
+    }
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
     let mut app = App::new(root, env::current_dir()?, Rc::clone(&config))?;

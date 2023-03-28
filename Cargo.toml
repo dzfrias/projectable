@@ -20,6 +20,7 @@ notify = "5.1.0"
 rust_search = "2.1.0"
 scopeguard = "1.1.0"
 serde = { version = "1.0.158", features = ["derive"] }
+strum = { version = "0.24.1", features = ["derive"] }
 toml = "0.7.3"
 tui = { version = "0.19.0", features = ["serde"] }
 tui-logger = "0.8.3"
