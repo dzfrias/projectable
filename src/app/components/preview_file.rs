@@ -6,7 +6,6 @@ use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
-    text::Text,
     widgets::{Block, Borders},
     Frame,
 };
