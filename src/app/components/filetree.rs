@@ -206,7 +206,7 @@ impl Filetree {
     }
 
     pub fn open_all(&mut self) {
-        for item in self.dir.walk().filter(|item| matches!(item, Item::File(_))) {
+        for item in self.dir.walk().filter(|item| matches!(item, Item::Dir(_))) {
             let loc = self
                 .dir
                 .location_by_path(item.path())
@@ -721,5 +721,14 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(vec![0], filetree.state.get_mut().selected());
+    }
+
+    #[test]
+    fn can_open_all() {
+        let temp = temp_files!("test.txt", "test/test2.txt", "test2/test4/test.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        filetree.open_all();
+        assert_eq!(3, filetree.state.get_mut().get_all_opened().len());
     }
 }
