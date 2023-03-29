@@ -30,7 +30,6 @@ pub struct PreviewFile {
     mode: Mode,
     contents: String,
     focused: bool,
-    cache: Cell<Option<Text<'static>>>,
     config: Rc<Config>,
     state: Cell<ParagraphState>,
 }
@@ -40,7 +39,6 @@ impl Default for PreviewFile {
         Self {
             contents: String::new(),
             focused: true,
-            cache: None.into(),
             mode: Mode::default(),
             config: Rc::new(Config::default()),
             git_cmd: "git diff {}".to_owned(),
@@ -54,7 +52,6 @@ impl PreviewFile {
         Self {
             contents: String::new(),
             focused: true,
-            cache: None.into(),
             mode: Mode::default(),
             config: Rc::new(Config::default()),
             git_cmd: "git diff {}".to_owned(),
@@ -82,7 +79,6 @@ impl PreviewFile {
         }
         self.state.get_mut().reset();
         // Cache has to be reset
-        self.cache = None.into();
         let replaced = {
             let replacement = if cfg!(target_os = "windows") {
                 file.as_ref().display().to_string()
@@ -167,13 +163,7 @@ impl Component for PreviewFile {
 
 impl Drawable for PreviewFile {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let text = if let Some(cache) = self.cache.take() {
-            cache
-        } else {
-            self.contents.into_text()?
-        };
-        self.cache.set(Some(text.clone()));
-
+        let text = self.contents.into_text()?;
         let paragraph = ScrollParagraph::new(text)
             .block(
                 Block::default()
