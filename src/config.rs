@@ -259,6 +259,8 @@ pub struct FiletreeConfig {
     pub new_dir: Key,
     pub git_filter: Key,
     pub diff_mode: Key,
+    pub open_all: Key,
+    pub close_all: Key,
 }
 
 impl Default for FiletreeConfig {
@@ -283,6 +285,8 @@ impl Default for FiletreeConfig {
                 code: KeyCode::Enter,
                 mods: KeyModifiers::NONE,
             },
+            open_all: Key::normal('o'),
+            close_all: Key::normal('O'),
             new_file: Key::normal('n'),
             new_dir: Key::normal('N'),
             git_filter: Key::normal('T'),

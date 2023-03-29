@@ -205,6 +205,16 @@ impl Filetree {
         Ok(())
     }
 
+    pub fn open_all(&mut self) {
+        for item in self.dir.walk().filter(|item| matches!(item, Item::File(_))) {
+            let loc = self
+                .dir
+                .location_by_path(item.path())
+                .expect("item should be in tree");
+            self.state.get_mut().open(loc);
+        }
+    }
+
     fn current_is_open(&mut self) -> bool {
         let selected = self.state.get_mut().selected();
         // Will return true if it was already closed
@@ -214,6 +224,18 @@ impl Filetree {
             self.state.get_mut().close(&selected);
         }
         !closed
+    }
+
+    pub fn open_under(&mut self, location: &mut Vec<usize>) {
+        let Item::Dir(dir) = self.dir.nested_child_mut(location).unwrap() else {
+            return;
+        };
+        for index in 0..dir.iter().len() {
+            location.push(index);
+            self.state.get_mut().open(location.clone());
+            self.open_under(location);
+            location.pop();
+        }
     }
 }
 
@@ -367,6 +389,8 @@ impl Component for Filetree {
                         self.queue
                             .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
                     },
+                    self.config.filetree.close_all => self.state.get_mut().close_all(),
+                    self.config.filetree.open_all => self.open_all(),
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {

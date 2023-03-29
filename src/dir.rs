@@ -232,8 +232,33 @@ impl Dir {
         self.into_iter()
     }
 
+    pub fn walk(&self) -> DirWalker<'_> {
+        DirWalker {
+            stack: self.children.iter().collect(),
+        }
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DirWalker<'a> {
+    stack: Vec<&'a Item>,
+}
+
+impl<'a> Iterator for DirWalker<'a> {
+    type Item = &'a Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.stack.pop()?;
+
+        if let Item::Dir(dir) = current {
+            self.stack.extend(dir);
+        }
+
+        Some(current)
     }
 }
 
@@ -335,6 +360,7 @@ mod tests {
         prelude::{FileWriteStr, PathChild},
         TempDir,
     };
+    use itertools::Itertools;
     use test_log::test;
 
     #[test]
@@ -587,5 +613,41 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         assert!(!dir.children.is_empty());
+    }
+
+    #[test]
+    fn can_walk_dir() {
+        let temp = temp_files!(
+            "test1.txt",
+            "test2.txt",
+            "test3/test.txt",
+            "test4/test/testing.txt"
+        );
+        let path = temp.path().to_owned();
+        let dir = DirBuilder::new(temp.path()).build().unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        let found = dir.walk().collect_vec();
+        assert!(found.contains(&&Item::Dir(Dir {
+            path: path.join("test3"),
+            children: vec![Item::File(File {
+                path: path.join("test3/test.txt")
+            })]
+        })));
+        assert!(found.contains(&&Item::Dir(Dir {
+            path: path.join("test4"),
+            children: vec![Item::Dir(Dir {
+                path: path.join("test4/test"),
+                children: vec![Item::File(File {
+                    path: path.join("test4/test/testing.txt")
+                })]
+            })]
+        })));
+        assert!(found.contains(&&Item::File(File {
+            path: path.join("test1.txt")
+        })));
+        assert!(found.contains(&&Item::File(File {
+            path: path.join("test2.txt")
+        })));
     }
 }
