@@ -46,12 +46,19 @@ pub struct FileCmdPopup {
     opened: Option<(FileCommand, PathBuf)>,
 }
 
+impl Default for FileCmdPopup {
+    fn default() -> Self {
+        Self::new(Queue::new(), Config::default().into())
+    }
+}
+
 impl FileCmdPopup {
     pub fn new(queue: Queue, config: Rc<Config>) -> Self {
         let registry = config
             .special_commands
             .iter()
             .map(|(pattern, commands)| {
+                // Prefixed with ** to work with absolute paths
                 let pat = Glob::new(&format!("**/{pattern}"))
                     .unwrap()
                     .compile_matcher();
@@ -207,5 +214,130 @@ impl Drawable for FileCmdPopup {
         self.state.set(state);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::components::testing::*;
+    use collect_all::collect;
+
+    fn test_popup() -> FileCmdPopup {
+        let mut config = Config::default();
+        config.special_commands = collect![_:
+            ("*".to_owned(), vec!["command {}".to_owned(), "command2 {} {...}".to_owned(), "command3".to_owned()])
+        ];
+        let mut popup = FileCmdPopup::new(Queue::new(), config.into());
+        let path = "test.txt".into();
+        popup.open_for(path);
+        popup
+    }
+
+    #[test]
+    fn starts_with_first_selected() {
+        let popup = FileCmdPopup::default();
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn silent_when_file_does_not_match() {
+        let path = "test.txt".into();
+        let mut popup = FileCmdPopup::default();
+        let state = popup.open_for(path);
+        assert_eq!(MatchState::NotMatched, state);
+    }
+
+    #[test]
+    fn can_open_for_file() {
+        let mut config = Config::default();
+        config.special_commands = collect![_:
+            ("*".to_owned(), vec!["command".to_owned()]),
+            ("not_there.txt".to_owned(), vec!["should_not_be_here".to_owned()])
+        ];
+        let mut popup = FileCmdPopup::new(Queue::new(), config.into());
+        let path = "test.txt".into();
+        let state = popup.open_for(path);
+        assert_eq!(MatchState::Matched, state);
+        assert_eq!(PathBuf::from("test.txt"), popup.opened.as_ref().unwrap().1);
+        assert_eq!(vec!["command".to_owned()], popup.opened.unwrap().0.commands);
+    }
+
+    #[test]
+    fn selecting_prev_cannot_go_below_zero() {
+        let mut popup = FileCmdPopup::default();
+        popup.select_prev();
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn selecting_next_cannot_go_above_opened_amount() {
+        let mut popup = test_popup();
+        for _ in 0..10 {
+            popup.select_next();
+        }
+        assert_eq!(2, popup.selected());
+    }
+
+    #[test]
+    fn can_select_last() {
+        let mut popup = test_popup();
+        popup.select_last();
+        assert_eq!(2, popup.selected());
+    }
+
+    #[test]
+    fn can_select_first() {
+        let mut popup = test_popup();
+        popup.select_next();
+        popup.select_first();
+        assert_eq!(0, popup.selected());
+    }
+
+    #[test]
+    fn visible_with_work() {
+        let popup = test_popup();
+        assert!(popup.visible());
+    }
+
+    #[test]
+    fn quitting_properly_restores_registry() {
+        let mut popup = test_popup();
+        assert!(popup.registry.is_empty());
+        let event = input_event!(KeyCode::Char('q'));
+        popup.handle_event(&event).unwrap();
+        assert_eq!(1, popup.registry.len());
+    }
+
+    #[test]
+    fn confirming_properly_restores_registry() {
+        let mut popup = test_popup();
+        assert!(popup.registry.is_empty());
+        let event = input_event!(KeyCode::Enter);
+        popup.handle_event(&event).unwrap();
+        assert_eq!(1, popup.registry.len());
+    }
+
+    #[test]
+    fn confirming_sends_run_command_event_with_interpolated_path() {
+        let mut popup = test_popup();
+        let event = input_event!(KeyCode::Enter);
+        popup.handle_event(&event).unwrap();
+        assert!(popup
+            .queue
+            .contains(&AppEvent::RunCommand("command test.txt".to_owned())))
+    }
+
+    #[test]
+    fn confirming_with_search_interpolation_opens_search_box() {
+        let mut popup = test_popup();
+        popup.select_next();
+        let event = input_event!(KeyCode::Enter);
+        popup.handle_event(&event).unwrap();
+        assert!(popup
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::SpecialCommand(
+                "command2 test.txt {...}".to_owned()
+            ))))
     }
 }
