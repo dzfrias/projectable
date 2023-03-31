@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     let config = Rc::new(get_config()?);
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
-    let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
+    let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
     let mut all_marks = get_marks()?;
     let project_marks = all_marks.marks.remove(&root).unwrap_or_default();
     let mut app = App::new(root, env::current_dir()?, Rc::clone(&config), project_marks)?;
@@ -68,7 +68,7 @@ fn get_config() -> Result<Config> {
         })
         .unwrap_or(Ok(Some(Config::default())))?
         .unwrap_or(Config::default());
-    if let Some(local_config) = find_local_config() {
+    if let Some(local_config) = find_local_config()? {
         let contents = fs::read_to_string(local_config)?;
         let local_config = toml::from_str(&contents)?;
         config.merge(local_config);
@@ -98,23 +98,27 @@ fn get_marks() -> Result<Marks> {
         .unwrap_or(Ok(Marks::default()))
 }
 
-fn find_project_root() -> Option<PathBuf> {
-    let start = fs::canonicalize(".").expect("should be valid path");
-    start
+/// Get the project root. This function searches for a `.git` directory. Errors if the current
+/// directory is invalid, and returns `None` if there was no root found.
+fn find_project_root() -> Result<Option<PathBuf>> {
+    let start = env::current_dir()?;
+    Ok(start
         .ancestors()
-        .find_map(|path| path.join(".git").is_dir().then(|| path.to_path_buf()))
+        .find_map(|path| path.join(".git").is_dir().then(|| path.to_path_buf())))
 }
 
-fn find_local_config() -> Option<PathBuf> {
-    let start = fs::canonicalize(".").expect("should be valid path");
-    start.ancestors().find_map(|path| {
+/// Gets the local configuration file. Errors if the current directory is invalid, and returns
+/// `None` if there was no `.projectable.toml` found.
+fn find_local_config() -> Result<Option<PathBuf>> {
+    let start = env::current_dir()?;
+    Ok(start.ancestors().find_map(|path| {
         let new_path = path.join(".projectable.toml");
         if new_path.exists() {
             Some(new_path)
         } else {
             None
         }
-    })
+    }))
 }
 
 fn run_app(
