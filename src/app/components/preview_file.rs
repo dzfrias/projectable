@@ -167,6 +167,7 @@ impl Drawable for PreviewFile {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .title("Preview")
                     .border_style(self.config.preview.border_color.into()),
             )
             .bar_style(self.config.preview.scroll_bar_color.into())

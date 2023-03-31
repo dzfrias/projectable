@@ -259,7 +259,8 @@ impl Drawable for Filetree {
                 .split(area);
             let block = Block::default()
                 .borders(Borders::ALL)
-                .border_style(self.config.filetree.border_color.into());
+                .border_style(self.config.filetree.border_color.into())
+                .title("Files");
             let tree = Tree::new(items).highlight_style(self.config.selected.into());
             let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
                 .alignment(Alignment::Center)
@@ -274,6 +275,7 @@ impl Drawable for Filetree {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .title("Files")
                         .border_style(self.config.filetree.border_color.into()),
                 )
                 .highlight_style(self.config.selected.into());
