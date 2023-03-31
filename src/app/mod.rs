@@ -8,7 +8,7 @@ use crate::{
     external_event::{ExternalEvent, RefreshData},
     queue::{AppEvent, Queue},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use itertools::Itertools;
@@ -84,10 +84,12 @@ impl App {
                 AppEvent::OpenPopup(operation) => self.pending.operation = operation,
                 AppEvent::DeleteFile(path) => {
                     if path.is_file() {
-                        fs::remove_file(&path)?;
+                        fs::remove_file(&path)
+                            .context("failed to remove file while resolving event queue")?;
                         info!(" deleted file \"{}\"", path.display());
                     } else {
-                        fs::remove_dir_all(&path)?;
+                        fs::remove_dir_all(&path)
+                            .context("failed to remove dir while resolving event queue")?;
                         info!(" deleted directory \"{}\"", path.display());
                     }
                     self.tree.partial_refresh(&RefreshData::Delete(path))?;
@@ -101,16 +103,21 @@ impl App {
                 }
                 AppEvent::OpenInput(op) => self.input_box.operation = op,
                 AppEvent::NewFile(path) => {
-                    File::create(&path)?;
+                    File::create(&path)
+                        .context("failed to create file while resolving event queue")?;
                     info!(" created file \"{}\"", path.display());
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
                 AppEvent::NewDir(path) => {
-                    fs::create_dir(&path)?;
+                    fs::create_dir(&path)
+                        .context("failed to create dir while resolving event queue")?;
                     info!(" created directory \"{}\"", path.display());
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
-                AppEvent::PreviewFile(path) => self.previewer.preview_file(path)?,
+                AppEvent::PreviewFile(path) => self
+                    .previewer
+                    .preview_file(path)
+                    .context("failed to preview while resolving event queue")?,
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
                     if cfg!(target_os = "windows") {
@@ -145,11 +152,15 @@ impl App {
                     // Because it's sent from `self.tree`, it has not been deleted in
                     // `self.marks_popup` yet.
                     self.marks_popup.add_mark(path.clone());
+                    info!(" marked: \"{}\"", path.display());
                     return Ok(Some(TerminalEvent::WriteMark(path)));
                 }
-                // Because it's sent from `self.marks_popup,` we can assume it's been deleted
-                // internally already, just not in the file
-                AppEvent::DeleteMark(path) => return Ok(Some(TerminalEvent::DeleteMark(path))),
+                AppEvent::DeleteMark(path) => {
+                    // Because it's sent from `self.marks_popup,` we can assume it's been deleted
+                    // internally already, just not in the file
+                    info!(" deleted mark: \"{}\"", path.display());
+                    return Ok(Some(TerminalEvent::DeleteMark(path)));
+                }
             }
         }
 

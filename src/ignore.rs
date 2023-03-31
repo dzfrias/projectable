@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ignore::{
     gitignore::{Gitignore, GitignoreBuilder},
     overrides::{Override, OverrideBuilder},
@@ -42,7 +42,9 @@ impl<'a> IgnoreBuilder<'a> {
                 // Partial errors can occur, so do not cancel the build, just warn
                 warn!("problem adding gitignore file: {err}");
             }
-            let gitignore = gitignore_builder.build()?;
+            let gitignore = gitignore_builder
+                .build()
+                .context("failed to build gitignore")?;
             debug!("built gitignore with {} matches", gitignore.len());
             Some(gitignore)
         } else {
@@ -61,12 +63,18 @@ impl<'a> IgnoreBuilder<'a> {
         let mut override_builder = OverrideBuilder::new(self.root);
         for pat in self.ignore {
             // ! because overrides normally act like only-inclusive ignores
-            override_builder.add(&format!("!{pat}"))?;
+            override_builder
+                .add(&format!("!{pat}"))
+                .with_context(|| format!("failed to add glob for: \"!{pat}\""))?;
             trace!("added {pat} to ignore");
         }
-        override_builder.add("!/.git")?;
+        override_builder
+            .add("!/.git")
+            .context("failed to add glob for: \"!/.git\"")?;
         trace!("added .git to ignore");
-        let overrides = override_builder.build()?;
+        let overrides = override_builder
+            .build()
+            .context("failed to build override ignorer")?;
         debug!("built overrides with {} matches", overrides.num_ignores());
         Ok(Ignore {
             global_gitignore,

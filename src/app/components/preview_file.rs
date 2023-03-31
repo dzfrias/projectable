@@ -1,5 +1,5 @@
 use ansi_to_tui::IntoText;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
 use easy_switch::switch;
 use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
@@ -82,7 +82,7 @@ impl PreviewFile {
             let replacement = if cfg!(target_os = "windows") {
                 file.as_ref().display().to_string()
             } else {
-                format!("'{}'", &file.as_ref().display().to_string())
+                format!("'{}'", file.as_ref().display())
             };
 
             if self.mode == Mode::Preview {
@@ -92,7 +92,11 @@ impl PreviewFile {
             }
         };
         self.contents = if cfg!(target_os = "windows") {
-            let out = Command::new("cmd").arg("/C").arg(&replaced).output()?;
+            let out = Command::new("cmd")
+                .arg("/C")
+                .arg(&replaced)
+                .output()
+                .with_context(|| format!("problem running preview command with {replaced}"))?;
             let output = if out.stdout.is_empty() && !out.stderr.is_empty() {
                 out.stderr
             } else {
@@ -103,7 +107,8 @@ impl PreviewFile {
             let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
                 .arg("-c")
                 .arg(&replaced)
-                .output()?;
+                .output()
+                .with_context(|| format!("problem running preview command with {replaced}"))?;
             if out.stdout.is_empty() && !out.stderr.is_empty() {
                 String::from_utf8_lossy(&out.stderr).to_string()
             } else {

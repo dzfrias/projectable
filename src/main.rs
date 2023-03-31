@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use crossbeam_channel::unbounded;
 use log::{error, warn, LevelFilter};
 use projectable::{
@@ -51,7 +51,8 @@ fn main() -> Result<()> {
     let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
     let mut all_marks = get_marks()?;
     let project_marks = all_marks.marks.remove(&root).unwrap_or_default();
-    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config), project_marks)?;
+    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config), project_marks)
+        .context("failed to create app")?;
     run_app(&mut terminal, &mut app, Rc::clone(&config))?;
 
     Ok(())

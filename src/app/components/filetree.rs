@@ -6,7 +6,7 @@ use crate::{
     ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
@@ -42,7 +42,10 @@ pub struct Filetree {
 
 impl Filetree {
     fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
-        let tree = DirBuilder::new(path.as_ref()).dirs_first(true).build()?;
+        let tree = DirBuilder::new(path.as_ref())
+            .dirs_first(true)
+            .build()
+            .context("failed to create `Dir` when creating Filetree")?;
         let mut state = TreeState::default();
         state.select_first();
         let mut tree = Filetree {
@@ -72,11 +75,13 @@ impl Filetree {
         let ignore = IgnoreBuilder::new(path.as_ref())
             .ignore(&config.filetree.ignore)
             .use_gitignore(config.filetree.use_gitignore)
-            .build()?;
+            .build()
+            .context("failed to create glob ignorer")?;
         let tree = DirBuilder::new(path.as_ref())
             .dirs_first(config.filetree.dirs_first)
             .ignore(&ignore)
-            .build()?;
+            .build()
+            .context("failed to build `Dir`")?;
         Ok(Filetree {
             repo: if config.filetree.use_git {
                 Repository::open(path.as_ref().join(".git")).ok()
@@ -94,7 +99,8 @@ impl Filetree {
         let tree = DirBuilder::new(&self.root_path)
             .dirs_first(self.config.filetree.dirs_first)
             .ignore(&self.ignore)
-            .build()?;
+            .build()
+            .context("failed to build `Dir`")?;
         self.dir = tree;
         self.only_included = false;
         self.populate_status_cache();
@@ -160,7 +166,10 @@ impl Filetree {
         self.dir = DirBuilder::new(&self.root_path)
             .dirs_first(true)
             .only_include(include)
-            .build()?;
+            .build()
+            .with_context(|| {
+                format!("failed to build `Dir` while only-including files: \"{include:?}\"")
+            })?;
         self.only_included = true;
 
         if self.get_selected().is_none() {
@@ -309,10 +318,12 @@ impl Component for Filetree {
 
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
-            ExternalEvent::RefreshFiletree => self.refresh()?,
+            ExternalEvent::RefreshFiletree => self.refresh().context("problem refreshing tree")?,
             ExternalEvent::PartialRefresh(data) => {
                 for refresh_data in data {
-                    self.partial_refresh(refresh_data)?;
+                    self.partial_refresh(refresh_data).with_context(|| {
+                        format!("problem partially refreshing tree with data: \"{data:?}\"")
+                    })?;
                 }
             }
             ExternalEvent::Crossterm(Event::Key(key)) => {
@@ -362,7 +373,7 @@ impl Component for Filetree {
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
                     self.config.filetree.clear => {
                         info!(" refreshed filetree");
-                        self.refresh()?;
+                        self.refresh().context("problem refreshing filetree")?;
                     },
                     self.config.open => match self.get_selected() {
                         Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),
