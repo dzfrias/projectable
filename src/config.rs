@@ -1,9 +1,10 @@
 use anyhow::{anyhow, bail, Error};
+use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use itertools::Itertools;
 use serde::{
     de::{self, Visitor},
-    Deserialize,
+    Deserialize, Deserializer,
 };
 use std::{
     collections::HashMap,
@@ -35,9 +36,10 @@ pub trait Merge<Other = Self> {
     fn merge(&mut self, other: Other);
 }
 
-impl<T, U> Merge<U> for Vec<T>
+impl<T, U, E> Merge<U> for E
 where
     U: IntoIterator<Item = T>,
+    E: Extend<T>,
 {
     fn merge(&mut self, other: U) {
         self.extend(other);
@@ -82,12 +84,33 @@ pub enum Action {
 pub struct Config {
     pub quit: Key,
     pub help: Key,
+    #[serde(deserialize_with = "Config::deserialize_special_commands")]
+    pub special_commands: HashMap<String, Vec<String>>,
 
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
 }
 
 impl Config {
+    pub fn deserialize_special_commands<'de, D>(
+        deserializer: D,
+    ) -> Result<HashMap<String, Vec<String>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut initial = Self::default_special_commands();
+        let config = <HashMap<String, Vec<String>>>::deserialize(deserializer)?;
+        initial.merge(config);
+        Ok(initial)
+    }
+
+    pub fn default_special_commands() -> HashMap<String, Vec<String>> {
+        collect![HashMap<_, _>:
+            ("Makefile".to_owned(), vec!["make".to_owned(), "make {...}".to_owned()]),
+            ("Cargo.toml".to_owned(), vec!["cargo add {...}".to_owned(), "cargo remove {...}".to_owned(), "cargo run".to_owned()])
+        ]
+    }
+
     pub fn check_conflicts(&self) -> Vec<KeyConflict> {
         let keys = [
             (Action::Quit, &self.quit),
@@ -136,6 +159,7 @@ impl Config {
 impl Merge for Config {
     fn merge(&mut self, other: Self) {
         merge!(self, other; quit, help);
+        self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
     }
@@ -146,6 +170,7 @@ impl Default for Config {
         Self {
             quit: Key::normal('q'),
             help: Key::normal('?'),
+            special_commands: Self::default_special_commands(),
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
@@ -244,6 +269,7 @@ pub struct FiletreeConfig {
     pub git_new_style: Style,
     pub git_modified_style: Style,
 
+    pub open_special_commands: Key,
     pub down: Key,
     pub up: Key,
     pub all_up: Key,
@@ -291,6 +317,7 @@ impl Default for FiletreeConfig {
             new_dir: Key::normal('N'),
             git_filter: Key::normal('T'),
             diff_mode: Key::normal('t'),
+            open_special_commands: Key::normal('v'),
 
             selected: Style::bg(Color::Black, Color::LightGreen),
             filtered_out_message: Style::color(Color::Yellow),

@@ -45,6 +45,7 @@ pub struct App {
     input_box: InputBox,
     previewer: PreviewFile,
     text_popup: Popup,
+    file_cmd_popup: FileCmdPopup,
     config: Rc<Config>,
 }
 
@@ -62,6 +63,7 @@ impl App {
             previewer: PreviewFile::with_config(Rc::clone(&config)),
             text_popup: Popup::default(),
             config: Rc::clone(&config),
+            file_cmd_popup: FileCmdPopup::new(queue.clone(), Rc::clone(&config)),
             queue,
         })
     }
@@ -129,6 +131,7 @@ impl App {
                     }
                     self.tree.only_include(results.as_ref())?;
                 }
+                AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
             }
         }
 
@@ -136,8 +139,10 @@ impl App {
     }
 
     pub fn handle_event(&mut self, ev: &ExternalEvent) -> Result<()> {
-        let popup_open =
-            self.pending.visible() || self.input_box.visible() || self.text_popup.visible();
+        let popup_open = self.pending.visible()
+            || self.input_box.visible()
+            || self.text_popup.visible()
+            || self.file_cmd_popup.visible();
         // Do not give the Filetree or previewer focus if there are any popups open
         self.tree.focus(!popup_open);
         self.previewer.focus(!popup_open);
@@ -147,6 +152,7 @@ impl App {
         self.tree.handle_event(ev)?;
         self.previewer.handle_event(ev)?;
         self.text_popup.handle_event(ev)?;
+        self.file_cmd_popup.handle_event(ev)?;
 
         if popup_open {
             return Ok(());
@@ -200,6 +206,7 @@ impl Drawable for App {
         self.pending.draw(f, area)?;
         self.input_box.draw(f, area)?;
         self.text_popup.draw(f, area)?;
+        self.file_cmd_popup.draw(f, area)?;
 
         Ok(())
     }

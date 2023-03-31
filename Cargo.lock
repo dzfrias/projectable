@@ -202,6 +202,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "collect-all"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d12a3ccd19f0e6e7f1e14ffcab9c7a083ed327665a4c86d05c4548b5a0196"
+
+[[package]]
 name = "concolor-override"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1032,6 +1038,7 @@ dependencies = [
  "ansi-to-tui",
  "anyhow",
  "assert_fs",
+ "collect-all",
  "crossbeam-channel",
  "crossterm",
  "dirs-next",
@@ -1039,6 +1046,7 @@ dependencies = [
  "easy_switch",
  "env_logger",
  "git2",
+ "globset",
  "human-panic",
  "ignore",
  "itertools",

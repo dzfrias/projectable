@@ -26,6 +26,7 @@ pub enum InputOperation {
     Command {
         to: PathBuf,
     },
+    SpecialCommand(String),
     SearchFiles,
     #[default]
     NoOperations,
@@ -135,6 +136,10 @@ impl Component for InputBox {
                         InputOperation::SearchFiles => {
                             self.queue.add(AppEvent::SearchFiles(self.text.clone()));
                         }
+                        InputOperation::SpecialCommand(cmd) => {
+                            let full_cmd = cmd.replace("{...}", self.text.as_str());
+                            self.queue.add(AppEvent::RunCommand(full_cmd));
+                        }
 
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };
@@ -171,6 +176,7 @@ impl Drawable for InputBox {
         let area = ui::centered_rect_absolute(50, 3, area);
         let title = match self.operation {
             InputOperation::Command { .. } => "Run Command",
+            InputOperation::SpecialCommand(_) => "Command Input",
             InputOperation::NewDir { .. } => "New Directory",
             InputOperation::NewFile { .. } => "New File",
             InputOperation::SearchFiles => "Search",

@@ -391,6 +391,11 @@ impl Component for Filetree {
                     },
                     self.config.filetree.close_all => self.state.get_mut().close_all(),
                     self.config.filetree.open_all => self.open_all(),
+                    self.config.filetree.open_special_commands => {
+                        if let Some(selected) = self.get_selected() {
+                            self.queue.add(AppEvent::SpecialCommand(selected.path().to_path_buf()));
+                        }
+                    },
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
