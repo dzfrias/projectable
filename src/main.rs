@@ -128,9 +128,9 @@ fn run_app(
                         terminal.clear().expect("error clearing terminal");
                     }
                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
-                    *poll_state.lock().unwrap() = PollState::Paused;
+                    *poll_state.lock().expect("error locking mutex") = PollState::Paused;
                     Command::new(editor).arg(path).status()?;
-                    *poll_state.lock().unwrap() = PollState::Polling;
+                    *poll_state.lock().expect("error locking mutex") = PollState::Polling;
                 }
             },
             Err(err) => {

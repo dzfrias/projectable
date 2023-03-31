@@ -26,7 +26,9 @@ pub fn crossterm_watch(event_sender: Sender<ExternalEvent>) -> Arc<Mutex<PollSta
             // Non-blocking event read
             match event::poll(Duration::from_millis(POLL_TIME)) {
                 Ok(can_poll) => {
-                    if !can_poll || *poll_state.lock().unwrap() == PollState::Paused {
+                    if !can_poll
+                        || *poll_state.lock().expect("error locking mutex") == PollState::Paused
+                    {
                         continue;
                     }
                     match event::read() {
