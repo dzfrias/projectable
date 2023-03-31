@@ -26,6 +26,7 @@ pub struct Marks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_log::test;
 
     #[test]
     fn getting_marks_file_uses_custom_environment_variable() {
@@ -37,7 +38,7 @@ mod tests {
     }
 
     #[test]
-    fn gets_correct_data_location_on_mac() {
+    fn gets_correct_data_location() {
         #[cfg(not(target_os = "windows"))]
         let correct_path = dirs_next::home_dir()
             .unwrap()
@@ -51,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     fn getting_correct_data_location_looks_at_xdg_data_home() {
         env::set_var("XDG_DATA_HOME", ".");
         assert_eq!(
