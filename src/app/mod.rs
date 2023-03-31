@@ -24,7 +24,6 @@ use std::{
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
     widgets::{Block, Borders},
     Frame,
 };
