@@ -96,6 +96,10 @@ pub struct Config {
     #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
 
+    pub selected: Style,
+    pub popup_border_style: Style,
+    pub help_key_style: Style,
+
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
     pub log: LogConfig,
@@ -172,7 +176,19 @@ impl Config {
 
 impl Merge for Config {
     fn merge(&mut self, other: Self) {
-        merge!(self, other; quit, help, down, up, all_down, all_up, open);
+        merge!(
+            self, other;
+            quit,
+            help,
+            down,
+            up,
+            all_down,
+            all_up,
+            open,
+            selected,
+            popup_border_style,
+            help_key_style
+        );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
@@ -191,6 +207,13 @@ impl Default for Config {
             all_up: Key::normal('g'),
             all_down: Key::normal('G'),
             special_commands: Self::default_special_commands(),
+            selected: Style::bg(Color::Black, Color::LightGreen),
+            popup_border_style: Style::default(),
+            help_key_style: Style {
+                color: Color::LightCyan,
+                bg: Color::Reset,
+                mods: Modifier(TuiModifier::BOLD),
+            },
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
@@ -283,7 +306,6 @@ pub struct FiletreeConfig {
     pub refresh_time: u64,
     pub dirs_first: bool,
 
-    pub selected: Style,
     pub filtered_out_message: Style,
     pub border_color: Style,
     pub added_style: Style,
@@ -327,7 +349,6 @@ impl Default for FiletreeConfig {
             diff_mode: Key::normal('t'),
             special_command: Key::normal('v'),
 
-            selected: Style::bg(Color::Black, Color::LightGreen),
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::default(),
             added_style: Style::color(Color::Green),
@@ -355,7 +376,6 @@ impl Merge for FiletreeConfig {
             new_dir,
             git_filter,
             diff_mode,
-            selected,
             filtered_out_message,
             border_color,
             added_style,

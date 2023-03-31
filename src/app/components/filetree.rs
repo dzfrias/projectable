@@ -260,7 +260,7 @@ impl Drawable for Filetree {
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_style(self.config.filetree.border_color.into());
-            let tree = Tree::new(items).highlight_style(self.config.filetree.selected.into());
+            let tree = Tree::new(items).highlight_style(self.config.selected.into());
             let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
                 .alignment(Alignment::Center)
                 .wrap(Wrap { trim: true })
@@ -276,7 +276,7 @@ impl Drawable for Filetree {
                         .borders(Borders::ALL)
                         .border_style(self.config.filetree.border_color.into()),
                 )
-                .highlight_style(self.config.filetree.selected.into());
+                .highlight_style(self.config.selected.into());
             f.render_stateful_widget(tree, area, &mut state);
         }
 

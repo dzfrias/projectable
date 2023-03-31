@@ -15,7 +15,6 @@ use std::{cell::Cell, path::PathBuf, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
-    style::{Color, Style},
     widgets::{Block, Borders, Clear, List, ListItem, ListState},
     Frame,
 };
@@ -195,8 +194,12 @@ impl Drawable for FileCmdPopup {
             .map(|command| ListItem::new(command.as_str()))
             .collect_vec();
         let list = List::new(commands)
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen))
-            .block(Block::default().borders(Borders::ALL));
+            .highlight_style(self.config.selected.into())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(self.config.popup_border_style.into()),
+            );
         let area = ui::centered_rect_absolute(50, 10, area);
         f.render_widget(Clear, area);
         let mut state = self.state.take();

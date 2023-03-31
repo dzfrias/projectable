@@ -12,7 +12,6 @@ use std::{cell::Cell, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
-    style::{Color, Modifier, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -127,9 +126,7 @@ impl Drawable for Popup {
                                 Span::styled(
                                     // Pad based on longest key length
                                     format!("{:width$}", key, width = longest_key_len + 1),
-                                    Style::default()
-                                        .fg(Color::Cyan)
-                                        .add_modifier(Modifier::BOLD),
+                                    self.config.help_key_style.into(),
                                 ),
                                 Span::raw(description),
                             ])
@@ -152,7 +149,12 @@ impl Drawable for Popup {
             }
         };
         let paragraph = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).title(title))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(self.config.popup_border_style.into()),
+            )
             .scroll((scroll, 0));
         self.scroll_y.set(scroll);
 

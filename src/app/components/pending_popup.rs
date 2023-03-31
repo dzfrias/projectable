@@ -13,7 +13,6 @@ use std::{cell::Cell, path::PathBuf};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
@@ -138,8 +137,7 @@ impl Drawable for PendingPopup {
             return Ok(());
         }
         let items = [ListItem::new("Confirm"), ListItem::new("Deny")];
-        let list = List::new(items)
-            .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+        let list = List::new(items).highlight_style(self.config.selected.into());
         let area = ui::centered_rect(30, 20, area);
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -152,6 +150,7 @@ impl Drawable for PendingPopup {
             Block::default()
                 .title("Confirm")
                 .borders(Borders::ALL)
+                .border_style(self.config.popup_border_style.into())
                 .title_alignment(Alignment::Center),
             area,
         );
