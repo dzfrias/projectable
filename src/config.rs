@@ -140,7 +140,7 @@ impl Config {
             (Action::FiletreeDiffMode, &self.filetree.diff_mode),
             (
                 Action::FiletreeSpecialCommand,
-                &self.filetree.open_special_commands,
+                &self.filetree.special_command,
             ),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
@@ -284,7 +284,7 @@ pub struct FiletreeConfig {
     pub git_new_style: Style,
     pub git_modified_style: Style,
 
-    pub open_special_commands: Key,
+    pub special_command: Key,
     pub down_three: Key,
     pub up_three: Key,
     pub exec_cmd: Key,
@@ -319,7 +319,7 @@ impl Default for FiletreeConfig {
             new_dir: Key::normal('N'),
             git_filter: Key::normal('T'),
             diff_mode: Key::normal('t'),
-            open_special_commands: Key::normal('v'),
+            special_command: Key::normal('v'),
 
             selected: Style::bg(Color::Black, Color::LightGreen),
             filtered_out_message: Style::color(Color::Yellow),
@@ -355,7 +355,7 @@ impl Merge for FiletreeConfig {
             added_style,
             git_new_style,
             git_modified_style,
-            open_special_commands
+            special_command
         );
     }
 }
@@ -569,6 +569,10 @@ impl<'de> Visitor<'de> for KeyVisitor {
             "up" => KeyCode::Up,
             "left" => KeyCode::Left,
             "right" => KeyCode::Right,
+            "enter" => KeyCode::Enter,
+            "backspace" => KeyCode::Backspace,
+            "tab" => KeyCode::Tab,
+            "backtab" => KeyCode::BackTab,
             k => {
                 if k.len() > 1 || key.is_empty() {
                     return Err(E::custom("invalid key"));
@@ -607,7 +611,11 @@ impl Display for Key {
             KeyCode::Down => key_parts.push_str("down"),
             KeyCode::Right => key_parts.push_str("right"),
             KeyCode::Left => key_parts.push_str("left"),
-            _ => unreachable!(),
+            KeyCode::Enter => key_parts.push_str("enter"),
+            KeyCode::Backspace => key_parts.push_str("backspace"),
+            KeyCode::Tab => key_parts.push_str("tab"),
+            KeyCode::BackTab => key_parts.push_str("backtab"),
+            _ => panic!("key conversion not set for: \"{:?}\"", self.code),
         }
 
         write!(f, "{key_parts}")

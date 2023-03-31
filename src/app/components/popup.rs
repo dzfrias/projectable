@@ -61,9 +61,7 @@ impl Component for Popup {
                     }
                 },
                 self.config.all_up => *self.scroll_y.get_mut() = 0,
-                self.config.all_down => {
-                    *self.scroll_y.get_mut() = u16::MAX
-                },
+                self.config.all_down => *self.scroll_y.get_mut() = u16::MAX,
                 self.config.quit => self.preset = Preset::Nothing,
             }
         }
@@ -80,31 +78,47 @@ impl Drawable for Popup {
 
         let (text, title, len) = match self.preset {
             Preset::Help => {
-                // TODO: Use config
                 let keybinds = [
-                    ("Enter", "Open file/toggle opened"),
-                    ("j", "Move down"),
-                    ("k", "Move up"),
-                    ("g", "Go to bottom"),
-                    ("G", "Go to top"),
-                    ("Ctrl-n", "Move down by 3"),
-                    ("Ctrl-p", "Move up by 3"),
-                    ("d", "Delete file"),
-                    ("n", "Create new file"),
-                    ("N", "Create new directory"),
-                    ("/", "Search"),
-                    ("\\", "Clear search"),
-                    ("Ctrl-d", "Preview down"),
-                    ("Ctrl-u", "Preview up"),
-                    ("t", "Toggle diff view"),
-                    ("T", "Filter for files with new git changes"),
-                    ("e", "Execute command"),
+                    (self.config.open.to_string(), "Open file/toggle opened"),
+                    (self.config.down.to_string(), "Move down"),
+                    (self.config.up.to_string(), "Move up"),
+                    (self.config.all_up.to_string(), "Go to bottom"),
+                    (self.config.all_down.to_string(), "Go to top"),
+                    (
+                        self.config.filetree.down_three.to_string(),
+                        "Move down by 3",
+                    ),
+                    (self.config.filetree.up_three.to_string(), "Move up by 3"),
+                    (self.config.filetree.delete.to_string(), "Delete file"),
+                    (self.config.filetree.new_file.to_string(), "Create new file"),
+                    (
+                        self.config.filetree.new_dir.to_string(),
+                        "Create new directory",
+                    ),
+                    (self.config.filetree.search.to_string(), "Search"),
+                    (self.config.filetree.clear.to_string(), "Clear search"),
+                    (self.config.preview.up_key.to_string(), "Preview down"),
+                    (self.config.preview.down_key.to_string(), "Preview up"),
+                    (
+                        self.config.filetree.diff_mode.to_string(),
+                        "Toggle diff view",
+                    ),
+                    (
+                        self.config.filetree.git_filter.to_string(),
+                        "Filter for files with new git changes",
+                    ),
+                    (self.config.filetree.exec_cmd.to_string(), "Execute command"),
+                    (
+                        self.config.filetree.special_command.to_string(),
+                        "Execute special command",
+                    ),
                 ];
                 let longest_key_len = keybinds
                     .iter()
                     .map(|(key, _)| key.len())
                     .max()
                     .expect("should not be empty");
+                let len = keybinds.len() as u16;
                 (
                     keybinds
                         .into_iter()
@@ -122,7 +136,7 @@ impl Drawable for Popup {
                         })
                         .collect_vec(),
                     "Help",
-                    keybinds.len() as u16,
+                    len,
                 )
             }
             Preset::Nothing => unreachable!("checked at top of method"),
