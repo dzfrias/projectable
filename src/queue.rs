@@ -43,4 +43,7 @@ pub enum AppEvent {
     SearchFiles(String),
     TogglePreviewMode,
     SpecialCommand(PathBuf),
+    GotoFile(PathBuf),
+    Mark(PathBuf),
+    DeleteMark(PathBuf),
 }

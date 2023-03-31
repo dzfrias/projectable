@@ -33,6 +33,8 @@ use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 #[derive(Debug)]
 pub enum TerminalEvent {
     OpenFile(PathBuf),
+    WriteMark(PathBuf),
+    DeleteMark(PathBuf),
 }
 
 pub struct App {
@@ -45,16 +47,22 @@ pub struct App {
     previewer: PreviewFile,
     text_popup: Popup,
     file_cmd_popup: FileCmdPopup,
+    marks_popup: MarksPopup,
     config: Rc<Config>,
 }
 
 impl App {
-    pub fn new(path: impl AsRef<Path>, cwd: impl AsRef<Path>, config: Rc<Config>) -> Result<Self> {
+    pub fn new(
+        path: PathBuf,
+        cwd: impl AsRef<Path>,
+        config: Rc<Config>,
+        marks: Vec<PathBuf>,
+    ) -> Result<Self> {
         let queue = Queue::new();
         let mut tree = Filetree::from_dir_with_config(&path, queue.clone(), Rc::clone(&config))?;
         tree.open_path(cwd)?;
         Ok(App {
-            path: path.as_ref().to_path_buf(),
+            path: path.clone(),
             tree,
             should_quit: false,
             pending: PendingPopup::new(queue.clone(), Rc::clone(&config)),
@@ -62,6 +70,7 @@ impl App {
             previewer: PreviewFile::with_config(Rc::clone(&config)),
             text_popup: Popup::new(Rc::clone(&config)),
             config: Rc::clone(&config),
+            marks_popup: MarksPopup::new(marks, queue.clone(), Rc::clone(&config), path),
             file_cmd_popup: FileCmdPopup::new(queue.clone(), Rc::clone(&config)),
             queue,
         })
@@ -131,6 +140,16 @@ impl App {
                     self.tree.only_include(results.as_ref())?;
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
+                AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
+                AppEvent::Mark(path) => {
+                    // Because it's sent from `self.tree`, it has not been deleted in
+                    // `self.marks_popup` yet.
+                    self.marks_popup.add_mark(path.clone());
+                    return Ok(Some(TerminalEvent::WriteMark(path)));
+                }
+                // Because it's sent from `self.marks_popup,` we can assume it's been deleted
+                // internally already, just not in the file
+                AppEvent::DeleteMark(path) => return Ok(Some(TerminalEvent::DeleteMark(path))),
             }
         }
 
@@ -141,7 +160,8 @@ impl App {
         let popup_open = self.pending.visible()
             || self.input_box.visible()
             || self.text_popup.visible()
-            || self.file_cmd_popup.visible();
+            || self.file_cmd_popup.visible()
+            || self.marks_popup.visible();
         // Do not give the Filetree or previewer focus if there are any popups open
         self.tree.focus(!popup_open);
         self.previewer.focus(!popup_open);
@@ -152,6 +172,7 @@ impl App {
         self.previewer.handle_event(ev)?;
         self.text_popup.handle_event(ev)?;
         self.file_cmd_popup.handle_event(ev)?;
+        self.marks_popup.handle_event(ev)?;
 
         if popup_open {
             return Ok(());
@@ -160,6 +181,7 @@ impl App {
             switch! { key;
                 self.config.quit => self.should_quit = true,
                 self.config.help => self.text_popup.preset = Preset::Help,
+                self.config.marks.open => self.marks_popup.open(),
             }
         }
         Ok(())
@@ -211,6 +233,7 @@ impl Drawable for App {
         self.input_box.draw(f, area)?;
         self.text_popup.draw(f, area)?;
         self.file_cmd_popup.draw(f, area)?;
+        self.marks_popup.draw(f, area)?;
 
         Ok(())
     }

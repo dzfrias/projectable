@@ -5,10 +5,13 @@ use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, Merge},
     external_event::{self, PollState},
+    marks::{self, Marks},
 };
 use std::{
-    env, fs,
-    io::{self, Stdout},
+    collections::hash_map::Entry,
+    env,
+    fs::{self, File},
+    io::{self, Stdout, Write},
     panic,
     path::PathBuf,
     process::Command,
@@ -43,6 +46,18 @@ fn main() -> Result<()> {
             .expect("human-panic: printing error message to console failed");
     }));
 
+    let config = Rc::new(get_config()?);
+    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
+    let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
+    let mut all_marks = get_marks()?;
+    let project_marks = all_marks.marks.remove(&root).unwrap_or_default();
+    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config), project_marks)?;
+    run_app(&mut terminal, &mut app, Rc::clone(&config))?;
+
+    Ok(())
+}
+
+fn get_config() -> Result<Config> {
     let mut config = config::get_config_home()
         .map(|path| -> Result<Option<Config>> {
             if !path.join("config.toml").exists() {
@@ -60,17 +75,27 @@ fn main() -> Result<()> {
     }
     tui_logger::init_logger(config.log.log_level).unwrap();
     tui_logger::set_default_level(LevelFilter::Trace);
-    let config = Rc::new(config);
     let conflicts = config.check_conflicts();
     for conflict in conflicts {
         warn!("{conflict}");
     }
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
-    let root = find_project_root().ok_or(anyhow!("not in a project!"))?;
-    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config))?;
-    run_app(&mut terminal, &mut app, Rc::clone(&config))?;
 
-    Ok(())
+    Ok(config)
+}
+
+fn get_marks() -> Result<Marks> {
+    marks::get_marks_file()
+        .map(|path| -> Result<Marks> {
+            if !path.exists() {
+                fs::create_dir_all(path.parent().expect("data dir should have parent"))?;
+                let mut file = File::create(path)?;
+                file.write_all(b"{}")?;
+                return Ok(Marks::default());
+            }
+            let contents = fs::read_to_string(path)?;
+            Ok(serde_json::from_str(&contents)?)
+        })
+        .unwrap_or(Ok(Marks::default()))
 }
 
 fn find_project_root() -> Option<PathBuf> {
@@ -131,9 +156,46 @@ fn run_app(
                     Command::new(editor).arg(path).status()?;
                     *poll_state.lock().expect("error locking mutex") = PollState::Polling;
                 }
+                TerminalEvent::WriteMark(path) => match get_marks() {
+                    Ok(mut marks) => {
+                        match marks.marks.entry(app.path().to_path_buf()) {
+                            Entry::Vacant(entry) => drop(entry.insert(vec![path])),
+                            Entry::Occupied(mut entry) => {
+                                if !entry.get().contains(&path) {
+                                    entry.get_mut().push(path)
+                                }
+                            }
+                        }
+                        if let Err(err) = write_marks(&marks) {
+                            error!(" {err}")
+                        }
+                    }
+                    Err(err) => error!(" {err}"),
+                },
+                TerminalEvent::DeleteMark(path) => match get_marks() {
+                    Ok(mut marks) => {
+                        match marks.marks.entry(app.path().to_path_buf()) {
+                            Entry::Vacant(_) => {
+                                error!(" trying to delete mark that doesn't exist")
+                            }
+                            Entry::Occupied(mut entry) => {
+                                let position = entry.get().iter().position(|p| p == &path);
+                                if let Some(position) = position {
+                                    entry.get_mut().remove(position);
+                                } else {
+                                    error!(" trying to delete mark that doesn't exist")
+                                }
+                            }
+                        }
+                        if let Err(err) = write_marks(&marks) {
+                            error!(" {err}")
+                        }
+                    }
+                    Err(err) => error!(" {err}"),
+                },
             },
             Err(err) => {
-                error!(" {}", err);
+                error!(" {err}");
             }
             Ok(None) => {}
         }
@@ -143,6 +205,15 @@ fn run_app(
             return Ok(());
         }
     }
+}
+
+fn write_marks(marks: &Marks) -> Result<()> {
+    let json = serde_json::to_string(&marks)?;
+    fs::write(
+        marks::get_marks_file().expect("should not error here, would have errored earlier"),
+        json,
+    )?;
+    Ok(())
 }
 
 fn shut_down() {

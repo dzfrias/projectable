@@ -58,6 +58,7 @@ macro_rules! merge {
     }};
 }
 
+/// Every possible key action that can be pressed and is not part of a popup
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action {
@@ -70,6 +71,7 @@ pub enum Action {
     AllUp,
     AllDown,
     Open,
+    OpenMarks,
     FiletreeDownThree,
     FiletreeUpThree,
     FiletreeExecCmd,
@@ -81,6 +83,7 @@ pub enum Action {
     FiletreeGitFilter,
     FiletreeDiffMode,
     FiletreeSpecialCommand,
+    FiletreeMarkSelected,
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,6 +106,7 @@ pub struct Config {
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
     pub log: LogConfig,
+    pub marks: MarksConfig,
 }
 
 impl Config {
@@ -150,6 +154,8 @@ impl Config {
                 Action::FiletreeSpecialCommand,
                 &self.filetree.special_command,
             ),
+            (Action::FiletreeMarkSelected, &self.filetree.mark_selected),
+            (Action::OpenMarks, &self.marks.open),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
@@ -193,6 +199,7 @@ impl Merge for Config {
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
         self.log.merge(other.log);
+        self.marks.merge(other.marks);
     }
 }
 
@@ -218,6 +225,7 @@ impl Default for Config {
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
             log: LogConfig::default(),
+            marks: MarksConfig::default(),
         }
     }
 }
@@ -325,6 +333,7 @@ pub struct FiletreeConfig {
     pub diff_mode: Key,
     pub open_all: Key,
     pub close_all: Key,
+    pub mark_selected: Key,
 }
 
 impl Default for FiletreeConfig {
@@ -348,6 +357,7 @@ impl Default for FiletreeConfig {
             git_filter: Key::normal('T'),
             diff_mode: Key::normal('t'),
             special_command: Key::normal('v'),
+            mark_selected: Key::normal('m'),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::default(),
@@ -381,7 +391,8 @@ impl Merge for FiletreeConfig {
             added_style,
             git_new_style,
             git_modified_style,
-            special_command
+            special_command,
+            mark_selected
         );
     }
 }
@@ -417,6 +428,42 @@ impl Default for LogConfig {
 impl Merge for LogConfig {
     fn merge(&mut self, other: Self) {
         merge!(self, other; log_level, error, debug, warn, trace, info, border_color);
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct MarksConfig {
+    pub marks_dir: Option<PathBuf>,
+    pub relative: bool,
+
+    pub open: Key,
+    pub delete: Key,
+    pub mark_style: Style,
+}
+
+impl Default for MarksConfig {
+    fn default() -> Self {
+        Self {
+            marks_dir: None,
+            relative: true,
+            open: Key::normal('M'),
+            delete: Key::normal('d'),
+            mark_style: Style::default(),
+        }
+    }
+}
+
+impl Merge for MarksConfig {
+    fn merge(&mut self, other: Self) {
+        merge!(
+            self, other;
+            marks_dir,
+            relative,
+            open,
+            delete,
+            mark_style
+        );
     }
 }
 

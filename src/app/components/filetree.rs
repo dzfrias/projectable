@@ -398,6 +398,11 @@ impl Component for Filetree {
                             self.queue.add(AppEvent::SpecialCommand(selected.path().to_path_buf()));
                         }
                     },
+                    self.config.filetree.mark_selected => {
+                        if let Some(selected) = self.get_selected() {
+                            self.queue.add(AppEvent::Mark(selected.path().to_path_buf()));
+                        }
+                    },
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
@@ -737,5 +742,18 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.open_all();
         assert_eq!(3, filetree.state.get_mut().get_all_opened().len());
+    }
+
+    #[test]
+    fn can_mark_selected() {
+        let temp = temp_files!("test.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        let path = temp.path().to_path_buf();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let event = input_event!(KeyCode::Char('m'));
+        assert!(filetree.handle_event(&event).is_ok());
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::Mark(path.join("test.txt"))))
     }
 }
