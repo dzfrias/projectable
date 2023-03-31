@@ -62,21 +62,22 @@ pub enum Action {
     Help,
     PreviewDown,
     PreviewUp,
-    FiletreeDown,
-    FiletreeUp,
-    FiletreeAllUp,
-    FiletreeAllDown,
+    Down,
+    Up,
+    AllUp,
+    AllDown,
+    Open,
     FiletreeDownThree,
     FiletreeUpThree,
     FiletreeExecCmd,
     FiletreeDelete,
     FiletreeSearch,
     FiletreeClear,
-    FiletreeOpen,
     FiletreeNewFile,
     FiletreeNewDir,
     FiletreeGitFilter,
     FiletreeDiffMode,
+    FiletreeSpecialCommand,
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +85,11 @@ pub enum Action {
 pub struct Config {
     pub quit: Key,
     pub help: Key,
+    pub down: Key,
+    pub up: Key,
+    pub all_down: Key,
+    pub all_up: Key,
+    pub open: Key,
     #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
 
@@ -115,23 +121,27 @@ impl Config {
         let keys = [
             (Action::Quit, &self.quit),
             (Action::Help, &self.help),
+            (Action::Down, &self.down),
+            (Action::Open, &self.open),
+            (Action::Up, &self.up),
+            (Action::AllDown, &self.all_down),
+            (Action::AllUp, &self.all_up),
             (Action::PreviewDown, &self.preview.down_key),
             (Action::PreviewUp, &self.preview.up_key),
-            (Action::FiletreeUp, &self.filetree.up),
-            (Action::FiletreeDown, &self.filetree.down),
-            (Action::FiletreeAllUp, &self.filetree.all_up),
-            (Action::FiletreeAllDown, &self.filetree.all_down),
             (Action::FiletreeUpThree, &self.filetree.up_three),
             (Action::FiletreeDownThree, &self.filetree.down_three),
             (Action::FiletreeExecCmd, &self.filetree.exec_cmd),
             (Action::FiletreeDelete, &self.filetree.delete),
             (Action::FiletreeSearch, &self.filetree.search),
             (Action::FiletreeClear, &self.filetree.clear),
-            (Action::FiletreeOpen, &self.filetree.open),
             (Action::FiletreeNewFile, &self.filetree.new_file),
             (Action::FiletreeNewDir, &self.filetree.new_dir),
             (Action::FiletreeGitFilter, &self.filetree.git_filter),
             (Action::FiletreeDiffMode, &self.filetree.diff_mode),
+            (
+                Action::FiletreeSpecialCommand,
+                &self.filetree.open_special_commands,
+            ),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
@@ -158,7 +168,7 @@ impl Config {
 
 impl Merge for Config {
     fn merge(&mut self, other: Self) {
-        merge!(self, other; quit, help);
+        merge!(self, other; quit, help, down, up, all_down, all_up, open);
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
@@ -170,6 +180,11 @@ impl Default for Config {
         Self {
             quit: Key::normal('q'),
             help: Key::normal('?'),
+            down: Key::normal('j'),
+            up: Key::normal('k'),
+            open: Key::key_code(KeyCode::Enter),
+            all_up: Key::normal('g'),
+            all_down: Key::normal('G'),
             special_commands: Self::default_special_commands(),
 
             preview: PreviewConfig::default(),
@@ -270,17 +285,12 @@ pub struct FiletreeConfig {
     pub git_modified_style: Style,
 
     pub open_special_commands: Key,
-    pub down: Key,
-    pub up: Key,
-    pub all_up: Key,
-    pub all_down: Key,
     pub down_three: Key,
     pub up_three: Key,
     pub exec_cmd: Key,
     pub delete: Key,
     pub search: Key,
     pub clear: Key,
-    pub open: Key,
     pub new_file: Key,
     pub new_dir: Key,
     pub git_filter: Key,
@@ -297,20 +307,12 @@ impl Default for FiletreeConfig {
             dirs_first: true,
             ignore: Vec::new(),
             refresh_time: 1000,
-            down: Key::normal('j'),
-            up: Key::normal('k'),
-            all_up: Key::normal('g'),
-            all_down: Key::normal('G'),
             down_three: Key::ctrl('n'),
             up_three: Key::ctrl('p'),
             exec_cmd: Key::normal('e'),
             delete: Key::normal('d'),
             search: Key::normal('/'),
             clear: Key::normal('\\'),
-            open: Key {
-                code: KeyCode::Enter,
-                mods: KeyModifiers::NONE,
-            },
             open_all: Key::normal('o'),
             close_all: Key::normal('O'),
             new_file: Key::normal('n'),
@@ -338,17 +340,12 @@ impl Merge for FiletreeConfig {
             use_gitignore,
             dirs_first,
             refresh_time,
-            down,
-            up,
-            all_up,
-            all_down,
             down_three,
             up_three,
             exec_cmd,
             delete,
             search,
             clear,
-            open,
             new_dir,
             git_filter,
             diff_mode,
@@ -357,7 +354,8 @@ impl Merge for FiletreeConfig {
             border_color,
             added_style,
             git_new_style,
-            git_modified_style
+            git_modified_style,
+            open_special_commands
         );
     }
 }
@@ -630,6 +628,13 @@ impl Key {
             mods: KeyModifiers::CONTROL,
         }
     }
+
+    pub fn key_code(code: KeyCode) -> Self {
+        Self {
+            code,
+            mods: KeyModifiers::NONE,
+        }
+    }
 }
 
 impl PartialEq<&KeyEvent> for Key {
@@ -779,11 +784,11 @@ mod tests {
     fn properly_reports_keybind_conflicts() {
         let mut config = Config::default();
         config.help = Key::normal('q');
-        config.filetree.down = Key::normal('q');
+        config.down = Key::normal('q');
         assert_eq!(
             vec![KeyConflict {
                 on: &Key::normal('q'),
-                conflictors: vec![Action::Quit, Action::Help, Action::FiletreeDown]
+                conflictors: vec![Action::Quit, Action::Help, Action::Down]
             }],
             config.check_conflicts()
         );

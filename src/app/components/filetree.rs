@@ -317,10 +317,10 @@ impl Component for Filetree {
                 let mut refresh_preview = true;
                 let not_empty = !items.is_empty();
                 switch! { key;
-                    self.config.filetree.all_up => self.state.get_mut().select_first(),
-                    self.config.filetree.all_down => self.state.get_mut().select_last(&items),
-                    self.config.filetree.down, not_empty => self.state.get_mut().key_down(&items),
-                    self.config.filetree.up, not_empty => self.state.get_mut().key_up(&items),
+                    self.config.all_up => self.state.get_mut().select_first(),
+                    self.config.all_down => self.state.get_mut().select_last(&items),
+                    self.config.down, not_empty => self.state.get_mut().key_down(&items),
+                    self.config.up, not_empty => self.state.get_mut().key_up(&items),
                     self.config.filetree.down_three, not_empty => {
                         for _ in 0..JUMP_DOWN_AMOUNT {
                             self.state.get_mut().key_down(&items);
@@ -362,7 +362,7 @@ impl Component for Filetree {
                         info!(" refreshed filetree");
                         self.refresh()?;
                     },
-                    self.config.filetree.open => match self.get_selected() {
+                    self.config.open => match self.get_selected() {
                         Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),
                         Some(Item::File(file)) => self
                             .queue

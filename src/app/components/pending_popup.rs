@@ -1,13 +1,15 @@
-use std::{cell::Cell, path::PathBuf};
-
 use crate::app::component::{Component, Drawable};
+use crate::config::Config;
 use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
     ui,
 };
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::Event;
+use easy_switch::switch;
+use std::rc::Rc;
+use std::{cell::Cell, path::PathBuf};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -26,6 +28,7 @@ pub enum PendingOperation {
 pub struct PendingPopup {
     pub operation: PendingOperation,
     pub state: Cell<ListState>,
+    config: Rc<Config>,
     queue: Queue,
 }
 
@@ -37,18 +40,20 @@ impl Default for PendingPopup {
             state: state.into(),
             queue: Queue::default(),
             operation: PendingOperation::default(),
+            config: Config::default().into(),
         }
     }
 }
 
 impl PendingPopup {
-    pub fn new(queue: Queue) -> Self {
+    pub fn new(queue: Queue, config: Rc<Config>) -> Self {
         let mut state = ListState::default();
         state.select(Some(0));
         Self {
             queue,
             state: state.into(),
             operation: Default::default(),
+            config,
         }
     }
 
@@ -97,23 +102,11 @@ impl Component for PendingPopup {
         }
 
         if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
-            match key {
-                KeyEvent {
-                    code: KeyCode::Char('j'),
-                    ..
-                } => self.select_next(),
-                KeyEvent {
-                    code: KeyCode::Char('k'),
-                    ..
-                } => self.select_prev(),
-                KeyEvent {
-                    code: KeyCode::Esc | KeyCode::Char('q'),
-                    ..
-                } => self.reset_work(),
-                KeyEvent {
-                    code: KeyCode::Enter,
-                    ..
-                } => {
+            switch! { key;
+                self.config.down => self.select_next(),
+                self.config.up => self.select_prev(),
+                self.config.quit => self.reset_work(),
+                self.config.open => {
                     let selected = self
                         .state
                         .get_mut()
@@ -132,8 +125,7 @@ impl Component for PendingPopup {
                     };
                     self.queue.add(event);
                     self.reset_work();
-                }
-                _ => {}
+                },
             }
         }
         Ok(())

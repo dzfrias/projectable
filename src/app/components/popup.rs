@@ -1,13 +1,14 @@
-use std::cell::Cell;
-
 use crate::{
     app::component::{Component, Drawable},
+    config::Config,
     external_event::ExternalEvent,
     ui,
 };
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::Event;
+use easy_switch::switch;
 use itertools::Itertools;
+use std::{cell::Cell, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -28,13 +29,15 @@ pub enum Preset {
 pub struct Popup {
     pub preset: Preset,
     scroll_y: Cell<u16>,
+    config: Rc<Config>,
 }
 
 impl Popup {
-    pub fn new() -> Self {
+    pub fn new(config: Rc<Config>) -> Self {
         Self {
             preset: Preset::default(),
             scroll_y: 0.into(),
+            config,
         }
     }
 }
@@ -49,24 +52,19 @@ impl Component for Popup {
             return Ok(());
         }
 
-        if let ExternalEvent::Crossterm(Event::Key(KeyEvent { code, .. })) = ev {
-            match code {
-                KeyCode::Char('q') | KeyCode::Esc => self.preset = Preset::Nothing,
-                KeyCode::Char('k') => {
+        if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
+            switch! { key;
+                self.config.down => *self.scroll_y.get_mut() += 1,
+                self.config.up => {
                     if self.scroll_y.get() != 0 {
                         *self.scroll_y.get_mut() -= 1;
                     }
-                }
-                KeyCode::Char('j') => {
-                    *self.scroll_y.get_mut() += 1;
-                }
-                KeyCode::Char('g') => {
-                    *self.scroll_y.get_mut() = 0;
-                }
-                KeyCode::Char('G') => {
-                    *self.scroll_y.get_mut() = u16::MAX;
-                }
-                _ => {}
+                },
+                self.config.all_up => *self.scroll_y.get_mut() = 0,
+                self.config.all_down => {
+                    *self.scroll_y.get_mut() = u16::MAX
+                },
+                self.config.quit => self.preset = Preset::Nothing,
             }
         }
 
@@ -82,6 +80,7 @@ impl Drawable for Popup {
 
         let (text, title, len) = match self.preset {
             Preset::Help => {
+                // TODO: Use config
                 let keybinds = [
                     ("Enter", "Open file/toggle opened"),
                     ("j", "Move down"),
@@ -189,7 +188,8 @@ mod tests {
     fn g_and_shift_g_go_all_up_and_all_down() {
         let mut popup = Popup::default();
         popup.preset = Preset::Help;
-        let [all_up, all_down] = input_events!(KeyCode::Char('g'), KeyCode::Char('G'));
+        let [all_up, all_down] =
+            input_events!(KeyCode::Char('g'), KeyCode::Char('G'); KeyModifiers::SHIFT);
         popup.handle_event(&all_down).unwrap();
         assert_eq!(u16::MAX, popup.scroll_y.get());
         popup.handle_event(&all_up).unwrap();

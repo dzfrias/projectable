@@ -6,7 +6,8 @@ use crate::{
     ui,
 };
 use anyhow::Result;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::Event;
+use easy_switch::switch;
 use globset::{Glob, GlobMatcher};
 use itertools::Itertools;
 use std::{cell::Cell, path::PathBuf, rc::Rc};
@@ -44,6 +45,7 @@ pub struct FileCmdPopup {
     registry: Vec<FileCommand>,
     queue: Queue,
     opened: Option<(FileCommand, PathBuf)>,
+    config: Rc<Config>,
 }
 
 impl Default for FileCmdPopup {
@@ -75,6 +77,7 @@ impl FileCmdPopup {
             registry,
             state: state.into(),
             opened: None,
+            config,
         }
     }
 
@@ -146,30 +149,18 @@ impl Component for FileCmdPopup {
         }
 
         if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
-            match key {
-                KeyEvent {
-                    code: KeyCode::Char('j'),
-                    ..
-                } => {
-                    self.select_next();
-                }
-                KeyEvent {
-                    code: KeyCode::Char('k'),
-                    ..
-                } => self.select_prev(),
-                KeyEvent {
-                    code: KeyCode::Esc | KeyCode::Char('q'),
-                    ..
-                } => {
+            switch! { key;
+                self.config.down => self.select_next(),
+                self.config.up => self.select_prev(),
+                self.config.all_up => self.select_first(),
+                self.config.all_down => self.select_last(),
+                self.config.quit => {
                     let Some(opened) = self.opened.take() else {
                         unreachable!("checked at top of method");
                     };
                     self.registry.push(opened.0);
-                }
-                KeyEvent {
-                    code: KeyCode::Enter,
-                    ..
-                } => {
+                },
+                self.config.open => {
                     let Some(opened) = self.opened.take() else {
                         unreachable!("checked at top of method");
                     };
@@ -185,7 +176,6 @@ impl Component for FileCmdPopup {
                     }
                     self.registry.push(opened.0);
                 }
-                _ => {}
             }
         }
         Ok(())
