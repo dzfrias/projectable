@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Error};
 use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use itertools::Itertools;
+use log::LevelFilter;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -46,6 +47,8 @@ where
     }
 }
 
+/// Merge two structs against their default. As long as the right-hand merge is not the default,
+/// it replaces the left-hande merge.
 macro_rules! merge {
     ($first:expr, $second:expr; $($field:ident),+) => {{
         let base = Self::default();
@@ -95,6 +98,7 @@ pub struct Config {
 
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
+    pub log: LogConfig,
 }
 
 impl Config {
@@ -172,6 +176,7 @@ impl Merge for Config {
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
+        self.log.merge(other.log);
     }
 }
 
@@ -189,6 +194,7 @@ impl Default for Config {
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
+            log: LogConfig::default(),
         }
     }
 }
@@ -357,6 +363,40 @@ impl Merge for FiletreeConfig {
             git_modified_style,
             special_command
         );
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct LogConfig {
+    pub log_level: LevelFilter,
+
+    pub error: Style,
+    pub debug: Style,
+    pub warn: Style,
+    pub trace: Style,
+    pub info: Style,
+    pub border_color: Style,
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            log_level: LevelFilter::Info,
+
+            error: Style::color(Color::Red),
+            debug: Style::color(Color::Green),
+            warn: Style::color(Color::Yellow),
+            trace: Style::color(Color::Magenta),
+            info: Style::color(Color::Cyan),
+            border_color: Style::default(),
+        }
+    }
+}
+
+impl Merge for LogConfig {
+    fn merge(&mut self, other: Self) {
+        merge!(self, other; log_level, error, debug, warn, trace, info, border_color);
     }
 }
 

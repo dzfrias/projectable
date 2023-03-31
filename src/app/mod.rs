@@ -188,16 +188,21 @@ impl Drawable for App {
             .split(main_layout[0]);
 
         let logger = TuiLoggerWidget::default()
-            .style_error(Style::default().fg(Color::Red))
-            .style_debug(Style::default().fg(Color::Green))
-            .style_warn(Style::default().fg(Color::Yellow))
-            .style_trace(Style::default().fg(Color::Magenta))
-            .style_info(Style::default().fg(Color::Cyan))
+            .style_error(self.config.log.error.into())
+            .style_debug(self.config.log.debug.into())
+            .style_warn(self.config.log.warn.into())
+            .style_trace(self.config.log.trace.into())
+            .style_info(self.config.log.info.into())
             .output_level(Some(TuiLoggerLevelOutput::Long))
             .output_target(false)
             .output_file(false)
             .output_line(false)
-            .block(Block::default().borders(Borders::ALL).title("Log"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Log")
+                    .border_style(self.config.log.border_color.into()),
+            )
             .state(&TuiWidgetState::new());
 
         self.tree.draw(f, left_hand_layout[0])?;

@@ -25,9 +25,6 @@ use scopeguard::{defer, defer_on_success};
 use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
-    tui_logger::init_logger(LevelFilter::Info).unwrap();
-    tui_logger::set_default_level(LevelFilter::Trace);
-
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -61,6 +58,8 @@ fn main() -> Result<()> {
         let local_config = toml::from_str(&contents)?;
         config.merge(local_config);
     }
+    tui_logger::init_logger(config.log.log_level).unwrap();
+    tui_logger::set_default_level(LevelFilter::Trace);
     let config = Rc::new(config);
     let conflicts = config.check_conflicts();
     for conflict in conflicts {
