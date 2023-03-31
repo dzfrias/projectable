@@ -3,7 +3,7 @@ mod refresh;
 
 use anyhow::Error;
 use crossterm::event::Event;
-pub use crossterm_event::crossterm_watch;
+pub use crossterm_event::*;
 pub use refresh::fs_watch;
 use std::path::PathBuf;
 

@@ -4,7 +4,7 @@ use log::{error, warn, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, Merge},
-    external_event,
+    external_event::{self, PollState},
 };
 use std::{
     env, fs,
@@ -19,8 +19,9 @@ use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
 };
-use scopeguard::defer_on_success;
+use scopeguard::{defer, defer_on_success};
 use tui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> Result<()> {
@@ -101,7 +102,7 @@ fn run_app(
     let (event_send, event_recv) = unbounded();
     let _watcher =
         external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
-    external_event::crossterm_watch(event_send);
+    let poll_state = external_event::crossterm_watch(event_send);
 
     let mut first_run = true;
     loop {
@@ -121,11 +122,15 @@ fn run_app(
         match app.update() {
             Ok(Some(event)) => match event {
                 TerminalEvent::OpenFile(path) => {
+                    io::stdout().execute(LeaveAlternateScreen)?;
+                    defer! {
+                        io::stdout().execute(EnterAlternateScreen).expect("error entering alternate screen");
+                        terminal.clear().expect("error clearing terminal");
+                    }
                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
+                    *poll_state.lock().unwrap() = PollState::Paused;
                     Command::new(editor).arg(path).status()?;
-                    let mut stdout = io::stdout();
-                    execute!(stdout, EnterAlternateScreen)?;
-                    terminal.clear()?;
+                    *poll_state.lock().unwrap() = PollState::Polling;
                 }
             },
             Err(err) => {
