@@ -215,6 +215,7 @@ mod tests {
     use super::*;
     use crate::app::components::testing::*;
     use collect_all::collect;
+    use test_log::test;
 
     fn test_popup() -> FileCmdPopup {
         let mut config = Config::default();
