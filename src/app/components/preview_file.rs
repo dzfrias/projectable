@@ -82,7 +82,7 @@ impl PreviewFile {
         self.state.get_mut().reset();
         let replaced = {
             #[cfg(target_os = "windows")]
-            let replacement = file.as_ref().display().to_string();
+            let replacement = format!("\"{}\"", file.as_ref().display());
             #[cfg(not(target_os = "windows"))]
             let replacement = format!("'{}'", file.as_ref().display());
 
@@ -94,8 +94,9 @@ impl PreviewFile {
         };
 
         #[cfg(target_os = "windows")]
-        let out = Command::new("cmd")
-            .raw_arg(&format!("/C \"{replaced}\""))
+        let out = Command::new("cmd.exe")
+            // See https://github.com/rust-lang/rust/issues/92939
+            .raw_arg(&format!("/C {replaced}"))
             .output()
             .with_context(|| format!("problem running preview command with {replaced}"))?;
         #[cfg(not(target_os = "windows"))]
