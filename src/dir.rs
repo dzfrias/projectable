@@ -155,7 +155,7 @@ impl Dir {
 
         let location = self
             .location_by_path(parent)
-            .ok_or(anyhow!("invalid remove target"))?;
+            .ok_or(anyhow!("invalid add target"))?;
 
         let Item::Dir(parent) = self
             .nested_child_mut(&location)
