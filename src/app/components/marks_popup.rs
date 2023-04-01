@@ -66,6 +66,7 @@ impl MarksPopup {
     }
 
     pub fn close(&mut self) {
+        self.state.get_mut().select(Some(0));
         self.open = false;
     }
 
@@ -302,5 +303,13 @@ mod tests {
         assert!(popup.visible());
         popup.close();
         assert!(!popup.visible());
+    }
+
+    #[test]
+    fn resets_selected_when_closed() {
+        let mut popup = test_popup();
+        popup.select_next();
+        popup.close();
+        assert_eq!(0, popup.selected());
     }
 }
