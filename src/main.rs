@@ -48,6 +48,18 @@ fn main() -> Result<()> {
     }));
 
     let config = Rc::new(get_config()?);
+
+    #[cfg(debug_assertions)]
+    tui_logger::init_logger(LevelFilter::Trace).unwrap();
+    #[cfg(not(debug_assertions))]
+    tui_logger::init_logger(config.log.log_level).unwrap();
+
+    tui_logger::set_default_level(LevelFilter::Trace);
+    let conflicts = config.check_conflicts();
+    for conflict in conflicts {
+        warn!("{conflict}");
+    }
+
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
     let mut all_marks = get_marks()?;
@@ -79,12 +91,6 @@ fn get_config() -> Result<Config> {
         let contents = fs::read_to_string(local_config)?;
         let local_config = toml::from_str(&contents)?;
         config.merge(local_config);
-    }
-    tui_logger::init_logger(config.log.log_level).unwrap();
-    tui_logger::set_default_level(LevelFilter::Trace);
-    let conflicts = config.check_conflicts();
-    for conflict in conflicts {
-        warn!("{conflict}");
     }
 
     Ok(config)
