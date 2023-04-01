@@ -130,16 +130,15 @@ impl App {
                     .context("failed to preview while resolving event queue")?,
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
-                    if cfg!(target_os = "windows") {
-                        let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
-                        info!("\n{}", String::from_utf8_lossy(&output.stdout));
-                    } else {
-                        let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-                            .arg("-c")
-                            .arg(&cmd)
-                            .output()?;
-                        info!("\n{}", String::from_utf8_lossy(&output.stdout));
-                    }
+                    #[cfg(target_os = "windows")]
+                    let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
+                    #[cfg(not(target_os = "windows"))]
+                    let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
+                        .arg("-c")
+                        .arg(&cmd)
+                        .output()?;
+
+                    info!("\n{}", String::from_utf8_lossy(&output.stdout));
                 }
                 AppEvent::SearchFiles(search) => {
                     info!(" searching for: \"{}\"", search);

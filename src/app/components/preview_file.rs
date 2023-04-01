@@ -2,6 +2,7 @@ use ansi_to_tui::IntoText;
 use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
 use easy_switch::switch;
+use log::trace;
 use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
@@ -77,13 +78,11 @@ impl PreviewFile {
             bail!("should have command");
         }
         self.state.get_mut().reset();
-        // Cache has to be reset
         let replaced = {
-            let replacement = if cfg!(target_os = "windows") {
-                file.as_ref().display().to_string()
-            } else {
-                format!("'{}'", file.as_ref().display())
-            };
+            #[cfg(target_os = "windows")]
+            let replacement = format!("{:?}", file.as_ref());
+            #[cfg(not(target_os = "windows"))]
+            let replacement = format!("'{}'", file.as_ref().display());
 
             if self.mode == Mode::Preview {
                 self.config.preview.preview_cmd.replace("{}", &replacement)
@@ -91,29 +90,25 @@ impl PreviewFile {
                 self.git_cmd.replace("{}", &replacement)
             }
         };
-        self.contents = if cfg!(target_os = "windows") {
-            let out = Command::new("cmd")
-                .arg("/C")
-                .arg(&replaced)
-                .output()
-                .with_context(|| format!("problem running preview command with {replaced}"))?;
-            let output = if out.stdout.is_empty() && !out.stderr.is_empty() {
-                out.stderr
-            } else {
-                out.stdout
-            };
-            String::from_utf8_lossy(&output).to_string()
+
+        #[cfg(target_os = "windows")]
+        let out = Command::new("cmd")
+            .arg("/C")
+            .arg(&replaced)
+            .output()
+            .with_context(|| format!("problem running preview command with {replaced}"))?;
+        #[cfg(not(target_os = "windows"))]
+        let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
+            .arg("-c")
+            .arg(&replaced)
+            .output()
+            .with_context(|| format!("problem running preview command with {replaced}"))?;
+
+        trace!("ran preview command: \"{replaced}\"");
+        self.contents = if out.stdout.is_empty() && !out.stderr.is_empty() {
+            String::from_utf8_lossy(&out.stderr).to_string()
         } else {
-            let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-                .arg("-c")
-                .arg(&replaced)
-                .output()
-                .with_context(|| format!("problem running preview command with {replaced}"))?;
-            if out.stdout.is_empty() && !out.stderr.is_empty() {
-                String::from_utf8_lossy(&out.stderr).to_string()
-            } else {
-                String::from_utf8_lossy(&out.stdout).to_string()
-            }
+            String::from_utf8_lossy(&out.stdout).to_string()
         };
         Ok(())
     }
@@ -192,11 +187,11 @@ mod tests {
     use test_log::test;
 
     fn preview_default() -> String {
-        let program = if cfg!(target_os = "windows") {
-            "type {}"
-        } else {
-            "cat {}"
-        };
+        #[cfg(target_os = "windows")]
+        let program = "type {}";
+        #[cfg(not(target_os = "windows"))]
+        let program = "cat {}";
+
         program.to_owned()
     }
 
@@ -249,8 +244,6 @@ mod tests {
     }
 
     #[test]
-    // FIX: Does not work on windows yet
-    #[cfg(not(target_os = "windows"))]
     fn works_with_file_with_spaces() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
         let child = temp_dir.child("hello world");
