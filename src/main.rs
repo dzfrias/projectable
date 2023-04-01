@@ -163,8 +163,11 @@ fn run_app(
         match app.update() {
             Ok(Some(event)) => match event {
                 TerminalEvent::OpenFile(path) => {
-                    io::stdout().execute(LeaveAlternateScreen)?;
+                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+                    disable_raw_mode()?;
                     defer! {
+                        execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture).expect("error setting up screen");
+                        enable_raw_mode().expect("error enabling raw mode");
                         io::stdout().execute(EnterAlternateScreen).expect("error entering alternate screen");
                         terminal.clear().expect("error clearing terminal");
                     }
