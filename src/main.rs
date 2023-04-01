@@ -50,7 +50,7 @@ fn main() -> Result<()> {
     let config = Rc::new(get_config()?);
 
     #[cfg(debug_assertions)]
-    tui_logger::init_logger(LevelFilter::Trace).unwrap();
+    tui_logger::init_logger(LevelFilter::Debug).unwrap();
     #[cfg(not(debug_assertions))]
     tui_logger::init_logger(config.log.log_level).unwrap();
 
