@@ -8,7 +8,7 @@ use crate::{
     external_event::{ExternalEvent, RefreshData},
     queue::{AppEvent, Queue},
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use itertools::Itertools;
@@ -98,11 +98,7 @@ impl App {
                             .context("failed to remove dir while resolving event queue")?;
                         info!(" deleted directory \"{}\"", path.display());
                     }
-                    if let Err(err) = self.tree.partial_refresh(&RefreshData::Delete(path)) {
-                        if err.root_cause().to_string().as_str() != "invalid remove target" {
-                            bail!(err);
-                        }
-                    };
+                    self.tree.partial_refresh(&RefreshData::Delete(path))?;
                     self.queue.add(AppEvent::PreviewFile(
                         self.tree
                             .get_selected()

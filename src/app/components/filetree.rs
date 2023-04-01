@@ -6,12 +6,12 @@ use crate::{
     ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
 use itertools::Itertools;
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
@@ -326,9 +326,17 @@ impl Component for Filetree {
             ExternalEvent::RefreshFiletree => self.refresh().context("problem refreshing tree")?,
             ExternalEvent::PartialRefresh(data) => {
                 for refresh_data in data {
-                    self.partial_refresh(refresh_data).with_context(|| {
+                    if let Err(err) = self.partial_refresh(refresh_data).with_context(|| {
                         format!("problem partially refreshing tree with data: \"{data:?}\"")
-                    })?;
+                    }) {
+                        // Caused by weird fsevent bug, see https://github.com/notify-rs/notify/issues/272
+                        // for more info.
+                        if err.root_cause().to_string() == "invalid remove target" {
+                            debug!("swallowed invalid remove target error");
+                            continue;
+                        }
+                        bail!(err)
+                    };
                 }
             }
             ExternalEvent::Crossterm(Event::Key(key)) => {
@@ -777,5 +785,15 @@ mod tests {
         assert!(filetree
             .queue
             .contains(&AppEvent::Mark(path.join("test.txt"))))
+    }
+
+    #[test]
+    fn swallow_invalid_delete_external_events() {
+        let temp = temp_files!("test.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let event =
+            ExternalEvent::PartialRefresh(vec![RefreshData::Delete("does_not_exist.txt".into())]);
+        assert!(filetree.handle_event(&event).is_ok());
     }
 }
