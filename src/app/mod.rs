@@ -15,6 +15,7 @@ use itertools::Itertools;
 use log::{info, warn};
 use rust_search::SearchBuilder;
 use std::{
+    cell::RefCell,
     env,
     fs::{self, File},
     path::{Path, PathBuf},
@@ -56,10 +57,15 @@ impl App {
         path: PathBuf,
         cwd: impl AsRef<Path>,
         config: Rc<Config>,
-        marks: Vec<PathBuf>,
+        marks: Rc<RefCell<Vec<PathBuf>>>,
     ) -> Result<Self> {
         let queue = Queue::new();
-        let mut tree = Filetree::from_dir_with_config(&path, queue.clone(), Rc::clone(&config))?;
+        let mut tree = Filetree::from_dir_with_config(
+            &path,
+            queue.clone(),
+            Rc::clone(&config),
+            Rc::clone(&marks),
+        )?;
         tree.open_path(cwd)?;
         Ok(App {
             path: path.clone(),

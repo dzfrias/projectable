@@ -319,6 +319,7 @@ pub struct FiletreeConfig {
     pub added_style: Style,
     pub git_new_style: Style,
     pub git_modified_style: Style,
+    pub marks_style: Style,
 
     pub special_command: Key,
     pub down_three: Key,
@@ -364,6 +365,7 @@ impl Default for FiletreeConfig {
             added_style: Style::color(Color::Green),
             git_new_style: Style::color(Color::Red),
             git_modified_style: Style::color(Color::Blue),
+            marks_style: Style::color(Color::Yellow),
         }
     }
 }
@@ -392,7 +394,8 @@ impl Merge for FiletreeConfig {
             git_new_style,
             git_modified_style,
             special_command,
-            mark_selected
+            mark_selected,
+            marks_style
         );
     }
 }

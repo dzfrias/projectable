@@ -9,7 +9,11 @@ use anyhow::Result;
 use crossterm::event::Event;
 use easy_switch::switch;
 use itertools::Itertools;
-use std::{cell::Cell, path::PathBuf, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    path::PathBuf,
+    rc::Rc,
+};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -18,7 +22,8 @@ use tui::{
 };
 
 pub struct MarksPopup {
-    marks: Vec<PathBuf>,
+    // Must be an Rc<RefCell> so marks can be updated in filetree when changed
+    marks: Rc<RefCell<Vec<PathBuf>>>,
     queue: Queue,
     open: bool,
     config: Rc<Config>,
@@ -29,7 +34,7 @@ pub struct MarksPopup {
 impl Default for MarksPopup {
     fn default() -> Self {
         Self::new(
-            Vec::new(),
+            Default::default(),
             Queue::new(),
             Rc::new(Config::default()),
             ".".into(),
@@ -38,7 +43,12 @@ impl Default for MarksPopup {
 }
 
 impl MarksPopup {
-    pub fn new(marks: Vec<PathBuf>, queue: Queue, config: Rc<Config>, root: PathBuf) -> Self {
+    pub fn new(
+        marks: Rc<RefCell<Vec<PathBuf>>>,
+        queue: Queue,
+        config: Rc<Config>,
+        root: PathBuf,
+    ) -> Self {
         let mut state = ListState::default();
         state.select(Some(0));
         Self {
@@ -61,16 +71,16 @@ impl MarksPopup {
 
     pub fn add_mark(&mut self, path: PathBuf) {
         // Not a HashSet so it can be well-ordered
-        if self.marks.contains(&path) {
+        if self.marks.borrow().contains(&path) {
             return;
         }
-        self.marks.push(path);
+        self.marks.borrow_mut().push(path);
     }
 
     fn delete_selected(&mut self) {
-        self.marks.remove(self.selected());
+        self.marks.borrow_mut().remove(self.selected());
         if let Some(selected) = self.state.get_mut().selected() {
-            if selected >= self.marks.len() {
+            if selected >= self.marks.borrow().len() {
                 self.select_first();
             }
         } else {
@@ -87,7 +97,7 @@ impl MarksPopup {
 
     fn select_next(&mut self) {
         let current = self.selected();
-        if self.marks.is_empty() || current == self.marks.len() - 1 {
+        if self.marks.borrow().is_empty() || current == self.marks.borrow().len() - 1 {
             return;
         }
         self.state.get_mut().select(Some(current + 1));
@@ -106,10 +116,12 @@ impl MarksPopup {
     }
 
     fn select_last(&mut self) {
-        if self.marks.is_empty() {
+        if self.marks.borrow().is_empty() {
             return;
         }
-        self.state.get_mut().select(Some(self.marks.len() - 1));
+        self.state
+            .get_mut()
+            .select(Some(self.marks.borrow().len() - 1));
     }
 }
 
@@ -119,8 +131,8 @@ impl Drawable for MarksPopup {
             return Ok(());
         }
 
-        let marks = self
-            .marks
+        let marks = self.marks.borrow();
+        let marks = marks
             .iter()
             .map(|mark| {
                 ListItem::new(if self.config.marks.relative {
@@ -170,18 +182,26 @@ impl Component for MarksPopup {
                 self.config.all_up => self.select_first(),
                 self.config.all_down => self.select_last(),
                 self.config.open => {
-                    let selected = self.marks.get(self.selected());
+                    let selected = {
+                        let marks = self.marks.borrow();
+                        let selected = marks.get(self.selected()).cloned();
+                        selected
+                    };
                     // Will be `None` if there are no marks
                     if let Some(selected) = selected {
-                        self.queue.add(AppEvent::GotoFile(selected.clone()));
+                        self.queue.add(AppEvent::GotoFile(selected));
                         self.close();
                     }
                 },
                 self.config.marks.delete => {
-                    let selected = self.marks.get(self.selected());
+                    let selected = {
+                        let marks = self.marks.borrow();
+                        let selected = marks.get(self.selected()).cloned();
+                        selected
+                    };
                     // Will be `None` if there are no marks
                     if let Some(selected) = selected {
-                        self.queue.add(AppEvent::DeleteMark(selected.clone()));
+                        self.queue.add(AppEvent::DeleteMark(selected));
                         self.delete_selected();
                     }
                 },
@@ -200,7 +220,7 @@ mod tests {
 
     fn test_popup() -> MarksPopup {
         let mut popup = MarksPopup::new(
-            vec![".".into(), "/".into()],
+            Rc::new(RefCell::new(vec![".".into(), "/".into()])),
             Queue::new(),
             Rc::new(Config::default()),
             ".".into(),
@@ -218,16 +238,17 @@ mod tests {
     #[test]
     fn adding_marks_is_unique() {
         let mut popup = test_popup();
-        assert_eq!(2, popup.marks.len());
+        assert_eq!(2, popup.marks.borrow().len());
         popup.add_mark(".".into());
-        assert_eq!(2, popup.marks.len());
+        assert_eq!(2, popup.marks.borrow().len());
     }
 
     #[test]
     fn can_delete_marks() {
         let mut popup = test_popup();
         popup.delete_selected();
-        assert_eq!(PathBuf::from("/"), popup.marks[0])
+        let marks = popup.marks.borrow();
+        assert_eq!(PathBuf::from("/"), marks[0])
     }
 
     #[test]
@@ -241,7 +262,7 @@ mod tests {
     #[test]
     fn does_not_panic_with_zero_marks() {
         let mut popup = test_popup();
-        popup.marks = Vec::new();
+        popup.marks = Default::default();
         let events = input_events!(
             KeyCode::Char('j'),
             KeyCode::Char('k'),
@@ -266,7 +287,11 @@ mod tests {
     #[test]
     fn can_select_last() {
         let mut popup = test_popup();
-        popup.marks = vec![".".into(), "/".into(), "/test.txt".into()];
+        popup.marks = Rc::new(RefCell::new(vec![
+            ".".into(),
+            "/".into(),
+            "/test.txt".into(),
+        ]));
         popup.select_last();
         assert_eq!(2, popup.selected())
     }

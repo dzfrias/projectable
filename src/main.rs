@@ -8,6 +8,7 @@ use projectable::{
     marks::{self, Marks},
 };
 use std::{
+    cell::RefCell,
     collections::hash_map::Entry,
     env,
     fs::{self, File},
@@ -51,8 +52,13 @@ fn main() -> Result<()> {
     let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
     let mut all_marks = get_marks()?;
     let project_marks = all_marks.marks.remove(&root).unwrap_or_default();
-    let mut app = App::new(root, env::current_dir()?, Rc::clone(&config), project_marks)
-        .context("failed to create app")?;
+    let mut app = App::new(
+        root,
+        env::current_dir()?,
+        Rc::clone(&config),
+        Rc::new(RefCell::new(project_marks)),
+    )
+    .context("failed to create app")?;
     run_app(&mut terminal, &mut app, Rc::clone(&config))?;
 
     Ok(())
@@ -141,7 +147,7 @@ fn run_app(
             match event_recv.recv() {
                 Ok(event) => {
                     if let Err(err) = app.handle_event(&event) {
-                        error!(" {}", err);
+                        error!(" {err:#}");
                     }
                 }
                 Err(err) => bail!(err),
@@ -200,7 +206,7 @@ fn run_app(
                 },
             },
             Err(err) => {
-                error!(" {err}");
+                error!(" {err:#}");
             }
             Ok(None) => {}
         }

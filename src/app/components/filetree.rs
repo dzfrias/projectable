@@ -13,7 +13,7 @@ use git2::{Repository, Status};
 use itertools::Itertools;
 use log::{info, warn};
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
@@ -38,6 +38,7 @@ pub struct Filetree {
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
     ignore: Ignore,
+    marks: Rc<RefCell<Vec<PathBuf>>>,
 }
 
 impl Filetree {
@@ -59,6 +60,7 @@ impl Filetree {
             status_cache: None,
             config: Rc::new(Config::default()),
             ignore: Ignore::default(),
+            marks: Default::default(),
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -71,6 +73,7 @@ impl Filetree {
         path: impl AsRef<Path>,
         queue: Queue,
         config: Rc<Config>,
+        marks: Rc<RefCell<Vec<PathBuf>>>,
     ) -> Result<Self> {
         let ignore = IgnoreBuilder::new(path.as_ref())
             .ignore(&config.filetree.ignore)
@@ -91,6 +94,7 @@ impl Filetree {
             ignore,
             dir: tree,
             config: Rc::clone(&config),
+            marks,
             ..Self::from_dir(path, queue)?
         })
     }
@@ -254,6 +258,7 @@ impl Drawable for Filetree {
             &self.dir,
             self.status_cache.as_ref(),
             Rc::clone(&self.config),
+            &self.marks.borrow(),
         );
         let mut state = self.state.take();
 
@@ -314,7 +319,7 @@ impl Component for Filetree {
             return Ok(());
         }
 
-        let items = build_filetree(&self.dir, None, Rc::clone(&self.config));
+        let items = build_filetree(&self.dir, None, Rc::clone(&self.config), &[]);
 
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
@@ -444,25 +449,31 @@ fn build_filetree<'a>(
     tree: &'a Dir,
     statuses: Option<&HashMap<PathBuf, Status>>,
     config: Rc<Config>,
+    marks: &[PathBuf],
 ) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
-        let style = statuses.map_or(Style::default(), |statuses| {
-            statuses
-                .get(item.path())
-                .map_or(Style::default(), |status| match *status {
-                    Status::WT_NEW => Style::from(config.filetree.git_new_style),
-                    Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
-                    Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-                        Style::from(config.filetree.git_modified_style)
-                    }
-                    _ => Style::default(),
-                })
-        });
+        let style = 'style: {
+            if marks.iter().any(|path| path == item.path()) {
+                break 'style config.filetree.marks_style.into();
+            }
+            statuses.map_or(Style::default(), |statuses| {
+                statuses
+                    .get(item.path())
+                    .map_or(Style::default(), |status| match *status {
+                        Status::WT_NEW => Style::from(config.filetree.git_new_style),
+                        Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
+                        Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+                            Style::from(config.filetree.git_modified_style)
+                        }
+                        _ => Style::default(),
+                    })
+            })
+        };
         let tree_item = match item {
             Item::Dir(dir) => TreeItem::new(
                 last_of_path(dir.path()),
-                build_filetree(dir, statuses, Rc::clone(&config)),
+                build_filetree(dir, statuses, Rc::clone(&config), marks),
             )
             .style(style),
             Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
