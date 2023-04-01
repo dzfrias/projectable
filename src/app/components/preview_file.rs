@@ -3,9 +3,11 @@ use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
 use easy_switch::switch;
 use log::trace;
+#[cfg(not(target_os = "windows"))]
+use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
+use std::{cell::Cell, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
