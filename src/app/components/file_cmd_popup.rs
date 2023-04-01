@@ -198,7 +198,8 @@ impl Drawable for FileCmdPopup {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(self.config.popup_border_style.into()),
+                    .border_style(self.config.popup_border_style.into())
+                    .title("Special Commands"),
             );
         let area = ui::centered_rect_absolute(50, 10, area);
         f.render_widget(Clear, area);
