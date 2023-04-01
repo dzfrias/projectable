@@ -153,7 +153,7 @@ fn run_app(
             match event_recv.recv() {
                 Ok(event) => {
                     if let Err(err) = app.handle_event(&event) {
-                        error!(" {err:#}");
+                        error!("{err:#}");
                     }
                 }
                 Err(err) => bail!(err),
@@ -184,35 +184,35 @@ fn run_app(
                             }
                         }
                         if let Err(err) = write_marks(&marks) {
-                            error!(" {err}")
+                            error!("{err}")
                         }
                     }
-                    Err(err) => error!(" {err}"),
+                    Err(err) => error!("{err}"),
                 },
                 TerminalEvent::DeleteMark(path) => match get_marks() {
                     Ok(mut marks) => {
                         match marks.marks.entry(app.path().to_path_buf()) {
                             Entry::Vacant(_) => {
-                                error!(" trying to delete mark that doesn't exist")
+                                error!("trying to delete mark that doesn't exist")
                             }
                             Entry::Occupied(mut entry) => {
                                 let position = entry.get().iter().position(|p| p == &path);
                                 if let Some(position) = position {
                                     entry.get_mut().remove(position);
                                 } else {
-                                    error!(" trying to delete mark that doesn't exist")
+                                    error!("trying to delete mark that doesn't exist")
                                 }
                             }
                         }
                         if let Err(err) = write_marks(&marks) {
-                            error!(" {err}")
+                            error!("{err}")
                         }
                     }
-                    Err(err) => error!(" {err}"),
+                    Err(err) => error!("{err}"),
                 },
             },
             Err(err) => {
-                error!(" {err:#}");
+                error!("{err:#}");
             }
             Ok(None) => {}
         }

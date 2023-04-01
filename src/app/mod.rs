@@ -28,7 +28,7 @@ use tui::{
     widgets::{Block, Borders},
     Frame,
 };
-use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
+use tui_logger::{TuiLoggerLevelOutput as LoggerLevel, TuiLoggerWidget as Logger};
 
 /// Event that is sent back up to main.rs
 #[derive(Debug)]
@@ -92,11 +92,11 @@ impl App {
                     if path.is_file() {
                         fs::remove_file(&path)
                             .context("failed to remove file while resolving event queue")?;
-                        info!(" deleted file \"{}\"", path.display());
+                        info!("deleted file \"{}\"", path.display());
                     } else {
                         fs::remove_dir_all(&path)
                             .context("failed to remove dir while resolving event queue")?;
-                        info!(" deleted directory \"{}\"", path.display());
+                        info!("deleted directory \"{}\"", path.display());
                     }
                     self.tree.partial_refresh(&RefreshData::Delete(path))?;
                     self.queue.add(AppEvent::PreviewFile(
@@ -108,20 +108,20 @@ impl App {
                     ));
                 }
                 AppEvent::OpenFile(path) => {
-                    info!(" opening file \"{}\"", path.display());
+                    info!("opening file \"{}\"", path.display());
                     return Ok(Some(TerminalEvent::OpenFile(path)));
                 }
                 AppEvent::OpenInput(op) => self.input_box.operation = op,
                 AppEvent::NewFile(path) => {
                     File::create(&path)
                         .context("failed to create file while resolving event queue")?;
-                    info!(" created file \"{}\"", path.display());
+                    info!("created file \"{}\"", path.display());
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
                 AppEvent::NewDir(path) => {
                     fs::create_dir(&path)
                         .context("failed to create dir while resolving event queue")?;
-                    info!(" created directory \"{}\"", path.display());
+                    info!("created directory \"{}\"", path.display());
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
                 AppEvent::PreviewFile(path) => self
@@ -141,7 +141,7 @@ impl App {
                     info!("\n{}", String::from_utf8_lossy(&output.stdout));
                 }
                 AppEvent::SearchFiles(search) => {
-                    info!(" searching for: \"{}\"", search);
+                    info!("searching for: \"{}\"", search);
                     let results = SearchBuilder::default()
                         .location(&self.path)
                         .search_input(search)
@@ -151,7 +151,7 @@ impl App {
                         .map_into()
                         .collect_vec();
                     if results.is_empty() {
-                        warn!(" no files found when searching");
+                        warn!("no files found when searching");
                     }
                     self.tree.only_include(results.as_ref())?;
                 }
@@ -161,13 +161,13 @@ impl App {
                     // Because it's sent from `self.tree`, it has not been deleted in
                     // `self.marks_popup` yet.
                     self.marks_popup.add_mark(path.clone());
-                    info!(" marked: \"{}\"", path.display());
+                    info!("marked: \"{}\"", path.display());
                     return Ok(Some(TerminalEvent::WriteMark(path)));
                 }
                 AppEvent::DeleteMark(path) => {
                     // Because it's sent from `self.marks_popup,` we can assume it's been deleted
                     // internally already, just not in the file
-                    info!(" deleted mark: \"{}\"", path.display());
+                    info!("deleted mark: \"{}\"", path.display());
                     return Ok(Some(TerminalEvent::DeleteMark(path)));
                 }
             }
@@ -228,23 +228,24 @@ impl Drawable for App {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
             .split(main_layout[0]);
 
-        let logger = TuiLoggerWidget::default()
+        let logger = Logger::default()
             .style_error(self.config.log.error.into())
             .style_debug(self.config.log.debug.into())
             .style_warn(self.config.log.warn.into())
             .style_trace(self.config.log.trace.into())
             .style_info(self.config.log.info.into())
-            .output_level(Some(TuiLoggerLevelOutput::Long))
+            .output_level(Some(LoggerLevel::Long))
             .output_target(false)
             .output_file(false)
             .output_line(false)
+            .output_level(None)
+            .output_timestamp(None)
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title("Log")
                     .border_style(self.config.log.border_color.into()),
-            )
-            .state(&TuiWidgetState::new());
+            );
 
         self.tree.draw(f, left_hand_layout[0])?;
         f.render_widget(logger, left_hand_layout[1]);

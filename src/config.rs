@@ -426,7 +426,7 @@ impl Default for LogConfig {
             debug: Style::color(Color::Green),
             warn: Style::color(Color::Yellow),
             trace: Style::color(Color::Magenta),
-            info: Style::color(Color::Cyan),
+            info: Style::default(),
             border_color: Style::default(),
         }
     }

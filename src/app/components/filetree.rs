@@ -375,10 +375,10 @@ impl Component for Filetree {
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
                     self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
-                            info!(" filtered for modified files");
+                            info!("filtered for modified files");
                             self.only_include(cache.keys().cloned().collect_vec().as_ref())?;
                         } else {
-                            warn!(" no git status to filter for");
+                            warn!("no git status to filter for");
                         }
                     },
                     self.config.filetree.search => self
