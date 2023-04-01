@@ -1,3 +1,9 @@
+use crate::{
+    app::component::{Component, Drawable},
+    config::Config,
+    external_event::ExternalEvent,
+    ui::{ParagraphState, ScrollParagraph},
+};
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
@@ -7,7 +13,7 @@ use log::trace;
 use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use std::{cell::Cell, path::Path, process::Command, rc::Rc};
+use std::{cell::Cell, collections::VecDeque, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -15,12 +21,18 @@ use tui::{
     Frame,
 };
 
-use crate::{
-    app::component::{Component, Drawable},
-    config::Config,
-    external_event::ExternalEvent,
-    ui::{ParagraphState, ScrollParagraph},
-};
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+enum ScrollDirection {
+    Down,
+    Up,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+struct Scroll {
+    direction: ScrollDirection,
+    x: u16,
+    y: u16,
+}
 
 #[derive(Default, PartialEq, Eq, Clone, Debug)]
 enum Mode {
@@ -36,6 +48,7 @@ pub struct PreviewFile {
     focused: bool,
     config: Rc<Config>,
     state: Cell<ParagraphState>,
+    scrolls: Cell<VecDeque<Scroll>>,
 }
 
 impl Default for PreviewFile {
@@ -47,6 +60,7 @@ impl Default for PreviewFile {
             config: Rc::new(Config::default()),
             git_cmd: "git diff {}".to_owned(),
             state: ParagraphState::default().into(),
+            scrolls: VecDeque::new().into(),
         }
     }
 }
@@ -60,6 +74,7 @@ impl PreviewFile {
             config: Rc::new(Config::default()),
             git_cmd: "git diff {}".to_owned(),
             state: ParagraphState::default().into(),
+            scrolls: VecDeque::new().into(),
         }
     }
 
@@ -152,8 +167,20 @@ impl Component for PreviewFile {
                     }
                 }
                 Event::Mouse(mouse) => match mouse.kind {
-                    MouseEventKind::ScrollDown => self.state.get_mut().down(),
-                    MouseEventKind::ScrollUp => self.state.get_mut().up(),
+                    MouseEventKind::ScrollDown => {
+                        self.scrolls.get_mut().push_front(Scroll {
+                            direction: ScrollDirection::Down,
+                            x: mouse.column,
+                            y: mouse.row,
+                        });
+                    }
+                    MouseEventKind::ScrollUp => {
+                        self.scrolls.get_mut().push_back(Scroll {
+                            direction: ScrollDirection::Up,
+                            x: mouse.column,
+                            y: mouse.row,
+                        });
+                    }
                     _ => {}
                 },
                 _ => {}
@@ -177,6 +204,16 @@ impl Drawable for PreviewFile {
             .bar_style(self.config.preview.scroll_bar_color.into())
             .unreached_bar_style(self.config.preview.unreached_bar_color.into());
         let mut state = self.state.take();
+        let mut scrolls = self.scrolls.take();
+        while let Some(Scroll { direction, x, y }) = scrolls.pop_front() {
+            let mouse_rect = Rect::new(x, y, 1, 1);
+            if area.intersects(mouse_rect) {
+                match direction {
+                    ScrollDirection::Up => state.up(),
+                    ScrollDirection::Down => state.down(),
+                }
+            }
+        }
         f.render_stateful_widget(paragraph, area, &mut state);
         self.state.set(state);
 
@@ -188,6 +225,8 @@ impl Drawable for PreviewFile {
 mod tests {
     use super::*;
     use assert_fs::{prelude::*, TempDir};
+    use collect_all::collect;
+    use crossterm::event::{KeyModifiers, MouseEvent};
     use test_log::test;
 
     fn preview_default() -> String {
@@ -258,5 +297,42 @@ mod tests {
             .preview_file(child.path())
             .expect("preview should work");
         assert_eq!("should be previewed", previewer.contents);
+    }
+
+    #[test]
+    fn mouse_inputs_are_stored_in_queue() {
+        let mut previewer = PreviewFile::default();
+        let events = [
+            ExternalEvent::Crossterm(Event::Mouse(MouseEvent {
+                kind: MouseEventKind::ScrollDown,
+                column: 22,
+                row: 22,
+                modifiers: KeyModifiers::NONE,
+            })),
+            ExternalEvent::Crossterm(Event::Mouse(MouseEvent {
+                kind: MouseEventKind::ScrollUp,
+                column: 1,
+                row: 2,
+                modifiers: KeyModifiers::NONE,
+            })),
+        ];
+        for event in events {
+            assert!(previewer.handle_event(&event).is_ok());
+        }
+        assert_eq!(
+            collect![VecDeque<Scroll>:
+                Scroll {
+                    direction: ScrollDirection::Down,
+                    x: 22,
+                    y: 22,
+                },
+                Scroll {
+                    direction: ScrollDirection::Up,
+                    x: 1,
+                    y: 2,
+                }
+            ],
+            previewer.scrolls.take()
+        )
     }
 }
