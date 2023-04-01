@@ -276,7 +276,11 @@ pub struct PreviewConfig {
 impl Default for PreviewConfig {
     fn default() -> Self {
         Self {
+            #[cfg(target_os = "windows")]
+            preview_cmd: "type {}".to_owned(),
+            #[cfg(not(target_os = "windows"))]
             preview_cmd: "cat {}".to_owned(),
+
             git_pager: None,
             down_key: Key::ctrl('d'),
             up_key: Key::ctrl('u'),

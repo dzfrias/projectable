@@ -3,6 +3,8 @@ use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
 use easy_switch::switch;
 use log::trace;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::{cell::Cell, env, path::Path, process::Command, rc::Rc};
 use tui::{
     backend::Backend,
@@ -80,7 +82,7 @@ impl PreviewFile {
         self.state.get_mut().reset();
         let replaced = {
             #[cfg(target_os = "windows")]
-            let replacement = format!("{:?}", file.as_ref());
+            let replacement = file.as_ref().display().to_string();
             #[cfg(not(target_os = "windows"))]
             let replacement = format!("'{}'", file.as_ref().display());
 
@@ -93,8 +95,7 @@ impl PreviewFile {
 
         #[cfg(target_os = "windows")]
         let out = Command::new("cmd")
-            .arg("/C")
-            .arg(&replaced)
+            .raw_arg(&format!("/C \"{replaced}\""))
             .output()
             .with_context(|| format!("problem running preview command with {replaced}"))?;
         #[cfg(not(target_os = "windows"))]
