@@ -385,7 +385,7 @@ impl Component for Filetree {
                         .queue
                         .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
                     self.config.filetree.clear => {
-                        info!(" refreshed filetree");
+                        info!("refreshed filetree");
                         self.refresh().context("problem refreshing filetree")?;
                     },
                     self.config.open => match self.get_selected() {
