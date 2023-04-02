@@ -99,13 +99,13 @@ impl App {
                         info!("deleted directory \"{}\"", path.display());
                     }
                     self.tree.partial_refresh(&RefreshData::Delete(path))?;
-                    self.queue.add(AppEvent::PreviewFile(
+                    self.previewer.preview_file(
                         self.tree
                             .get_selected()
                             .expect("should have selected after partial refresh")
                             .path()
                             .to_owned(),
-                    ));
+                    )?;
                 }
                 AppEvent::OpenFile(path) => {
                     info!("opening file \"{}\"", path.display());
