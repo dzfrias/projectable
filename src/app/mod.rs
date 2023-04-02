@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use itertools::Itertools;
-use log::{info, warn};
+use log::{debug, info, warn};
 use rust_search::SearchBuilder;
 use std::{
     cell::RefCell,
@@ -142,18 +142,21 @@ impl App {
                 }
                 AppEvent::SearchFiles(search) => {
                     info!("searching for: \"{}\"", search);
-                    let results = SearchBuilder::default()
+                    let mut results = SearchBuilder::default()
                         .location(&self.path)
-                        .search_input(search)
+                        .search_input(&search)
                         .ignore_case()
                         .hidden()
                         .build()
-                        .map_into()
-                        .collect_vec();
+                        .collect();
+                    rust_search::similarity_sort(&mut results, &search);
                     if results.is_empty() {
                         warn!("no files found when searching");
                     }
-                    self.tree.only_include(results.as_ref())?;
+                    self.tree
+                        .only_include(results.iter().map_into().collect_vec().as_ref())?;
+                    debug!("got results: {results:?}");
+                    results.get(0).map(|path| self.tree.open_path(path));
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
                 AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
