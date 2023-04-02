@@ -156,7 +156,10 @@ impl App {
                     self.tree
                         .only_include(results.iter().map_into().collect_vec().as_ref())?;
                     debug!("got results: {results:?}");
-                    results.get(0).map(|path| self.tree.open_path(path));
+                    if let Some(best_match) = results.get(0) {
+                        self.tree.open_path(best_match)?;
+                        self.previewer.preview_file(best_match)?;
+                    }
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
                 AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
