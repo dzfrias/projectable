@@ -148,6 +148,7 @@ impl App {
                         .ignore_case()
                         .hidden()
                         .build()
+                        .filter(|path| !self.tree.is_ignored(path))
                         .collect();
                     rust_search::similarity_sort(&mut results, &search);
                     if results.is_empty() {
