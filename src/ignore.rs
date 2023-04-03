@@ -5,7 +5,7 @@ use ignore::{
     Match,
 };
 use log::{debug, trace, warn};
-use std::path::Path;
+use std::{iter, path::Path};
 
 #[derive(Debug, Clone)]
 pub struct IgnoreBuilder<'a> {
@@ -50,6 +50,8 @@ impl<'a> IgnoreBuilder<'a> {
         } else {
             None
         };
+        // ignore distinguishes between global and repo gitignores, so a separate one must be
+        // constructed for each using `build_global` and `build` respectively
         let global_gitignore = if self.use_gitignore {
             let (gitignore, err) = gitignore_builder.build_global();
             if let Some(err) = err {
@@ -61,17 +63,20 @@ impl<'a> IgnoreBuilder<'a> {
             None
         };
         let mut override_builder = OverrideBuilder::new(self.root);
-        for pat in self.ignore {
+        for pat in self
+            .ignore
+            .into_iter()
+            .chain(iter::once(&"/.git".to_owned()))
+        {
             // ! because overrides normally act like only-inclusive ignores
+            // The trailing /** must be added, as overrides will not ignore child directories
             override_builder
                 .add(&format!("!{pat}"))
-                .with_context(|| format!("failed to add glob for: \"!{pat}\""))?;
+                .with_context(|| format!("failed to add glob for: \"!{pat}\""))?
+                .add(&format!("!{pat}/**"))
+                .with_context(|| format!("failed to add glob for: \"!{pat}/**\""))?;
             trace!("added {pat} to ignore");
         }
-        override_builder
-            .add("!/.git")
-            .context("failed to add glob for: \"!/.git\"")?;
-        trace!("added .git to ignore");
         let overrides = override_builder
             .build()
             .context("failed to build override ignorer")?;
@@ -93,6 +98,10 @@ pub struct Ignore {
 
 impl Ignore {
     pub fn is_ignored(&self, path: impl AsRef<Path>) -> bool {
+        // Check all three ignores:
+        // 1. Custom ignores
+        // 2. Repo-local gitignore
+        // 3. Global gitignore
         return !matches!(
             self.overrides.matched(&path, path.as_ref().is_dir()),
             Match::None
@@ -172,5 +181,23 @@ mod tests {
             .unwrap();
         assert!(!ignore.is_ignored("test.txt"));
         assert!(!ignore.is_ignored("test2.txt"));
+    }
+
+    #[test]
+    fn custom_ignored_directories_are_recursively_ignored() {
+        let temp = temp_files!("test.txt", "test/test.txt");
+        let ignore = IgnoreBuilder::new(&temp)
+            .ignore(&["test".to_owned()])
+            .build()
+            .unwrap();
+        assert!(ignore.is_ignored("test"));
+        assert!(ignore.is_ignored("test/test.txt"));
+    }
+
+    #[test]
+    fn git_directory_is_implictly_ignored() {
+        let temp = temp_files!(".git/git_stuff.txt", "test.txt");
+        let ignore = IgnoreBuilder::new(&temp).build().unwrap();
+        assert!(ignore.is_ignored(".git"));
     }
 }

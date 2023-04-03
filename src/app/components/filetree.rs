@@ -169,6 +169,7 @@ impl Filetree {
     pub fn only_include(&mut self, include: &[PathBuf]) -> Result<()> {
         self.dir = DirBuilder::new(&self.root_path)
             .dirs_first(true)
+            .ignore(&self.ignore)
             .only_include(include)
             .build()
             .with_context(|| {
