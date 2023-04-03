@@ -103,8 +103,7 @@ impl App {
                         self.tree
                             .get_selected()
                             .expect("should have selected after partial refresh")
-                            .path()
-                            .to_owned(),
+                            .path(),
                     )?;
                 }
                 AppEvent::OpenFile(path) => {

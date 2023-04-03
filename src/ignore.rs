@@ -63,11 +63,7 @@ impl<'a> IgnoreBuilder<'a> {
             None
         };
         let mut override_builder = OverrideBuilder::new(self.root);
-        for pat in self
-            .ignore
-            .into_iter()
-            .chain(iter::once(&"/.git".to_owned()))
-        {
+        for pat in self.ignore.iter().chain(iter::once(&"/.git".to_owned())) {
             // ! because overrides normally act like only-inclusive ignores
             // The trailing /** must be added, as overrides will not ignore child directories
             override_builder
