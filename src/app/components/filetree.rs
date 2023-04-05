@@ -33,7 +33,7 @@ pub struct Filetree {
     dir: Dir,
     root_path: PathBuf,
     queue: Queue,
-    only_included: bool,
+    only_included: Vec<PathBuf>,
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
@@ -55,7 +55,7 @@ impl Filetree {
             is_focused: true,
             queue: queue.clone(),
             dir: tree,
-            only_included: false,
+            only_included: Vec::new(),
             repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
             config: Rc::new(Config::default()),
@@ -106,7 +106,7 @@ impl Filetree {
             .build()
             .context("failed to build `Dir`")?;
         self.dir = tree;
-        self.only_included = false;
+        self.only_included = Vec::new();
         self.populate_status_cache();
 
         if self.get_selected().is_none() {
@@ -166,16 +166,16 @@ impl Filetree {
         Some(item)
     }
 
-    pub fn only_include(&mut self, include: &[PathBuf]) -> Result<()> {
+    pub fn only_include(&mut self, include: Vec<PathBuf>) -> Result<()> {
         self.dir = DirBuilder::new(&self.root_path)
             .dirs_first(true)
             .ignore(&self.ignore)
-            .only_include(include)
+            .only_include(&include)
             .build()
             .with_context(|| {
                 format!("failed to build `Dir` while only-including files: \"{include:?}\"")
             })?;
-        self.only_included = true;
+        self.only_included = include;
 
         if self.get_selected().is_none() {
             self.state.get_mut().select_first();
@@ -264,10 +264,11 @@ impl Drawable for Filetree {
             self.status_cache.as_ref(),
             Rc::clone(&self.config),
             &self.marks.borrow(),
+            &self.only_included,
         );
         let mut state = self.state.take();
 
-        if self.only_included {
+        if !self.only_included.is_empty() {
             let layout = Layout::default()
                 .constraints([
                     Constraint::Length(1),
@@ -324,7 +325,7 @@ impl Component for Filetree {
             return Ok(());
         }
 
-        let items = build_filetree(&self.dir, None, Rc::clone(&self.config), &[]);
+        let items = build_filetree(&self.dir, None, Rc::clone(&self.config), &[], &[]);
 
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
@@ -381,7 +382,7 @@ impl Component for Filetree {
                     self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
                             info!("filtered for modified files");
-                            self.only_include(cache.keys().cloned().collect_vec().as_ref())?;
+                            self.only_include(cache.keys().cloned().collect_vec())?;
                         } else {
                             warn!("no git status to filter for");
                         }
@@ -463,10 +464,14 @@ fn build_filetree<'a>(
     statuses: Option<&HashMap<PathBuf, Status>>,
     config: Rc<Config>,
     marks: &[PathBuf],
+    highlight: &[PathBuf],
 ) -> Vec<TreeItem<'a>> {
     let mut items = Vec::new();
     for item in tree {
         let style = 'style: {
+            if highlight.iter().any(|path| path == item.path()) {
+                break 'style config.filetree.searched_style.into();
+            }
             if marks.iter().any(|path| path == item.path()) {
                 break 'style config.filetree.marks_style.into();
             }
@@ -486,7 +491,7 @@ fn build_filetree<'a>(
         let tree_item = match item {
             Item::Dir(dir) => TreeItem::new(
                 last_of_path(dir.path()),
-                build_filetree(dir, statuses, Rc::clone(&config), marks),
+                build_filetree(dir, statuses, Rc::clone(&config), marks, highlight),
             )
             .style(style),
             Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
@@ -712,7 +717,7 @@ mod tests {
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
 
         assert!(filetree
-            .only_include(&[temp.path().join("test.txt")])
+            .only_include(vec![temp.path().join("test.txt")])
             .is_ok());
         assert_eq!(1, filetree.dir.iter().len());
         temp.close().unwrap();

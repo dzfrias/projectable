@@ -154,7 +154,7 @@ impl App {
                         warn!("no files found when searching");
                     }
                     self.tree
-                        .only_include(results.iter().map_into().collect_vec().as_ref())?;
+                        .only_include(results.iter().map_into().collect_vec())?;
                     debug!("got results: {results:?}");
                     if let Some(best_match) = results.get(0) {
                         self.tree.open_path(best_match)?;
