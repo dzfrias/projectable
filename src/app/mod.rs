@@ -14,9 +14,10 @@ use easy_switch::switch;
 use itertools::Itertools;
 use log::{debug, info, warn};
 use rust_search::SearchBuilder;
+#[cfg(not(target_os = "windows"))]
+use std::env;
 use std::{
     cell::RefCell,
-    env,
     fs::{self, File},
     path::{Path, PathBuf},
     process::Command,
