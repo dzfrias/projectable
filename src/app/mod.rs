@@ -161,7 +161,14 @@ impl App {
                     }
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
-                AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
+                AppEvent::GotoFile(path) => {
+                    if self.tree.is_searching() {
+                        self.tree
+                            .refresh()
+                            .context("problem refreshing filetree while going to file")?;
+                    }
+                    self.tree.open_path(&path)?;
+                }
                 AppEvent::Mark(path) => {
                     // Because it's sent from `self.tree`, it has not been deleted in
                     // `self.marks_popup` yet.

@@ -166,6 +166,10 @@ impl Filetree {
         Some(item)
     }
 
+    pub fn only_included(&self) -> bool {
+        !self.only_included.is_empty()
+    }
+
     pub fn only_include(&mut self, include: Vec<PathBuf>) -> Result<()> {
         self.dir = DirBuilder::new(&self.root_path)
             .dirs_first(true)
@@ -270,7 +274,7 @@ impl Drawable for Filetree {
         );
         let mut state = self.state.take();
 
-        if !self.only_included.is_empty() {
+        if self.is_searching() {
             let layout = Layout::default()
                 .constraints([
                     Constraint::Length(1),
