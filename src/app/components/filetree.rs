@@ -151,7 +151,7 @@ impl Filetree {
                     return Ok(());
                 }
 
-                self.dir.add(path)?;
+                self.dir.add(path.clone())?;
                 self.populate_status_cache();
             }
         }

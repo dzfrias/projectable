@@ -132,7 +132,7 @@ impl Dir {
         Ok(item)
     }
 
-    pub fn add(&mut self, path: impl AsRef<Path>) -> Result<()> {
+    pub fn add(&mut self, path: PathBuf) -> Result<()> {
         fn push_child(path: PathBuf, items: &mut Vec<Item>) {
             if items.iter().any(|item| item.path() == path) {
                 return;
@@ -147,9 +147,9 @@ impl Dir {
             }
         }
 
-        let parent = path.as_ref().parent().unwrap();
+        let parent = path.parent().unwrap();
         if parent == self.path {
-            push_child(path.as_ref().to_path_buf(), &mut self.children);
+            push_child(path, &mut self.children);
             return Ok(());
         }
 
@@ -160,7 +160,7 @@ impl Dir {
         let Item::Dir(parent) = self
             .nested_child_mut(&location)
             .expect("parent should exist") else { unreachable!() };
-        push_child(path.as_ref().to_path_buf(), &mut parent.children);
+        push_child(path, &mut parent.children);
         Ok(())
     }
 
