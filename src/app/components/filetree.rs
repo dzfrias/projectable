@@ -166,7 +166,7 @@ impl Filetree {
         Some(item)
     }
 
-    pub fn only_included(&self) -> bool {
+    pub fn is_searching(&self) -> bool {
         !self.only_included.is_empty()
     }
 
