@@ -111,6 +111,21 @@ impl Drawable for Popup {
                         self.config.filetree.special_command.to_string(),
                         "Execute special command",
                     ),
+                    (
+                        self.config.filetree.open_all.to_string(),
+                        "Open all directories",
+                    ),
+                    (
+                        self.config.filetree.close_all.to_string(),
+                        "Close all directories",
+                    ),
+                    (
+                        self.config.filetree.mark_selected.to_string(),
+                        "Mark selected file",
+                    ),
+                    (self.config.marks.open.to_string(), "Open marks window"),
+                    (self.config.quit.to_string(), "Quit"),
+                    (self.config.help.to_string(), "Open help window"),
                 ];
                 let longest_key_len = keybinds
                     .iter()
