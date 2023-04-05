@@ -158,7 +158,6 @@ impl App {
                     debug!("got results: {results:?}");
                     if let Some(best_match) = results.get(0) {
                         self.tree.open_path(best_match)?;
-                        self.queue.add(AppEvent::PreviewFile(best_match.into()));
                     }
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),

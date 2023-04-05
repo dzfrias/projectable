@@ -201,7 +201,7 @@ impl Filetree {
     pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
         let mut location = self
             .dir
-            .location_by_path(path)
+            .location_by_path(&path)
             .ok_or(anyhow!("path not found"))?;
         if location.is_empty() {
             return Ok(());
@@ -216,6 +216,8 @@ impl Filetree {
             self.state.get_mut().open(location);
             location = next_location;
         }
+        self.queue
+            .add(AppEvent::PreviewFile(path.as_ref().to_path_buf()));
         Ok(())
     }
 
@@ -805,5 +807,18 @@ mod tests {
         let event =
             ExternalEvent::PartialRefresh(vec![RefreshData::Delete("does_not_exist.txt".into())]);
         assert!(filetree.handle_event(&event).is_ok());
+    }
+
+    #[test]
+    fn opening_path_adds_preview_event_to_queue() {
+        let temp = temp_files!("test.txt");
+        let path = temp.path().to_path_buf();
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        filetree.open_path(path.join("test.txt")).unwrap();
+
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::PreviewFile(path.join("test.txt"))));
     }
 }
