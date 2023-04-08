@@ -138,6 +138,15 @@ impl Items {
         Some(removed)
     }
 
+    pub fn add(&mut self, item: Item) -> Option<&Item> {
+        if self.0.contains(&item) {
+            return None;
+        }
+
+        self.0.push(item);
+        Some(self.0.last().expect("should have last item, just pushed"))
+    }
+
     pub fn iter(&self) -> slice::Iter<'_, Item> {
         self.into_iter()
     }
@@ -426,5 +435,28 @@ mod tests {
         ]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
         assert_eq!(vec![Item::File("/root/test.txt".into()),], items.0);
+    }
+
+    #[test]
+    fn can_add_item() {
+        let mut items = Items(vec![Item::File("/root/test.txt".into())]);
+        assert_eq!(
+            Some(&Item::File("/root/test2.txt".into())),
+            items.add(Item::File("/root/test2.txt".into())),
+        );
+        assert_eq!(
+            vec![
+                Item::File("/root/test.txt".into()),
+                Item::File("/root/test2.txt".into())
+            ],
+            items.0
+        )
+    }
+
+    #[test]
+    fn adding_duplicate_item_does_not_add_and_returns_none() {
+        let mut items = Items(vec![Item::File("/root/test.txt".into())]);
+        assert_eq!(None, items.add(Item::File("/root/test.txt".into())));
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
     }
 }
