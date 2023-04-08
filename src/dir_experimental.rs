@@ -112,6 +112,32 @@ impl<'a> ItemsBuilder<'a> {
 }
 
 impl Items {
+    pub fn get(&self, index: usize) -> Option<&Item> {
+        self.0.get(index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+        self.0.get_mut(index)
+    }
+
+    pub fn remove(&mut self, index: usize) -> Option<Item> {
+        if index >= self.0.len() {
+            return None;
+        }
+        let removed = self.0.remove(index);
+        if let Item::Dir(ref path) = removed {
+            // Gets index of the last item that has `path` as one of its ancestors
+            let end = self
+                .0
+                .iter()
+                .skip(index)
+                .position(|item| !item.path().starts_with(path))
+                .unwrap_or(self.0.len() - 1);
+            self.0.drain(index..end + 1);
+        }
+        Some(removed)
+    }
+
     pub fn iter(&self) -> slice::Iter<'_, Item> {
         self.into_iter()
     }
@@ -347,5 +373,58 @@ mod tests {
             ],
             items.into_iter().collect_vec()
         );
+    }
+
+    #[test]
+    fn can_remove_files() {
+        let mut items = Items(vec![
+            Item::File("/root/test.txt".into()),
+            Item::File("/root/test2.txt".into()),
+        ]);
+        assert_eq!(Some(Item::File("/root/test.txt".into())), items.remove(0));
+        assert_eq!(vec![Item::File("/root/test2.txt".into())], items.0);
+    }
+
+    #[test]
+    fn can_remove_directories_and_deletes_all_children() {
+        let mut items = Items(vec![
+            Item::File("/root/test.txt".into()),
+            Item::Dir("/root/test".into()),
+            Item::File("/root/test/test.txt".into()),
+            Item::File("/root/test/test2.txt".into()),
+            Item::File("/root/test/test3.txt".into()),
+            Item::File("/root/test2.txt".into()),
+        ]);
+        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(
+            vec![
+                Item::File("/root/test.txt".into()),
+                Item::File("/root/test2.txt".into())
+            ],
+            items.0
+        );
+    }
+
+    #[test]
+    fn can_remove_directories_and_removes_until_end_if_children_are_at_end() {
+        let mut items = Items(vec![
+            Item::File("/root/test.txt".into()),
+            Item::Dir("/root/test".into()),
+            Item::File("/root/test/test.txt".into()),
+            Item::File("/root/test/test2.txt".into()),
+            Item::File("/root/test/test3.txt".into()),
+        ]);
+        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.0);
+    }
+
+    #[test]
+    fn can_remove_single_directory() {
+        let mut items = Items(vec![
+            Item::File("/root/test.txt".into()),
+            Item::Dir("/root/test".into()),
+        ]);
+        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.0);
     }
 }
