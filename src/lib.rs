@@ -90,6 +90,7 @@
 pub mod app;
 pub mod config;
 pub mod dir;
+pub mod dir_experimental;
 pub mod external_event;
 pub mod ignore;
 pub mod marks;
