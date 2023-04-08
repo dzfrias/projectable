@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     iter,
     path::{Path, PathBuf},
+    slice,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -107,6 +108,43 @@ impl<'a> ItemsBuilder<'a> {
             .filter(|item| item.path() != self.root)
             .collect();
         Items(items)
+    }
+}
+
+impl Items {
+    pub fn iter(&self) -> slice::Iter<'_, Item> {
+        self.into_iter()
+    }
+
+    pub fn iter_mut(&mut self) -> slice::IterMut<'_, Item> {
+        self.into_iter()
+    }
+}
+
+impl IntoIterator for Items {
+    type Item = Item;
+    type IntoIter = <Vec<Item> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Items {
+    type Item = &'a Item;
+    type IntoIter = slice::Iter<'a, Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Items {
+    type Item = &'a mut Item;
+    type IntoIter = slice::IterMut<'a, Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
     }
 }
 
@@ -278,5 +316,36 @@ mod tests {
     fn panic_on_building_with_root() {
         let files = &["/".into()];
         ItemsBuilder::new("/root").with_files(files).build();
+    }
+
+    #[test]
+    fn can_iterate_over_items() {
+        let mut items = Items(vec![
+            Item::Dir("foo".into()),
+            Item::File("bar".into()),
+            Item::File("baz".into()),
+        ]);
+        assert_eq!(
+            vec![
+                &Item::Dir("foo".into()),
+                &Item::File("bar".into()),
+                &Item::File("baz".into()),
+            ],
+            items.iter().collect_vec()
+        );
+        for item in items.iter_mut() {
+            match item {
+                Item::Dir(path) => *path = PathBuf::new(),
+                Item::File(path) => *path = PathBuf::new(),
+            }
+        }
+        assert_eq!(
+            vec![
+                Item::Dir(PathBuf::new()),
+                Item::File(PathBuf::new()),
+                Item::File(PathBuf::new()),
+            ],
+            items.into_iter().collect_vec()
+        );
     }
 }
