@@ -70,6 +70,10 @@ impl<'a> ItemsBuilder<'a> {
         let mut items: HashMap<PathBuf, Vec<Item>> = HashMap::new();
         // This loop will fill up `items` in the form of (DIR, Vec<CHILDREN>).
         for file in self.files {
+            if file.parent().is_none() {
+                panic!("should not be given root as a member");
+            }
+
             let path = self.root.join(file);
             for dir in file.ancestors().skip(1).map(|path| self.root.join(path)) {
                 // Remove dir from parent dir if it has been mistaken as a file
@@ -267,5 +271,12 @@ mod tests {
             ],
             items.0
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_on_building_with_root() {
+        let files = &["/".into()];
+        ItemsBuilder::new("/root").with_files(files).build();
     }
 }
