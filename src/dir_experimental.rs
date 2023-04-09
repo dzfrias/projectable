@@ -44,6 +44,36 @@ impl Item {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ItemsIndex<'a> {
+    Number(usize),
+    Path(Cow<'a, Path>),
+}
+
+impl<'a> From<usize> for ItemsIndex<'a> {
+    fn from(value: usize) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl<'a> From<&'a Path> for ItemsIndex<'a> {
+    fn from(value: &'a Path) -> Self {
+        Self::Path(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<PathBuf> for ItemsIndex<'a> {
+    fn from(value: PathBuf) -> Self {
+        Self::Path(Cow::Owned(value))
+    }
+}
+
+impl<'a> From<&'a str> for ItemsIndex<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Path(Cow::Borrowed(Path::new(value)))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Items(Vec<Item>);
 
@@ -112,15 +142,28 @@ impl<'a> ItemsBuilder<'a> {
 }
 
 impl Items {
-    pub fn get(&self, index: usize) -> Option<&Item> {
+    pub fn get<'a, T>(&self, index: T) -> Option<&Item>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self.resolve_index(index)?;
         self.0.get(index)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut Item> {
+    pub fn get_mut<'a, T>(&mut self, index: T) -> Option<&mut Item>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self.resolve_index(index)?;
         self.0.get_mut(index)
     }
 
-    pub fn remove(&mut self, index: usize) -> Option<Item> {
+    pub fn remove<'a, T>(&mut self, index: T) -> Option<Item>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self.resolve_index(index)?;
+
         if index >= self.0.len() {
             return None;
         }
@@ -139,7 +182,7 @@ impl Items {
     }
 
     pub fn add(&mut self, item: Item) -> Option<&Item> {
-        if self.0.contains(&item) {
+        if self.iter().any(|i| i.path() == item.path()) {
             return None;
         }
 
@@ -153,6 +196,16 @@ impl Items {
 
     pub fn iter_mut(&mut self) -> slice::IterMut<'_, Item> {
         self.into_iter()
+    }
+
+    fn resolve_index<'a, T>(&self, index: T) -> Option<usize>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        match index.into() {
+            ItemsIndex::Number(n) => Some(n),
+            ItemsIndex::Path(path) => self.iter().position(|p| p.path() == path),
+        }
     }
 }
 
@@ -457,6 +510,16 @@ mod tests {
     fn adding_duplicate_item_does_not_add_and_returns_none() {
         let mut items = Items(vec![Item::File("/root/test.txt".into())]);
         assert_eq!(None, items.add(Item::File("/root/test.txt".into())));
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
+    }
+
+    #[test]
+    fn can_pass_path_into_remove() {
+        let mut items = Items(vec![
+            Item::File("/root/test.txt".into()),
+            Item::File("/root/test2.txt".into()),
+        ]);
+        assert!(items.remove("/root/test2.txt").is_some());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
     }
 }
