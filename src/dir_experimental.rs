@@ -75,57 +75,49 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Items(Vec<Item>);
 
-#[derive(Debug)]
-pub struct ItemsBuilder<'a> {
-    root: PathBuf,
-    files: &'a [PathBuf],
-}
-
-impl<'a> ItemsBuilder<'a> {
-    pub fn new(root: impl AsRef<Path>) -> Self {
-        Self {
-            root: root.as_ref().to_path_buf(),
-            files: &[],
-        }
-    }
-
-    pub fn with_files(mut self, files: &'a [PathBuf]) -> Self {
-        self.files = files;
-        self
-    }
-
-    pub fn build(self) -> Items {
+impl Items {
+    pub fn new(files: &[PathBuf]) -> Self {
+        let mut root = files
+            .get(0)
+            .map_or(Some(Path::new("")), |path| path.parent())
+            .unwrap_or(Path::new(""))
+            .to_path_buf();
         // Keeps track of directories as keys and the DIRECT children as values
         let mut items: HashMap<PathBuf, Vec<Item>> = HashMap::new();
         // This loop will fill up `items` in the form of (DIR, Vec<CHILDREN>).
-        for file in self.files {
-            if file.parent().is_none() {
-                panic!("should not be given root as a member");
+        for file in files {
+            if file.parent().is_none() || file.is_relative() {
+                panic!("should not be given root or relative file as a item");
             }
 
-            let path = self.root.join(file);
-            for dir in file.ancestors().skip(1).map(|path| self.root.join(path)) {
+            root = root
+                .ancestors()
+                .find(|ancestor| file.starts_with(ancestor))
+                .expect("should have an ancestor, checked at top of loop")
+                .to_path_buf();
+
+            for dir in file.ancestors().skip(1) {
                 // Remove dir from parent dir if it has been mistaken as a file
                 if let Some(parent) = dir.parent().and_then(|parent| items.get_mut(parent)) {
                     parent.retain(|item| item.path() != dir);
                 }
                 // Put every ancestor of file in `items` as an empty slot if it does not exist
-                items.entry(dir).or_default();
+                items.entry(dir.to_path_buf()).or_default();
             }
             // Do not add if path is a directory, because all directories are keys in `items`. This
             // prevents dirs from being mistaken as files
-            if items.contains_key(&path) {
+            if items.contains_key(file.as_path()) {
                 continue;
             }
             // Put file in `items` under its parent
             items
                 .entry(
-                    path.parent()
-                        .expect("item should have parent")
+                    file.parent()
+                        .expect("item should have parent, checked at top of loop")
                         .to_path_buf(),
                 )
                 .or_default()
-                .push(Item::File(path));
+                .push(Item::File(file.to_path_buf()));
         }
         // Sort items first by directory name, then flatten into an iterator of `Item`s
         let items = items
@@ -133,13 +125,11 @@ impl<'a> ItemsBuilder<'a> {
             .map(|(dir, children)| (Item::Dir(dir), children))
             .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
             .flat_map(|pair| iter::once(pair.0).chain(pair.1))
-            .filter(|item| item.path() != self.root)
+            .filter(|item| item.path() != root && item.path().starts_with(&root))
             .collect();
-        Items(items)
+        Self(items)
     }
-}
 
-impl Items {
     pub fn get<'a, T>(&self, index: T) -> Option<&Item>
     where
         T: Into<ItemsIndex<'a>>,
@@ -240,16 +230,14 @@ mod tests {
 
     #[test]
     fn can_build_dir_flat() {
-        let files = &["test.txt".into(), "test2.txt".into(), "test3.txt".into()];
-        let items = ItemsBuilder::new(PathBuf::from("/test"))
-            .with_files(files)
-            .build();
+        let files = &["/test.txt".into(), "/test2.txt".into(), "/test3.txt".into()];
+        let items = Items::new(files);
 
         assert_eq!(
             vec![
-                Item::File("/test/test.txt".into()),
-                Item::File("/test/test2.txt".into()),
-                Item::File("/test/test3.txt".into()),
+                Item::File("/test.txt".into()),
+                Item::File("/test2.txt".into()),
+                Item::File("/test3.txt".into()),
             ],
             items.0
         );
@@ -257,12 +245,13 @@ mod tests {
 
     #[test]
     fn can_build_dir_with_directory() {
-        let files = &["test/test.txt".into()];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let files = &["/test/test.txt".into(), "/test2.txt".into()];
+        let items = Items::new(files);
         assert_eq!(
             vec![
-                Item::Dir("/test/test".into()),
-                Item::File("/test/test/test.txt".into()),
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
+                Item::File("/test/test.txt".into()),
             ],
             items.0
         );
@@ -270,14 +259,15 @@ mod tests {
 
     #[test]
     fn can_build_dir_with_many_nested_directories() {
-        let files = &["test/test/test/test.txt".into()];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let files = &["/test/test/test/test.txt".into(), "/test2.txt".into()];
+        let items = Items::new(files);
         assert_eq!(
             vec![
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
                 Item::Dir("/test/test".into()),
                 Item::Dir("/test/test/test".into()),
-                Item::Dir("/test/test/test/test".into()),
-                Item::File("/test/test/test/test/test.txt".into()),
+                Item::File("/test/test/test/test.txt".into()),
             ],
             items.0
         );
@@ -286,17 +276,17 @@ mod tests {
     #[test]
     fn can_build_with_multiple_files_with_same_parent() {
         let files = &[
-            "test.txt".into(),
-            "test/test.txt".into(),
-            "test/test2.txt".into(),
+            "/test.txt".into(),
+            "/test/test.txt".into(),
+            "/test/test2.txt".into(),
         ];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let items = Items::new(files);
         assert_eq!(
             vec![
+                Item::File("/test.txt".into()),
+                Item::Dir("/test".into()),
                 Item::File("/test/test.txt".into()),
-                Item::Dir("/test/test".into()),
-                Item::File("/test/test/test.txt".into()),
-                Item::File("/test/test/test2.txt".into())
+                Item::File("/test/test2.txt".into())
             ],
             items.0
         );
@@ -323,19 +313,19 @@ mod tests {
     #[test]
     fn items_are_merged_under_parent_directory() {
         let files = &[
-            "test.txt".into(),
-            "test/test.txt".into(),
-            "test2.txt".into(),
-            "test/test2.txt".into(),
+            "/test.txt".into(),
+            "/test/test.txt".into(),
+            "/test2.txt".into(),
+            "/test/test2.txt".into(),
         ];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let items = Items::new(files);
         assert_eq!(
             vec![
+                Item::File("/test.txt".into()),
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
                 Item::File("/test/test.txt".into()),
                 Item::File("/test/test2.txt".into()),
-                Item::Dir("/test/test".into()),
-                Item::File("/test/test/test.txt".into()),
-                Item::File("/test/test/test2.txt".into()),
             ],
             items.0
         );
@@ -343,12 +333,13 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled() {
-        let files = &["test".into(), "test/test.txt".into()];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let files = &["/test".into(), "/test/test.txt".into(), "/test2.txt".into()];
+        let items = Items::new(files);
         assert_eq!(
             vec![
-                Item::Dir("/test/test".into()),
-                Item::File("/test/test/test.txt".into())
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
+                Item::File("/test/test.txt".into()),
             ],
             items.0
         );
@@ -356,12 +347,13 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_both_directions() {
-        let files = &["test/test.txt".into(), "test".into()];
-        let items = ItemsBuilder::new("/test").with_files(files).build();
+        let files = &["/test/test.txt".into(), "/test".into(), "/test2.txt".into()];
+        let items = Items::new(files);
         assert_eq!(
             vec![
-                Item::Dir("/test/test".into()),
-                Item::File("/test/test/test.txt".into())
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
+                Item::File("/test/test.txt".into()),
             ],
             items.0
         );
@@ -369,14 +361,19 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_any_level_of_nesting() {
-        let files = &["test/test/test/test.txt".into(), "test".into()];
-        let items = ItemsBuilder::new("/root").with_files(files).build();
+        let files = &[
+            "/test/test/test/test.txt".into(),
+            "/test".into(),
+            "/test2.txt".into(),
+        ];
+        let items = Items::new(files);
         assert_eq!(
             vec![
-                Item::Dir("/root/test".into()),
-                Item::Dir("/root/test/test".into()),
-                Item::Dir("/root/test/test/test".into()),
-                Item::File("/root/test/test/test/test.txt".into())
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
+                Item::Dir("/test/test".into()),
+                Item::Dir("/test/test/test".into()),
+                Item::File("/test/test/test/test.txt".into())
             ],
             items.0
         );
@@ -384,14 +381,19 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_any_level_of_nesting_in_both_directions() {
-        let files = &["test".into(), "test/test/test/test.txt".into()];
-        let items = ItemsBuilder::new("/root").with_files(files).build();
+        let files = &[
+            "/test".into(),
+            "/test/test/test/test.txt".into(),
+            "/test2.txt".into(),
+        ];
+        let items = Items::new(files);
         assert_eq!(
             vec![
-                Item::Dir("/root/test".into()),
-                Item::Dir("/root/test/test".into()),
-                Item::Dir("/root/test/test/test".into()),
-                Item::File("/root/test/test/test/test.txt".into())
+                Item::File("/test2.txt".into()),
+                Item::Dir("/test".into()),
+                Item::Dir("/test/test".into()),
+                Item::Dir("/test/test/test".into()),
+                Item::File("/test/test/test/test.txt".into())
             ],
             items.0
         );
@@ -401,7 +403,7 @@ mod tests {
     #[should_panic]
     fn panic_on_building_with_root() {
         let files = &["/".into()];
-        ItemsBuilder::new("/root").with_files(files).build();
+        Items::new(files);
     }
 
     #[test]
@@ -519,5 +521,16 @@ mod tests {
         ]);
         assert!(items.remove("/root/test2.txt").is_some());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
+    }
+
+    #[test]
+    #[should_panic]
+    fn new_items_panic_with_relative_path() {
+        Items::new(&["relative.txt".into()]);
+    }
+
+    #[test]
+    fn can_pass_empty_into_items() {
+        Items::new(&[]);
     }
 }
