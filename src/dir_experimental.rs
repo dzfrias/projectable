@@ -1,9 +1,11 @@
+use crate::ignore::IgnoreBuilder;
+use anyhow::Result;
 use itertools::Itertools;
 use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
-    iter,
+    iter, mem,
     path::{Path, PathBuf},
     slice,
 };
@@ -72,8 +74,11 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Items(Vec<Item>);
+#[derive(Debug, Clone)]
+pub struct Items {
+    items: Vec<Item>,
+    root: PathBuf,
+}
 
 impl Items {
     pub fn new(files: &[PathBuf]) -> Self {
@@ -127,7 +132,20 @@ impl Items {
             .flat_map(|pair| iter::once(pair.0).chain(pair.1))
             .filter(|item| item.path() != root && item.path().starts_with(&root))
             .collect();
-        Self(items)
+        Self { items, root }
+    }
+
+    pub fn ignore(mut self, globs: &[String]) -> Result<Items> {
+        let ignore = IgnoreBuilder::new(&self.root).ignore(globs).build()?;
+        self.items = mem::take(&mut self.items)
+            .into_iter()
+            .filter(|item| !ignore.is_ignored(item.path()))
+            .collect();
+        Ok(self)
+    }
+
+    pub fn items(&self) -> &[Item] {
+        &self.items
     }
 
     pub fn get<'a, T>(&self, index: T) -> Option<&Item>
@@ -135,7 +153,7 @@ impl Items {
         T: Into<ItemsIndex<'a>>,
     {
         let index = self.resolve_index(index)?;
-        self.0.get(index)
+        self.items.get(index)
     }
 
     pub fn get_mut<'a, T>(&mut self, index: T) -> Option<&mut Item>
@@ -143,7 +161,7 @@ impl Items {
         T: Into<ItemsIndex<'a>>,
     {
         let index = self.resolve_index(index)?;
-        self.0.get_mut(index)
+        self.items.get_mut(index)
     }
 
     pub fn remove<'a, T>(&mut self, index: T) -> Option<Item>
@@ -152,19 +170,19 @@ impl Items {
     {
         let index = self.resolve_index(index)?;
 
-        if index >= self.0.len() {
+        if index >= self.items.len() {
             return None;
         }
-        let removed = self.0.remove(index);
+        let removed = self.items.remove(index);
         if let Item::Dir(ref path) = removed {
             // Gets index of the last item that has `path` as one of its ancestors
             let end = self
-                .0
+                .items
                 .iter()
                 .skip(index)
                 .position(|item| !item.path().starts_with(path))
-                .unwrap_or(self.0.len() - 1);
-            self.0.drain(index..end + 1);
+                .unwrap_or(self.items.len() - 1);
+            self.items.drain(index..end + 1);
         }
         Some(removed)
     }
@@ -174,8 +192,12 @@ impl Items {
             return None;
         }
 
-        self.0.push(item);
-        Some(self.0.last().expect("should have last item, just pushed"))
+        self.items.push(item);
+        Some(
+            self.items
+                .last()
+                .expect("should have last item, just pushed"),
+        )
     }
 
     pub fn iter(&self) -> slice::Iter<'_, Item> {
@@ -202,7 +224,7 @@ impl IntoIterator for Items {
     type IntoIter = <Vec<Item> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.items.into_iter()
     }
 }
 
@@ -211,7 +233,7 @@ impl<'a> IntoIterator for &'a Items {
     type IntoIter = slice::Iter<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.items.iter()
     }
 }
 
@@ -220,7 +242,7 @@ impl<'a> IntoIterator for &'a mut Items {
     type IntoIter = slice::IterMut<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
+        self.items.iter_mut()
     }
 }
 
@@ -239,7 +261,7 @@ mod tests {
                 Item::File("/test2.txt".into()),
                 Item::File("/test3.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -253,7 +275,7 @@ mod tests {
                 Item::Dir("/test".into()),
                 Item::File("/test/test.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -269,7 +291,7 @@ mod tests {
                 Item::Dir("/test/test/test".into()),
                 Item::File("/test/test/test/test.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -288,7 +310,7 @@ mod tests {
                 Item::File("/test/test.txt".into()),
                 Item::File("/test/test2.txt".into())
             ],
-            items.0
+            items.items
         );
     }
 
@@ -327,7 +349,7 @@ mod tests {
                 Item::File("/test/test.txt".into()),
                 Item::File("/test/test2.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -341,7 +363,7 @@ mod tests {
                 Item::Dir("/test".into()),
                 Item::File("/test/test.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -355,7 +377,7 @@ mod tests {
                 Item::Dir("/test".into()),
                 Item::File("/test/test.txt".into()),
             ],
-            items.0
+            items.items
         );
     }
 
@@ -375,7 +397,7 @@ mod tests {
                 Item::Dir("/test/test/test".into()),
                 Item::File("/test/test/test/test.txt".into())
             ],
-            items.0
+            items.items
         );
     }
 
@@ -395,7 +417,7 @@ mod tests {
                 Item::Dir("/test/test/test".into()),
                 Item::File("/test/test/test/test.txt".into())
             ],
-            items.0
+            items.items
         );
     }
 
@@ -408,16 +430,12 @@ mod tests {
 
     #[test]
     fn can_iterate_over_items() {
-        let mut items = Items(vec![
-            Item::Dir("foo".into()),
-            Item::File("bar".into()),
-            Item::File("baz".into()),
-        ]);
+        let mut items = Items::new(&["/foo".into(), "/bar".into(), "/baz".into()]);
         assert_eq!(
             vec![
-                &Item::Dir("foo".into()),
-                &Item::File("bar".into()),
-                &Item::File("baz".into()),
+                &Item::File("/foo".into()),
+                &Item::File("/bar".into()),
+                &Item::File("/baz".into()),
             ],
             items.iter().collect_vec()
         );
@@ -429,7 +447,7 @@ mod tests {
         }
         assert_eq!(
             vec![
-                Item::Dir(PathBuf::new()),
+                Item::File(PathBuf::new()),
                 Item::File(PathBuf::new()),
                 Item::File(PathBuf::new()),
             ],
@@ -439,60 +457,58 @@ mod tests {
 
     #[test]
     fn can_remove_files() {
-        let mut items = Items(vec![
-            Item::File("/root/test.txt".into()),
-            Item::File("/root/test2.txt".into()),
-        ]);
+        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
         assert_eq!(Some(Item::File("/root/test.txt".into())), items.remove(0));
-        assert_eq!(vec![Item::File("/root/test2.txt".into())], items.0);
+        assert_eq!(vec![Item::File("/root/test2.txt".into())], items.items);
     }
 
     #[test]
     fn can_remove_directories_and_deletes_all_children() {
-        let mut items = Items(vec![
-            Item::File("/root/test.txt".into()),
-            Item::Dir("/root/test".into()),
-            Item::File("/root/test/test.txt".into()),
-            Item::File("/root/test/test2.txt".into()),
-            Item::File("/root/test/test3.txt".into()),
-            Item::File("/root/test2.txt".into()),
+        let mut items = Items::new(&[
+            "/root/test.txt".into(),
+            "/root/test2.txt".into(),
+            "/root/test".into(),
+            "/root/test/test.txt".into(),
+            "/root/test/test2.txt".into(),
+            "/root/test/test3.txt".into(),
         ]);
-        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(2));
         assert_eq!(
             vec![
                 Item::File("/root/test.txt".into()),
                 Item::File("/root/test2.txt".into())
             ],
-            items.0
+            items.items
         );
     }
 
     #[test]
     fn can_remove_directories_and_removes_until_end_if_children_are_at_end() {
-        let mut items = Items(vec![
-            Item::File("/root/test.txt".into()),
-            Item::Dir("/root/test".into()),
-            Item::File("/root/test/test.txt".into()),
-            Item::File("/root/test/test2.txt".into()),
-            Item::File("/root/test/test3.txt".into()),
+        let mut items = Items::new(&[
+            "/root/test.txt".into(),
+            "/root/test".into(),
+            "/root/test/test.txt".into(),
+            "/root/test/test2.txt".into(),
+            "/root/test/test3.txt".into(),
         ]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
-        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.0);
+        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
     }
 
     #[test]
     fn can_remove_single_directory() {
-        let mut items = Items(vec![
-            Item::File("/root/test.txt".into()),
-            Item::Dir("/root/test".into()),
+        let mut items = Items::new(&[
+            "/root/test.txt".into(),
+            "/root/test".into(),
+            "/root/test/test.txt".into(),
         ]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
-        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.0);
+        assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
     }
 
     #[test]
     fn can_add_item() {
-        let mut items = Items(vec![Item::File("/root/test.txt".into())]);
+        let mut items = Items::new(&["/root/test.txt".into()]);
         assert_eq!(
             Some(&Item::File("/root/test2.txt".into())),
             items.add(Item::File("/root/test2.txt".into())),
@@ -502,25 +518,22 @@ mod tests {
                 Item::File("/root/test.txt".into()),
                 Item::File("/root/test2.txt".into())
             ],
-            items.0
+            items.items
         )
     }
 
     #[test]
     fn adding_duplicate_item_does_not_add_and_returns_none() {
-        let mut items = Items(vec![Item::File("/root/test.txt".into())]);
+        let mut items = Items::new(&["/root/test.txt".into()]);
         assert_eq!(None, items.add(Item::File("/root/test.txt".into())));
-        assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
     }
 
     #[test]
     fn can_pass_path_into_remove() {
-        let mut items = Items(vec![
-            Item::File("/root/test.txt".into()),
-            Item::File("/root/test2.txt".into()),
-        ]);
+        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
         assert!(items.remove("/root/test2.txt").is_some());
-        assert_eq!(vec![Item::File("/root/test.txt".into())], items.0)
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
     }
 
     #[test]
@@ -532,5 +545,17 @@ mod tests {
     #[test]
     fn can_pass_empty_into_items() {
         Items::new(&[]);
+    }
+
+    #[test]
+    fn can_ignore_certain_globs() {
+        let items = Items::new(&[
+            "/root/test.txt".into(),
+            "/root/test2.txt".into(),
+            "/root/foo.txt".into(),
+        ])
+        .ignore(&["test*".into()])
+        .unwrap();
+        assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
     }
 }
