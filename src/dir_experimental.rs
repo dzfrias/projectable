@@ -1,13 +1,14 @@
 use crate::ignore::IgnoreBuilder;
 use anyhow::{anyhow, bail, Context, Result};
-use itertools::Itertools;
+use bitvec::prelude::*;
+use itertools::{EitherOrBoth, Itertools};
 use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
     iter, mem,
     path::{Path, PathBuf},
-    slice,
+    vec,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -77,6 +78,7 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
 #[derive(Debug, Clone)]
 pub struct Items {
     items: Vec<Item>,
+    only_include: BitVec,
     root: PathBuf,
 }
 
@@ -132,7 +134,11 @@ impl Items {
             .flat_map(|pair| iter::once(pair.0).chain(pair.1))
             .filter(|item| item.path() != root && item.path().starts_with(&root))
             .collect();
-        Self { items, root }
+        Self {
+            items,
+            root,
+            only_include: BitVec::new(),
+        }
     }
 
     pub fn ignore(mut self, globs: &[String]) -> Result<Items> {
@@ -144,8 +150,59 @@ impl Items {
         Ok(self)
     }
 
-    pub fn items(&self) -> &[Item] {
-        &self.items
+    pub fn only_include(&mut self, paths: &[impl AsRef<Path>]) {
+        let paths = paths.iter().map(|path| path.as_ref()).collect_vec();
+        self.only_include = self
+            .items
+            .iter()
+            .map(|item| {
+                paths
+                    .iter()
+                    .any(|path| !(path == &item.path() || item.path().starts_with(path)))
+            })
+            .collect();
+    }
+
+    pub fn items(&self) -> Vec<&Item> {
+        self.items
+            .iter()
+            .zip_longest(&self.only_include)
+            .filter_map(|either_or_both| match either_or_both {
+                EitherOrBoth::Left(item) => Some(item),
+                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
+                EitherOrBoth::Right(_) => {
+                    panic!("`only_include` should not have more items than `items`")
+                }
+            })
+            .collect()
+    }
+
+    pub fn items_mut(&mut self) -> Vec<&mut Item> {
+        self.items
+            .iter_mut()
+            .zip_longest(&self.only_include)
+            .filter_map(|either_or_both| match either_or_both {
+                EitherOrBoth::Left(item) => Some(item),
+                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
+                EitherOrBoth::Right(_) => {
+                    panic!("`only_include` should not have more items than `items`")
+                }
+            })
+            .collect()
+    }
+
+    pub fn into_items(self) -> Vec<Item> {
+        self.items
+            .into_iter()
+            .zip_longest(self.only_include)
+            .filter_map(|either_or_both| match either_or_both {
+                EitherOrBoth::Left(item) => Some(item),
+                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
+                EitherOrBoth::Right(_) => {
+                    panic!("`only_include` should not have more items than `items`")
+                }
+            })
+            .collect()
     }
 
     pub fn get<'a, T>(&self, index: T) -> Option<&Item>
@@ -196,11 +253,11 @@ impl Items {
         self.sort().context("error while adding new item")
     }
 
-    pub fn iter(&self) -> slice::Iter<'_, Item> {
+    pub fn iter(&self) -> vec::IntoIter<&Item> {
         self.into_iter()
     }
 
-    pub fn iter_mut(&mut self) -> slice::IterMut<'_, Item> {
+    pub fn iter_mut(&mut self) -> vec::IntoIter<&mut Item> {
         self.into_iter()
     }
 
@@ -259,25 +316,25 @@ impl IntoIterator for Items {
     type IntoIter = <Vec<Item> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items.into_iter()
+        self.into_items().into_iter()
     }
 }
 
 impl<'a> IntoIterator for &'a Items {
     type Item = &'a Item;
-    type IntoIter = slice::Iter<'a, Item>;
+    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items.iter()
+        self.items().into_iter()
     }
 }
 
 impl<'a> IntoIterator for &'a mut Items {
     type Item = &'a mut Item;
-    type IntoIter = slice::IterMut<'a, Item>;
+    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items.iter_mut()
+        self.items_mut().into_iter()
     }
 }
 
@@ -610,5 +667,29 @@ mod tests {
         .ignore(&["test*".into()])
         .unwrap();
         assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
+    }
+
+    #[test]
+    fn can_only_include_certain_paths() {
+        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        items.only_include(&["/root/test.txt"]);
+        assert_eq!(bitvec![0, 1], items.only_include);
+    }
+
+    #[test]
+    fn getting_items_respects_only_include() {
+        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        items.only_include(&["/root/test.txt"]);
+        assert_eq!(vec![&Item::File("/root/test.txt".into())], items.items());
+    }
+
+    #[test]
+    fn iterating_through_items_respects_only_incldue() {
+        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        items.only_include(&["/root/test.txt"]);
+        assert_eq!(
+            vec![&Item::File("/root/test.txt".into())],
+            items.iter().collect_vec()
+        );
     }
 }

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ansi-to-tui = "2.0.2"
 anyhow = "1.0.69"
+bitvec = "1.0.1"
 collect-all = "0.1.0"
 crossbeam-channel = "0.5.7"
 crossterm = "0.25"
