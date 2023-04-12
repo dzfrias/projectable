@@ -692,4 +692,16 @@ mod tests {
             items.iter().collect_vec()
         );
     }
+
+    #[test]
+    fn only_including_dir_includes_every_child() {
+        let mut items = Items::new(&[
+            "/root/test/test.txt".into(),
+            "/root/test/test2.txt".into(),
+            "/root/test.txt".into(),
+        ]);
+        items.only_include(&["/root/test"]);
+        assert_eq!(bitvec![1, 0, 0, 0], items.only_include);
+        assert!(false);
+    }
 }
