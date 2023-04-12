@@ -1,5 +1,5 @@
 use crate::ignore::IgnoreBuilder;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Context, Result};
 use itertools::Itertools;
 use std::{
     borrow::Cow,
@@ -122,7 +122,7 @@ impl Items {
                         .to_path_buf(),
                 )
                 .or_default()
-                .push(Item::File(file.to_path_buf()));
+                .push(Item::File(file.clone()));
         }
         // Sort items first by directory name, then flatten into an iterator of `Item`s
         let items = items
@@ -187,17 +187,13 @@ impl Items {
         Some(removed)
     }
 
-    pub fn add(&mut self, item: Item) -> Option<&Item> {
+    pub fn add(&mut self, item: Item) -> Result<()> {
         if self.iter().any(|i| i.path() == item.path()) {
-            return None;
+            bail!("cannot add duplicate item");
         }
 
         self.items.push(item);
-        Some(
-            self.items
-                .last()
-                .expect("should have last item, just pushed"),
-        )
+        self.sort().context("error while adding new item")
     }
 
     pub fn iter(&self) -> slice::Iter<'_, Item> {
@@ -216,6 +212,45 @@ impl Items {
             ItemsIndex::Number(n) => Some(n),
             ItemsIndex::Path(path) => self.iter().position(|p| p.path() == path),
         }
+    }
+
+    fn sort(&mut self) -> Result<()> {
+        let mut items: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+        let unsorted = mem::take(&mut self.items);
+
+        for item in unsorted {
+            match item {
+                Item::Dir(path) => drop(items.entry(path).or_default()),
+                Item::File(path) => items
+                    .entry(
+                        path.parent()
+                            .ok_or(anyhow!("found item without a parent"))?
+                            .to_path_buf(),
+                    )
+                    .or_default()
+                    .push(path),
+            }
+        }
+
+        self.items = items
+            .into_iter()
+            .map(|(dir, children)| (Item::Dir(dir), children.into_iter().map(Item::File)))
+            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+            .flat_map(|(dir, children)| iter::once(dir).chain(children))
+            .filter(|item| item.path() != self.root)
+            .dedup_with_count()
+            .map(|(count, item)| {
+                if count == 1 {
+                    Ok(item)
+                } else {
+                    Err(anyhow!(
+                        "duplicate item found: {item:?} with {count} duplicates"
+                    ))
+                }
+            })
+            .try_collect()?;
+
+        Ok(())
     }
 }
 
@@ -509,10 +544,7 @@ mod tests {
     #[test]
     fn can_add_item() {
         let mut items = Items::new(&["/root/test.txt".into()]);
-        assert_eq!(
-            Some(&Item::File("/root/test2.txt".into())),
-            items.add(Item::File("/root/test2.txt".into())),
-        );
+        assert!(items.add(Item::File("/root/test2.txt".into())).is_ok());
         assert_eq!(
             vec![
                 Item::File("/root/test.txt".into()),
@@ -525,7 +557,7 @@ mod tests {
     #[test]
     fn adding_duplicate_item_does_not_add_and_returns_none() {
         let mut items = Items::new(&["/root/test.txt".into()]);
-        assert_eq!(None, items.add(Item::File("/root/test.txt".into())));
+        assert!(items.add(Item::File("/root/test.txt".into())).is_err());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
     }
 
@@ -534,6 +566,27 @@ mod tests {
         let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
         assert!(items.remove("/root/test2.txt").is_some());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
+    }
+
+    #[test]
+    fn adding_items_will_resort_everything() {
+        let mut items = Items::new(&[
+            "/root/test.txt".into(),
+            "/root/test/test.txt".into(),
+            "/root/test2/test.txt".into(),
+        ]);
+        assert!(items.add(Item::File("/root/test/test2.txt".into())).is_ok());
+        assert_eq!(
+            vec![
+                Item::File("/root/test.txt".into()),
+                Item::Dir("/root/test".into()),
+                Item::File("/root/test/test.txt".into()),
+                Item::File("/root/test/test2.txt".into()),
+                Item::Dir("/root/test2".into()),
+                Item::File("/root/test2/test.txt".into()),
+            ],
+            items.items
+        )
     }
 
     #[test]
