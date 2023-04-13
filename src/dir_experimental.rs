@@ -75,6 +75,22 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
     }
 }
 
+/// Applies a bitvec as a filter. Any corresponding values with 1 in the bitvec are ignored
+macro_rules! apply_bitvec_filter {
+    ($iterator:expr, $bitvec:expr) => {
+        $iterator
+            .zip_longest($bitvec)
+            .filter_map(|either_or_both| match either_or_both {
+                EitherOrBoth::Left(item) => Some(item),
+                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
+                EitherOrBoth::Right(_) => {
+                    panic!("bitvec should not have more elements than iterator")
+                }
+            })
+            .collect()
+    };
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Items {
     items: Vec<Item>,
@@ -168,45 +184,15 @@ impl Items {
     }
 
     pub fn items(&self) -> Vec<&Item> {
-        self.items
-            .iter()
-            .zip_longest(&self.only_include)
-            .filter_map(|either_or_both| match either_or_both {
-                EitherOrBoth::Left(item) => Some(item),
-                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
-                EitherOrBoth::Right(_) => {
-                    panic!("`only_include` should not have more items than `items`")
-                }
-            })
-            .collect()
+        apply_bitvec_filter!(self.items.iter(), &self.only_include)
     }
 
     pub fn items_mut(&mut self) -> Vec<&mut Item> {
-        self.items
-            .iter_mut()
-            .zip_longest(&self.only_include)
-            .filter_map(|either_or_both| match either_or_both {
-                EitherOrBoth::Left(item) => Some(item),
-                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
-                EitherOrBoth::Right(_) => {
-                    panic!("`only_include` should not have more items than `items`")
-                }
-            })
-            .collect()
+        apply_bitvec_filter!(self.items.iter_mut(), &self.only_include)
     }
 
     pub fn into_items(self) -> Vec<Item> {
-        self.items
-            .into_iter()
-            .zip_longest(self.only_include)
-            .filter_map(|either_or_both| match either_or_both {
-                EitherOrBoth::Left(item) => Some(item),
-                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
-                EitherOrBoth::Right(_) => {
-                    panic!("`only_include` should not have more items than `items`")
-                }
-            })
-            .collect()
+        apply_bitvec_filter!(self.items.into_iter(), self.only_include)
     }
 
     pub fn get<'a, T>(&self, index: T) -> Option<&Item>
