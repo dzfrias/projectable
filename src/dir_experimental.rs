@@ -75,7 +75,7 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Items {
     items: Vec<Item>,
     only_include: BitVec,
@@ -83,16 +83,17 @@ pub struct Items {
 }
 
 impl Items {
-    pub fn new(files: &[PathBuf]) -> Self {
+    pub fn new<T: AsRef<Path>>(files: &[T]) -> Self {
         let mut root = files
             .get(0)
-            .map_or(Some(Path::new("")), |path| path.parent())
+            .map_or(Some(Path::new("")), |path| path.as_ref().parent())
             .unwrap_or(Path::new(""))
             .to_path_buf();
         // Keeps track of directories as keys and the DIRECT children as values
         let mut items: HashMap<PathBuf, Vec<Item>> = HashMap::new();
         // This loop will fill up `items` in the form of (DIR, Vec<CHILDREN>).
         for file in files {
+            let file = file.as_ref();
             if file.parent().is_none() || file.is_relative() {
                 panic!("should not be given root or relative file as a item");
             }
@@ -113,7 +114,7 @@ impl Items {
             }
             // Do not add if path is a directory, because all directories are keys in `items`. This
             // prevents dirs from being mistaken as files
-            if items.contains_key(file.as_path()) {
+            if items.contains_key(file) {
                 continue;
             }
             // Put file in `items` under its parent
@@ -124,7 +125,7 @@ impl Items {
                         .to_path_buf(),
                 )
                 .or_default()
-                .push(Item::File(file.clone()));
+                .push(Item::File(file.to_path_buf()));
         }
         // Sort items first by directory name, then flatten into an iterator of `Item`s
         let items = items
@@ -348,7 +349,7 @@ mod tests {
 
     #[test]
     fn can_build_dir_flat() {
-        let files = &["/test.txt".into(), "/test2.txt".into(), "/test3.txt".into()];
+        let files = &["/test.txt", "/test2.txt", "/test3.txt"];
         let items = Items::new(files);
 
         assert_eq!(
@@ -363,7 +364,7 @@ mod tests {
 
     #[test]
     fn can_build_dir_with_directory() {
-        let files = &["/test/test.txt".into(), "/test2.txt".into()];
+        let files = &["/test/test.txt", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -377,7 +378,7 @@ mod tests {
 
     #[test]
     fn can_build_dir_with_many_nested_directories() {
-        let files = &["/test/test/test/test.txt".into(), "/test2.txt".into()];
+        let files = &["/test/test/test/test.txt", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -393,11 +394,7 @@ mod tests {
 
     #[test]
     fn can_build_with_multiple_files_with_same_parent() {
-        let files = &[
-            "/test.txt".into(),
-            "/test/test.txt".into(),
-            "/test/test2.txt".into(),
-        ];
+        let files = &["/test.txt", "/test/test.txt", "/test/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -431,10 +428,10 @@ mod tests {
     #[test]
     fn items_are_merged_under_parent_directory() {
         let files = &[
-            "/test.txt".into(),
-            "/test/test.txt".into(),
-            "/test2.txt".into(),
-            "/test/test2.txt".into(),
+            "/test.txt",
+            "/test/test.txt",
+            "/test2.txt",
+            "/test/test2.txt",
         ];
         let items = Items::new(files);
         assert_eq!(
@@ -451,7 +448,7 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled() {
-        let files = &["/test".into(), "/test/test.txt".into(), "/test2.txt".into()];
+        let files = &["/test", "/test/test.txt", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -465,7 +462,7 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_both_directions() {
-        let files = &["/test/test.txt".into(), "/test".into(), "/test2.txt".into()];
+        let files = &["/test/test.txt", "/test", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -479,11 +476,7 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_any_level_of_nesting() {
-        let files = &[
-            "/test/test/test/test.txt".into(),
-            "/test".into(),
-            "/test2.txt".into(),
-        ];
+        let files = &["/test/test/test/test.txt", "/test", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -499,11 +492,7 @@ mod tests {
 
     #[test]
     fn dirs_when_building_are_properly_handled_in_any_level_of_nesting_in_both_directions() {
-        let files = &[
-            "/test".into(),
-            "/test/test/test/test.txt".into(),
-            "/test2.txt".into(),
-        ];
+        let files = &["/test", "/test/test/test/test.txt", "/test2.txt"];
         let items = Items::new(files);
         assert_eq!(
             vec![
@@ -520,13 +509,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn panic_on_building_with_root() {
-        let files = &["/".into()];
+        let files = &["/"];
         Items::new(files);
     }
 
     #[test]
     fn can_iterate_over_items() {
-        let mut items = Items::new(&["/foo".into(), "/bar".into(), "/baz".into()]);
+        let mut items = Items::new(&["/foo", "/bar", "/baz"]);
         assert_eq!(
             vec![
                 &Item::File("/foo".into()),
@@ -553,7 +542,7 @@ mod tests {
 
     #[test]
     fn can_remove_files() {
-        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         assert_eq!(Some(Item::File("/root/test.txt".into())), items.remove(0));
         assert_eq!(vec![Item::File("/root/test2.txt".into())], items.items);
     }
@@ -561,12 +550,12 @@ mod tests {
     #[test]
     fn can_remove_directories_and_deletes_all_children() {
         let mut items = Items::new(&[
-            "/root/test.txt".into(),
-            "/root/test2.txt".into(),
-            "/root/test".into(),
-            "/root/test/test.txt".into(),
-            "/root/test/test2.txt".into(),
-            "/root/test/test3.txt".into(),
+            "/root/test.txt",
+            "/root/test2.txt",
+            "/root/test",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test/test3.txt",
         ]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(2));
         assert_eq!(
@@ -581,11 +570,11 @@ mod tests {
     #[test]
     fn can_remove_directories_and_removes_until_end_if_children_are_at_end() {
         let mut items = Items::new(&[
-            "/root/test.txt".into(),
-            "/root/test".into(),
-            "/root/test/test.txt".into(),
-            "/root/test/test2.txt".into(),
-            "/root/test/test3.txt".into(),
+            "/root/test.txt",
+            "/root/test",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test/test3.txt",
         ]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
         assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
@@ -593,18 +582,14 @@ mod tests {
 
     #[test]
     fn can_remove_single_directory() {
-        let mut items = Items::new(&[
-            "/root/test.txt".into(),
-            "/root/test".into(),
-            "/root/test/test.txt".into(),
-        ]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test", "/root/test/test.txt"]);
         assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
         assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
     }
 
     #[test]
     fn can_add_item() {
-        let mut items = Items::new(&["/root/test.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt"]);
         assert!(items.add(Item::File("/root/test2.txt".into())).is_ok());
         assert_eq!(
             vec![
@@ -617,14 +602,14 @@ mod tests {
 
     #[test]
     fn adding_duplicate_item_does_not_add_and_returns_none() {
-        let mut items = Items::new(&["/root/test.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt"]);
         assert!(items.add(Item::File("/root/test.txt".into())).is_err());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
     }
 
     #[test]
     fn can_pass_path_into_remove() {
-        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         assert!(items.remove("/root/test2.txt").is_some());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
     }
@@ -632,9 +617,9 @@ mod tests {
     #[test]
     fn adding_items_will_resort_everything() {
         let mut items = Items::new(&[
-            "/root/test.txt".into(),
-            "/root/test/test.txt".into(),
-            "/root/test2/test.txt".into(),
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test2/test.txt",
         ]);
         assert!(items.add(Item::File("/root/test/test2.txt".into())).is_ok());
         assert_eq!(
@@ -653,43 +638,39 @@ mod tests {
     #[test]
     #[should_panic]
     fn new_items_panic_with_relative_path() {
-        Items::new(&["relative.txt".into()]);
+        Items::new(&["relative.txt"]);
     }
 
     #[test]
     fn can_pass_empty_into_items() {
-        Items::new(&[]);
+        Items::new::<&Path>(&[]);
     }
 
     #[test]
     fn can_ignore_certain_globs() {
-        let items = Items::new(&[
-            "/root/test.txt".into(),
-            "/root/test2.txt".into(),
-            "/root/foo.txt".into(),
-        ])
-        .ignore(&["test*".into()])
-        .unwrap();
+        let items = Items::new(&["/root/test.txt", "/root/test2.txt", "/root/foo.txt"])
+            .ignore(&["test*".into()])
+            .unwrap();
         assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
     }
 
     #[test]
     fn can_only_include_certain_paths() {
-        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         items.only_include(&["/root/test.txt"]);
         assert_eq!(bitvec![0, 1], items.only_include);
     }
 
     #[test]
     fn getting_items_respects_only_include() {
-        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         items.only_include(&["/root/test.txt"]);
         assert_eq!(vec![&Item::File("/root/test.txt".into())], items.items());
     }
 
     #[test]
     fn iterating_through_items_respects_only_incldue() {
-        let mut items = Items::new(&["/root/test.txt".into(), "/root/test2.txt".into()]);
+        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         items.only_include(&["/root/test.txt"]);
         assert_eq!(
             vec![&Item::File("/root/test.txt".into())],
@@ -700,9 +681,9 @@ mod tests {
     #[test]
     fn only_including_dir_includes_every_child() {
         let mut items = Items::new(&[
-            "/root/test/test.txt".into(),
-            "/root/test/test2.txt".into(),
-            "/root/test.txt".into(),
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test.txt",
         ]);
         items.only_include(&["/root/test"]);
         assert_eq!(bitvec![1, 0, 0, 0], items.only_include);
