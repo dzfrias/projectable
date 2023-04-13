@@ -262,9 +262,11 @@ impl Items {
     }
 
     fn sort(&mut self) -> Result<()> {
+        // Each key is the path of a directory, and the value is all of its children
         let mut items: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
         let unsorted = mem::take(&mut self.items);
 
+        // Put all directories and their direct children into `items`
         for item in unsorted {
             match item {
                 Item::Dir(path) => drop(items.entry(path).or_default()),
@@ -279,6 +281,9 @@ impl Items {
             }
         }
 
+        // Sort directories, and then flatten so that all the children come after their parents.
+        // After, remove the (almost) inevitable root that appears in the `items`. Finally,
+        // deduplicate everything, turning any duplication into an error.
         self.items = items
             .into_iter()
             .map(|(dir, children)| (Item::Dir(dir), children.into_iter().map(Item::File)))
