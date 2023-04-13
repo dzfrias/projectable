@@ -163,6 +163,10 @@ impl Items {
             .collect();
     }
 
+    pub fn clear_included(&mut self) {
+        self.only_include.clear();
+    }
+
     pub fn items(&self) -> Vec<&Item> {
         self.items
             .iter()
