@@ -687,6 +687,5 @@ mod tests {
         ]);
         items.only_include(&["/root/test"]);
         assert_eq!(bitvec![1, 0, 0, 0], items.only_include);
-        assert!(false);
     }
 }
