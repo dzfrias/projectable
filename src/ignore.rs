@@ -11,7 +11,7 @@ use std::{iter, path::Path};
 pub struct IgnoreBuilder<'a> {
     root: &'a Path,
     use_gitignore: bool,
-    ignore: &'a [String],
+    ignore: Vec<&'a str>,
 }
 
 impl<'a> IgnoreBuilder<'a> {
@@ -19,13 +19,13 @@ impl<'a> IgnoreBuilder<'a> {
         IgnoreBuilder {
             root: path,
             use_gitignore: true,
-            ignore: &[],
+            ignore: Vec::new(),
         }
     }
 
     #[must_use]
-    pub fn ignore(mut self, globs: &'a [String]) -> Self {
-        self.ignore = globs;
+    pub fn ignore(mut self, globs: &'a [impl AsRef<str>]) -> Self {
+        self.ignore = globs.iter().map(|glob| glob.as_ref()).collect();
         self
     }
 
@@ -63,7 +63,7 @@ impl<'a> IgnoreBuilder<'a> {
             None
         };
         let mut override_builder = OverrideBuilder::new(self.root);
-        for pat in self.ignore.iter().chain(iter::once(&"/.git".to_owned())) {
+        for pat in self.ignore.iter().chain(iter::once(&"/.git")) {
             // ! because overrides normally act like only-inclusive ignores
             // The trailing /** must be added, as overrides will not ignore child directories
             override_builder

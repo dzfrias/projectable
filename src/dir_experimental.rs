@@ -142,7 +142,7 @@ impl Items {
         }
     }
 
-    pub fn ignore(mut self, globs: &[String]) -> Result<Items> {
+    pub fn ignore(mut self, globs: &[impl AsRef<str>]) -> Result<Items> {
         let ignore = IgnoreBuilder::new(&self.root).ignore(globs).build()?;
         self.items = mem::take(&mut self.items)
             .into_iter()
@@ -649,7 +649,7 @@ mod tests {
     #[test]
     fn can_ignore_certain_globs() {
         let items = Items::new(&["/root/test.txt", "/root/test2.txt", "/root/foo.txt"])
-            .ignore(&["test*".into()])
+            .ignore(&["test*"])
             .unwrap();
         assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
     }
