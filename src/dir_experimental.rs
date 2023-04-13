@@ -152,14 +152,13 @@ impl Items {
     }
 
     pub fn only_include(&mut self, paths: &[impl AsRef<Path>]) {
-        let paths = paths.iter().map(|path| path.as_ref()).collect_vec();
         self.only_include = self
             .items
             .iter()
             .map(|item| {
-                paths
-                    .iter()
-                    .any(|path| !(path == &item.path() || item.path().starts_with(path)))
+                paths.iter().any(|path| {
+                    !(path.as_ref() == item.path() || item.path().starts_with(path.as_ref()))
+                })
             })
             .collect();
     }
