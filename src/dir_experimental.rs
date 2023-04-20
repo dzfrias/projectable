@@ -2,6 +2,7 @@ use crate::ignore::IgnoreBuilder;
 use anyhow::{anyhow, bail, Context, Result};
 use bitvec::prelude::*;
 use itertools::{EitherOrBoth, Itertools};
+use log::{debug, trace};
 use std::{
     borrow::Cow,
     cmp::Ordering,
@@ -177,6 +178,7 @@ impl Items {
                 })
             })
             .collect();
+        debug!("applied only include to: {:?}", self.only_include);
     }
 
     pub fn clear_included(&mut self) {
@@ -221,6 +223,7 @@ impl Items {
             return None;
         }
         let removed = self.items.remove(index);
+        debug!("removed item at index: {index}");
         if let Item::Dir(ref path) = removed {
             // Gets index of the last item that has `path` as one of its ancestors
             let end = self
@@ -230,6 +233,7 @@ impl Items {
                 .position(|item| !item.path().starts_with(path))
                 .unwrap_or(self.items.len() - 1);
             self.items.drain(index..end + 1);
+            debug!("removed items from index: {index} to {}", end + 1);
         }
         Some(removed)
     }
@@ -301,6 +305,7 @@ impl Items {
                 }
             })
             .try_collect()?;
+        trace!("completed sorting items");
 
         Ok(())
     }
