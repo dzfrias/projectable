@@ -1,7 +1,6 @@
 use crate::ignore::IgnoreBuilder;
 use anyhow::{anyhow, bail, Context, Result};
-use bitvec::prelude::*;
-use itertools::{EitherOrBoth, Itertools};
+use itertools::Itertools;
 use log::{debug, trace};
 use std::{
     borrow::Cow,
@@ -9,7 +8,6 @@ use std::{
     collections::HashMap,
     iter, mem,
     path::{Path, PathBuf},
-    vec,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -76,26 +74,9 @@ impl<'a> From<&'a str> for ItemsIndex<'a> {
     }
 }
 
-/// Applies a bitvec as a filter. Any corresponding values with 1 in the bitvec are ignored
-macro_rules! apply_bitvec_filter {
-    ($iterator:expr, $bitvec:expr) => {
-        $iterator
-            .zip_longest($bitvec)
-            .filter_map(|either_or_both| match either_or_both {
-                EitherOrBoth::Left(item) => Some(item),
-                EitherOrBoth::Both(item, hide) => (!hide).then_some(item),
-                EitherOrBoth::Right(_) => {
-                    panic!("bitvec should not have more elements than iterator")
-                }
-            })
-            .collect()
-    };
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct Items {
     items: Vec<Item>,
-    only_include: BitVec,
     root: PathBuf,
 }
 
@@ -152,11 +133,7 @@ impl Items {
             .flat_map(|pair| iter::once(pair.0).chain(pair.1))
             .filter(|item| item.path() != root && item.path().starts_with(&root))
             .collect();
-        Self {
-            items,
-            root,
-            only_include: BitVec::new(),
-        }
+        Self { items, root }
     }
 
     pub fn ignore(mut self, globs: &[impl AsRef<str>]) -> Result<Items> {
@@ -168,33 +145,16 @@ impl Items {
         Ok(self)
     }
 
-    pub fn only_include(&mut self, paths: &[impl AsRef<Path>]) {
-        self.only_include = self
-            .items
-            .iter()
-            .map(|item| {
-                paths.iter().any(|path| {
-                    !(path.as_ref() == item.path() || item.path().starts_with(path.as_ref()))
-                })
-            })
-            .collect();
-        debug!("applied only include to: {:?}", self.only_include);
+    pub fn items(&self) -> &[Item] {
+        &self.items
     }
 
-    pub fn clear_included(&mut self) {
-        self.only_include.clear();
-    }
-
-    pub fn items(&self) -> Vec<&Item> {
-        apply_bitvec_filter!(self.items.iter(), &self.only_include)
-    }
-
-    pub fn items_mut(&mut self) -> Vec<&mut Item> {
-        apply_bitvec_filter!(self.items.iter_mut(), &self.only_include)
+    pub fn items_mut(&mut self) -> &mut [Item] {
+        &mut self.items
     }
 
     pub fn into_items(self) -> Vec<Item> {
-        apply_bitvec_filter!(self.items.into_iter(), self.only_include)
+        self.items
     }
 
     pub fn get<'a, T>(&self, index: T) -> Option<&Item>
@@ -247,11 +207,11 @@ impl Items {
         self.sort().context("error while adding new item")
     }
 
-    pub fn iter(&self) -> vec::IntoIter<&Item> {
+    pub fn iter(&self) -> std::slice::Iter<Item> {
         self.into_iter()
     }
 
-    pub fn iter_mut(&mut self) -> vec::IntoIter<&mut Item> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Item> {
         self.into_iter()
     }
 
@@ -322,7 +282,7 @@ impl IntoIterator for Items {
 
 impl<'a> IntoIterator for &'a Items {
     type Item = &'a Item;
-    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+    type IntoIter = std::slice::Iter<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items().into_iter()
@@ -331,7 +291,7 @@ impl<'a> IntoIterator for &'a Items {
 
 impl<'a> IntoIterator for &'a mut Items {
     type Item = &'a mut Item;
-    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+    type IntoIter = std::slice::IterMut<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items_mut().into_iter()
@@ -647,40 +607,5 @@ mod tests {
             .ignore(&["test*"])
             .unwrap();
         assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
-    }
-
-    #[test]
-    fn can_only_include_certain_paths() {
-        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
-        items.only_include(&["/root/test.txt"]);
-        assert_eq!(bitvec![0, 1], items.only_include);
-    }
-
-    #[test]
-    fn getting_items_respects_only_include() {
-        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
-        items.only_include(&["/root/test.txt"]);
-        assert_eq!(vec![&Item::File("/root/test.txt".into())], items.items());
-    }
-
-    #[test]
-    fn iterating_through_items_respects_only_incldue() {
-        let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
-        items.only_include(&["/root/test.txt"]);
-        assert_eq!(
-            vec![&Item::File("/root/test.txt".into())],
-            items.iter().collect_vec()
-        );
-    }
-
-    #[test]
-    fn only_including_dir_includes_every_child() {
-        let mut items = Items::new(&[
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test.txt",
-        ]);
-        items.only_include(&["/root/test"]);
-        assert_eq!(bitvec![1, 0, 0, 0], items.only_include);
     }
 }
