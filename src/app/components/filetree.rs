@@ -255,17 +255,6 @@ impl Filetree {
         self.ignore.is_ignored(path)
     }
 
-    fn current_is_open(&mut self) -> bool {
-        let selected = self.state.get_mut().selected();
-        // Will return true if it was already closed
-        let closed = self.state.get_mut().open(selected.clone());
-        if closed {
-            // Reverse the opening
-            self.state.get_mut().close(&selected);
-        }
-        !closed
-    }
-
     pub fn open_under(&mut self, location: &mut Vec<usize>) {
         let Item::Dir(dir) = self.dir.nested_child_mut(location).unwrap() else {
             return;
