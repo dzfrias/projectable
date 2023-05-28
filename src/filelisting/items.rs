@@ -1,7 +1,7 @@
 use crate::ignore::IgnoreBuilder;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Result};
 use itertools::Itertools;
-use log::{debug, trace};
+use log::debug;
 use std::{
     borrow::Cow,
     cmp::Ordering,
@@ -210,13 +210,19 @@ impl Items {
         Some(removed)
     }
 
-    pub fn add(&mut self, item: Item) -> Result<()> {
+    pub fn add(&mut self, item: Item) -> Result<usize> {
         if self.iter().any(|i| i.path() == item.path()) {
             bail!("cannot add duplicate item");
         }
 
-        self.items.push(item);
-        self.sort().context("error while adding new item")
+        let insertion_index = self
+            .items
+            .iter()
+            .position(|existing_item| item.path().parent().unwrap() == existing_item.path())
+            .unwrap_or_default()
+            + 1;
+        self.items.insert(insertion_index, item);
+        Ok(insertion_index)
     }
 
     pub fn root(&self) -> &Path {
@@ -239,51 +245,6 @@ impl Items {
             ItemsIndex::Number(n) => Some(n),
             ItemsIndex::Path(path) => self.iter().position(|p| p.path() == path),
         }
-    }
-
-    fn sort(&mut self) -> Result<()> {
-        // Each key is the path of a directory, and the value is all of its children
-        let mut items: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
-        let unsorted = mem::take(&mut self.items);
-
-        // Put all directories and their direct children into `items`
-        for item in unsorted {
-            match item {
-                Item::Dir(path) => drop(items.entry(path).or_default()),
-                Item::File(path) => items
-                    .entry(
-                        path.parent()
-                            .ok_or(anyhow!("found item without a parent"))?
-                            .to_path_buf(),
-                    )
-                    .or_default()
-                    .push(path),
-            }
-        }
-
-        // Sort directories, and then flatten so that all the children come after their parents.
-        // After, remove the (almost) inevitable root that appears in the `items`. Finally,
-        // deduplicate everything, turning any duplication into an error.
-        self.items = items
-            .into_iter()
-            .map(|(dir, children)| (Item::Dir(dir), children.into_iter().map(Item::File)))
-            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
-            .flat_map(|(dir, children)| iter::once(dir).chain(children))
-            .filter(|item| item.path() != self.root)
-            .dedup_with_count()
-            .map(|(count, item)| {
-                if count == 1 {
-                    Ok(item)
-                } else {
-                    Err(anyhow!(
-                        "duplicate item found: {item:?} with {count} duplicates"
-                    ))
-                }
-            })
-            .try_collect()?;
-        trace!("completed sorting items");
-
-        Ok(())
     }
 }
 
@@ -572,7 +533,7 @@ mod tests {
     }
 
     #[test]
-    fn adding_duplicate_item_does_not_add_and_returns_none() {
+    fn adding_duplicate_item_does_not_add_and_is_err() {
         let mut items = Items::new(&["/root/test.txt"]);
         assert!(items.add(Item::File("/root/test.txt".into())).is_err());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
@@ -586,19 +547,24 @@ mod tests {
     }
 
     #[test]
-    fn adding_items_will_resort_everything() {
+    fn adding_items_will_insert_in_correct_spot() {
         let mut items = Items::new(&[
             "/root/test.txt",
             "/root/test/test.txt",
             "/root/test2/test.txt",
         ]);
-        assert!(items.add(Item::File("/root/test/test2.txt".into())).is_ok());
+        assert_eq!(
+            2,
+            items
+                .add(Item::File("/root/test/test2.txt".into()))
+                .unwrap()
+        );
         assert_eq!(
             vec![
                 Item::File("/root/test.txt".into()),
                 Item::Dir("/root/test".into()),
-                Item::File("/root/test/test.txt".into()),
                 Item::File("/root/test/test2.txt".into()),
+                Item::File("/root/test/test.txt".into()),
                 Item::Dir("/root/test2".into()),
                 Item::File("/root/test2/test.txt".into()),
             ],

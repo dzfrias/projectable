@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     dir::*,
     external_event::{ExternalEvent, RefreshData},
-    filelisting::FileListing,
+    filelisting::{self, FileListing},
     ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
@@ -77,6 +77,7 @@ impl Filetree {
         if let Some(item) = tree.get_selected() {
             queue.add(AppEvent::PreviewFile(item.path().to_owned()));
         }
+        tree.listing.fold_all();
         Ok(tree)
     }
 
@@ -162,7 +163,11 @@ impl Filetree {
                     return Ok(());
                 }
 
-                self.dir.add(path.clone())?;
+                if path.is_dir() {
+                    self.listing.add(filelisting::Item::Dir(path.clone()));
+                } else {
+                    self.listing.add(filelisting::Item::File(path.clone()));
+                }
                 self.populate_status_cache();
             }
         }
@@ -438,21 +443,19 @@ impl Component for Filetree {
                         None => {}
                     },
                     self.config.filetree.new_file => {
-                        let opened = self.current_is_open();
-                        let add_path = match self.get_selected() {
-                            Some(Item::Dir(dir)) if opened => dir.path(),
-                            Some(item) => item.path().parent().expect("item should have parent"),
-                            None => return Ok(()),
+                        let is_folded = self.listing.is_folded(self.listing.selected()).unwrap();
+                        let add_path = match self.listing.selected_item() {
+                            filelisting::Item::Dir(dir) if !is_folded => dir,
+                            item => item.path().parent().expect("item should have parent"),
                         };
                         self.queue
                             .add(AppEvent::OpenInput(InputOperation::NewFile { at: add_path.to_path_buf() }));
                     },
                     self.config.filetree.new_dir => {
-                        let opened = self.current_is_open();
-                        let add_path = match self.get_selected() {
-                            Some(Item::Dir(dir)) if opened => dir.path(),
-                            Some(item) => item.path().parent().expect("item should have parent"),
-                            None => return Ok(()),
+                        let is_folded = self.listing.is_folded(self.listing.selected()).unwrap();
+                        let add_path = match self.listing.selected_item() {
+                            filelisting::Item::Dir(dir) if !is_folded => dir,
+                            item => item.path().parent().expect("item should have parent"),
                         };
                         self.queue
                             .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
@@ -621,7 +624,7 @@ mod tests {
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        assert_eq!(path.join("test"), filetree.get_selected().unwrap().path());
+        assert_eq!(path.join("test"), filetree.listing.selected_item().path());
 
         let n = input_event!(KeyCode::Char('n'));
         filetree
@@ -638,7 +641,8 @@ mod tests {
         let path = temp.path().to_owned();
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        filetree.state.get_mut().toggle_selected();
+        // Opens dir
+        filetree.listing.toggle_fold();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let n = input_event!(KeyCode::Char('n'));
@@ -657,6 +661,7 @@ mod tests {
         let temp = temp_files!("test/test.txt");
         let mut filetree =
             Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
+        filetree.listing.toggle_fold();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let enter = input_event!(KeyCode::Enter);

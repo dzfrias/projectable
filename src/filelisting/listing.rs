@@ -1,5 +1,6 @@
 use super::items::*;
 use bitvec::prelude::*;
+use log::debug;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -14,7 +15,7 @@ pub struct FileListing {
 
 // TODO: Adding/removing files
 // TODO: Only include
-// TODO: Hook up ignore
+// FIX: Folds are weird when folding in nested fold
 impl FileListing {
     pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
         let items = Items::new(items);
@@ -159,6 +160,32 @@ impl FileListing {
 
     pub fn root(&self) -> &Path {
         self.items.root()
+    }
+
+    pub fn add(&mut self, item: Item) {
+        match self.items.add(item) {
+            Ok(inserted_at) => self.folded.insert(inserted_at, false),
+            Err(err) => debug!("swallowed error: {err}"),
+        }
+    }
+
+    pub fn fold_all(&mut self) {
+        for dir_idx in self
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| !item.is_file())
+            .map(|(idx, _)| idx)
+        {
+            self.folded
+                .get_mut(dir_idx)
+                .expect("folded should be same length as items")
+                .set(true)
+        }
+    }
+
+    pub fn unfold_all(&mut self) {
+        self.folded.fill(false)
     }
 
     fn relative_to_absolute<'a, T>(&self, index: T) -> Option<usize>
@@ -457,5 +484,45 @@ mod tests {
         assert!(!items.is_folded(0).unwrap());
         items.fold(0);
         assert!(!items.is_folded(0).unwrap());
+    }
+
+    #[test]
+    fn fold_all_folds_only_directories() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test2/test.txt",
+        ]);
+
+        items.fold_all();
+        assert_eq!(bitvec![0, 1, 0, 0, 1, 0], items.folded);
+    }
+
+    #[test]
+    fn unfold_all_unfolds_everything() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test2/test.txt",
+        ]);
+
+        items.fold_all();
+        items.unfold_all();
+        assert_eq!(bitvec![0, 0, 0, 0, 0, 0], items.folded);
+    }
+
+    #[test]
+    fn adding_items_updates_folded() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+        ]);
+
+        items.fold_all();
+        items.add(Item::File("/root/test2.txt".into()));
+        assert_eq!(bitvec![0, 0, 1, 0, 0], items.folded);
     }
 }
