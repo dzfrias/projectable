@@ -242,15 +242,15 @@ impl<'a> Iterator for Iter<'a> {
             self.index += 1;
             if *folded {
                 let old_current = self.current_fold;
-                // The innermost most recent fold is stored in order to determine if preceding
-                // items should be visible or not
-                self.current_fold = Some(item.path());
                 // If the current item does not start with the old previous fold, include it. This
                 // makes directories visible when they're folded.
                 if !old_current
                     .map(|path| item.path().starts_with(path))
                     .unwrap_or_default()
                 {
+                    // The innermost most recent fold is stored in order to determine if preceding
+                    // items should be visible or not
+                    self.current_fold = Some(item.path());
                     break Some((original_index, item));
                 }
                 continue;
@@ -524,5 +524,19 @@ mod tests {
         items.fold_all();
         items.add(Item::File("/root/test2.txt".into()));
         assert_eq!(bitvec![0, 0, 1, 0, 0], items.folded);
+    }
+
+    #[test]
+    fn nested_dirs_are_not_visible_when_topmost_is_folded() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test/test2/test.txt",
+            "/root/test/test3/test.txt",
+        ]);
+
+        items.fold_all();
+        assert_eq!(2, items.len());
     }
 }
