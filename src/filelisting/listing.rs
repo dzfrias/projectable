@@ -1,18 +1,20 @@
-#![allow(dead_code)]
-
 use super::items::*;
 use bitvec::prelude::*;
 use std::path::Path;
 
 #[derive(Debug)]
-struct FileListing {
+pub struct FileListing {
     /// The list of files. Everything is absolutely positioned
     items: Items,
     /// An absolute index to the selected item
     selected: usize,
+    /// A 1:1 track of folded items. It's length should **always** be the same as `items`
     folded: BitVec,
 }
 
+// TODO: Adding/removing files
+// TODO: Only include
+// TODO: Hook up ignore
 impl FileListing {
     pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
         let items = Items::new(items);
@@ -42,6 +44,14 @@ impl FileListing {
         T: Into<ItemsIndex<'a>>,
     {
         let idx = self.relative_to_absolute(index)?;
+        if self
+            .items
+            .get(idx)
+            .expect("should be in listing, checked above")
+            .is_file()
+        {
+            return Some(idx);
+        }
         self.folded.get_mut(idx)?.set(true);
         Some(idx)
     }
@@ -56,6 +66,9 @@ impl FileListing {
     }
 
     pub fn toggle_fold(&mut self) {
+        if self.selected_item().is_file() {
+            return;
+        }
         let current = self.folded[self.selected];
         self.folded
             .get_mut(self.selected)
@@ -84,6 +97,12 @@ impl FileListing {
             .expect("selection should be in visible items")
     }
 
+    pub fn selected_item(&self) -> &Item {
+        self.items
+            .get(self.selected)
+            .expect("selected should be in items")
+    }
+
     pub fn select_next(&mut self) {
         self.select_next_n(1);
     }
@@ -93,7 +112,8 @@ impl FileListing {
     }
 
     pub fn select_next_n(&mut self, n: usize) {
-        let Some(new_selected) = self.iter().skip(self.selected).nth(n) else {
+        let Some(new_selected) = self.iter().skip(self.selected()).nth(n) else {
+            // Set to last if the jump is over the limit
             self.selected = self.len() - 1;
             return;
         };
@@ -101,6 +121,7 @@ impl FileListing {
     }
 
     pub fn select_prev_n(&mut self, n: usize) {
+        // Stop at 0 instead of overflowing
         let new = self.selected().saturating_sub(n);
         self.selected = self
             .relative_to_absolute(new)
@@ -120,12 +141,24 @@ impl FileListing {
         )
     }
 
+    pub fn select_first(&mut self) {
+        self.select(0);
+    }
+
+    pub fn select_last(&mut self) {
+        self.select(self.len() - 1);
+    }
+
     pub fn iter(&self) -> Iter<'_> {
         Iter {
             listing: self,
             index: 0,
             current_fold: None,
         }
+    }
+
+    pub fn root(&self) -> &Path {
+        self.items.root()
     }
 
     fn relative_to_absolute<'a, T>(&self, index: T) -> Option<usize>
@@ -160,7 +193,7 @@ impl<'a> IntoIterator for &'a FileListing {
     }
 }
 
-struct Iter<'a> {
+pub struct Iter<'a> {
     listing: &'a FileListing,
     index: usize,
     current_fold: Option<&'a Path>,
@@ -170,6 +203,7 @@ impl<'a> Iterator for Iter<'a> {
     type Item = (usize, &'a Item);
 
     fn next(&mut self) -> Option<Self::Item> {
+        // Loop until found a visible item, that is, an item that's not in a fold
         loop {
             let item = self.listing.items.get(self.index)?;
             let folded = self
@@ -181,7 +215,11 @@ impl<'a> Iterator for Iter<'a> {
             self.index += 1;
             if *folded {
                 let old_current = self.current_fold;
+                // The innermost most recent fold is stored in order to determine if preceding
+                // items should be visible or not
                 self.current_fold = Some(item.path());
+                // If the current item does not start with the old previous fold, include it. This
+                // makes directories visible when they're folded.
                 if !old_current
                     .map(|path| item.path().starts_with(path))
                     .unwrap_or_default()
@@ -191,6 +229,7 @@ impl<'a> Iterator for Iter<'a> {
                 continue;
             }
 
+            // Check if under a folded directory
             if self
                 .current_fold
                 .map(|path| item.path().starts_with(path))
@@ -387,5 +426,36 @@ mod tests {
         items.select_next();
         items.toggle_fold();
         assert!(items.is_folded(items.selected()).unwrap())
+    }
+
+    #[test]
+    fn can_handle_multiple_folds() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test2/test.txt",
+            "/root/test2/test2.txt",
+        ]);
+
+        items.select_next();
+        items.toggle_fold();
+        items.select_next();
+        items.select_next();
+        assert_eq!(5, items.selected);
+    }
+
+    #[test]
+    fn cannot_fold_files() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+        ]);
+
+        items.toggle_fold();
+        assert!(!items.is_folded(0).unwrap());
+        items.fold(0);
+        assert!(!items.is_folded(0).unwrap());
     }
 }

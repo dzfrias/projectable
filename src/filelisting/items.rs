@@ -42,6 +42,10 @@ impl Item {
             Self::Dir(dir) => dir,
         }
     }
+
+    pub fn is_file(&self) -> bool {
+        matches!(self, Item::File(_))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,6 +217,10 @@ impl Items {
 
         self.items.push(item);
         self.sort().context("error while adding new item")
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
     pub fn iter(&self) -> std::slice::Iter<Item> {

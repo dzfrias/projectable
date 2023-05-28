@@ -1,8 +1,11 @@
+#![allow(unused_imports)]
+
 use crate::{
     app::{component::*, InputOperation, PendingOperation},
     config::Config,
     dir::*,
     external_event::{ExternalEvent, RefreshData},
+    filelisting::FileListing,
     ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
@@ -10,6 +13,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
+use ignore::Walk;
 use itertools::Itertools;
 use log::{debug, info, warn};
 use std::{
@@ -21,8 +25,8 @@ use std::{
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::Style,
-    widgets::{Block, Borders, Paragraph, Wrap},
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
@@ -31,6 +35,7 @@ pub struct Filetree {
     state: Cell<TreeState>,
     is_focused: bool,
     dir: Dir,
+    listing: FileListing,
     root_path: PathBuf,
     queue: Queue,
     only_included: Vec<PathBuf>,
@@ -61,6 +66,12 @@ impl Filetree {
             config: Rc::new(Config::default()),
             ignore: Ignore::default(),
             marks: Default::default(),
+            listing: FileListing::new(
+                &Walk::new(path.as_ref())
+                    .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
+                    .filter(|entry_path| entry_path != path.as_ref())
+                    .collect_vec(),
+            ),
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -265,52 +276,79 @@ impl Filetree {
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let items = build_filetree(
-            &self.dir,
-            self.status_cache.as_ref(),
-            Rc::clone(&self.config),
-            &self.marks.borrow(),
-            &self.only_included,
-        );
-        let mut state = self.state.take();
+        let mut state = ListState::default();
+        state.select(Some(self.listing.selected()));
+        let list = List::new(
+            self.listing
+                .items()
+                .into_iter()
+                .map(|item| {
+                    let file_name = item
+                        .path()
+                        .file_name()
+                        .expect("path should have name")
+                        .to_string_lossy();
+                    // Calculate depth of indent
+                    let indent_amount =
+                        item.path().components().count() - self.listing.root().components().count();
+                    const INDENT: usize = 2;
 
-        if self.is_searching() {
-            let layout = Layout::default()
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Length(1),
-                    Constraint::Min(1),
-                ])
-                .margin(1)
-                .split(area);
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(self.config.filetree.border_color.into())
-                .title("Files");
-            let tree = Tree::new(items).highlight_style(self.config.selected.into());
-            let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
-                .alignment(Alignment::Center)
-                .wrap(Wrap { trim: true })
-                .style(self.config.filetree.filtered_out_message.into());
-
-            f.render_widget(block, area);
-            f.render_widget(p, layout[0]);
-            f.render_stateful_widget(tree, layout[2], &mut state);
-        } else {
-            let tree = Tree::new(items)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Files")
-                        .border_style(self.config.filetree.border_color.into()),
-                )
-                .highlight_style(self.config.selected.into());
-            f.render_stateful_widget(tree, area, &mut state);
-        }
-
-        self.state.set(state);
+                    ListItem::new(format!("{}{file_name}", " ".repeat(indent_amount * INDENT)))
+                })
+                .collect_vec(),
+        )
+        .highlight_style(Style::default().bg(Color::Red))
+        .block(Block::default().borders(Borders::ALL));
+        f.render_stateful_widget(list, area, &mut state);
 
         Ok(())
+
+        // let items = build_filetree(
+        //     &self.dir,
+        //     self.status_cache.as_ref(),
+        //     Rc::clone(&self.config),
+        //     &self.marks.borrow(),
+        //     &self.only_included,
+        // );
+        // let mut state = self.state.take();
+        //
+        // if self.is_searching() {
+        //     let layout = Layout::default()
+        //         .constraints([
+        //             Constraint::Length(1),
+        //             Constraint::Length(1),
+        //             Constraint::Min(1),
+        //         ])
+        //         .margin(1)
+        //         .split(area);
+        //     let block = Block::default()
+        //         .borders(Borders::ALL)
+        //         .border_style(self.config.filetree.border_color.into())
+        //         .title("Files");
+        //     let tree = Tree::new(items).highlight_style(self.config.selected.into());
+        //     let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
+        //         .alignment(Alignment::Center)
+        //         .wrap(Wrap { trim: true })
+        //         .style(self.config.filetree.filtered_out_message.into());
+        //
+        //     f.render_widget(block, area);
+        //     f.render_widget(p, layout[0]);
+        //     f.render_stateful_widget(tree, layout[2], &mut state);
+        // } else {
+        //     let tree = Tree::new(items)
+        //         .block(
+        //             Block::default()
+        //                 .borders(Borders::ALL)
+        //                 .title("Files")
+        //                 .border_style(self.config.filetree.border_color.into()),
+        //         )
+        //         .highlight_style(self.config.selected.into());
+        //     f.render_stateful_widget(tree, area, &mut state);
+        // }
+        //
+        // self.state.set(state);
+        //
+        // Ok(())
     }
 }
 
@@ -355,20 +393,12 @@ impl Component for Filetree {
                 let mut refresh_preview = true;
                 let not_empty = !items.is_empty();
                 switch! { key;
-                    self.config.all_up => self.state.get_mut().select_first(),
-                    self.config.all_down => self.state.get_mut().select_last(&items),
-                    self.config.down, not_empty => self.state.get_mut().key_down(&items),
-                    self.config.up, not_empty => self.state.get_mut().key_up(&items),
-                    self.config.filetree.down_three, not_empty => {
-                        for _ in 0..JUMP_DOWN_AMOUNT {
-                            self.state.get_mut().key_down(&items);
-                        }
-                    },
-                    self.config.filetree.up_three, not_empty => {
-                        for _ in 0..JUMP_DOWN_AMOUNT {
-                            self.state.get_mut().key_up(&items);
-                        }
-                    },
+                    self.config.all_up => self.listing.select_first(),
+                    self.config.all_down => self.listing.select_last(),
+                    self.config.down, not_empty => self.listing.select_next(),
+                    self.config.up, not_empty => self.listing.select_prev(),
+                    self.config.filetree.down_three, not_empty => self.listing.select_next_n(JUMP_DOWN_AMOUNT as usize),
+                    self.config.filetree.up_three, not_empty => self.listing.select_prev_n(JUMP_DOWN_AMOUNT as usize),
                     self.config.filetree.exec_cmd, not_empty => {
                         if let Some(item) = self.get_selected() {
                              self.queue.add(AppEvent::OpenInput(InputOperation::Command {
@@ -401,7 +431,7 @@ impl Component for Filetree {
                         self.refresh().context("problem refreshing filetree")?;
                     },
                     self.config.open => match self.get_selected() {
-                        Some(Item::Dir(_)) => self.state.get_mut().toggle_selected(),
+                        Some(Item::Dir(_)) => self.listing.toggle_fold(),
                         Some(Item::File(file)) => self
                             .queue
                             .add(AppEvent::OpenFile(file.path().to_path_buf())),
@@ -633,7 +663,10 @@ mod tests {
         filetree
             .handle_event(&enter)
             .expect("should be able to handle keypress");
-        assert_eq!(vec![vec![0]], filetree.state.get_mut().get_all_opened());
+        assert!(filetree
+            .listing
+            .is_folded(filetree.listing.selected())
+            .unwrap());
     }
 
     #[test]
@@ -664,7 +697,7 @@ mod tests {
         filetree
             .handle_event(&ctrl_n)
             .expect("should be able to handle keypress");
-        assert_eq!(3, filetree.state.get_mut().selected()[0])
+        assert_eq!(3, filetree.listing.selected())
     }
 
     #[test]
@@ -680,7 +713,7 @@ mod tests {
                 .handle_event(&input)
                 .expect("should be able to handle keypress");
         }
-        assert_eq!(0, filetree.state.get_mut().selected()[0])
+        assert_eq!(0, filetree.state.get_mut().selected()[0]);
     }
 
     #[test]
