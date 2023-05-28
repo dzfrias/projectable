@@ -135,29 +135,7 @@ impl Filetree {
                     return Ok(());
                 }
 
-                self.dir.remove(path)?;
-
-                let mut selected = self.state.get_mut().selected();
-                let mut opened = self.state.get_mut().get_all_opened();
-                opened
-                    .iter()
-                    .position(|item| item == &selected)
-                    .map(|index| opened.remove(index));
-                if self.get_selected().is_none() {
-                    let prev_item = {
-                        if *selected.last().expect("length should be greater than 0") == 0 {
-                            selected.pop();
-                        } else if let Some(last) = selected.last_mut() {
-                            *last -= 1;
-                        }
-                        selected
-                    };
-                    self.state.get_mut().select(prev_item);
-                }
-                self.state.get_mut().close_all();
-                for open in opened {
-                    self.state.get_mut().open(open);
-                }
+                self.listing.remove(path.as_path())?;
             }
             RefreshData::Add(path) => {
                 if self.ignore.is_ignored(path) {
@@ -402,12 +380,8 @@ impl Component for Filetree {
                          }
                     },
                     self.config.filetree.delete => {
-                        if let Some(item) = self.get_selected() {
-                            self.queue
-                                .add(AppEvent::OpenPopup(PendingOperation::DeleteFile(
-                                    item.path().to_path_buf(),
-                            )));
-                        }
+                        let item = self.listing.selected_item();
+                        self.queue.add(AppEvent::OpenPopup(PendingOperation::DeleteFile(item.path().to_path_buf())));
                     },
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
                     self.config.filetree.git_filter => {
@@ -782,17 +756,18 @@ mod tests {
     }
 
     #[test]
-    fn partial_refresh_delete_goes_to_prev_item() {
+    fn partial_refresh_delete_goes_to_same_item() {
         let temp = temp_files!("test/test.txt", "test/test2.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        filetree.state.get_mut().select(vec![0, 1]);
+        filetree.listing.unfold_all();
+        filetree.listing.select(1);
         filetree
             .partial_refresh(&RefreshData::Delete(
-                filetree.get_selected().unwrap().path().to_path_buf(),
+                filetree.listing.selected_item().path().to_path_buf(),
             ))
             .unwrap();
-        assert_eq!(vec![0, 0], filetree.state.get_mut().selected());
+        assert_eq!(1, filetree.listing.selected());
     }
 
     #[test]
@@ -800,13 +775,14 @@ mod tests {
         let temp = temp_files!("test/test.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        filetree.state.get_mut().select(vec![0, 0]);
+        filetree.listing.unfold_all();
+        filetree.listing.select(1);
         filetree
             .partial_refresh(&RefreshData::Delete(
-                filetree.get_selected().unwrap().path().to_path_buf(),
+                filetree.listing.selected_item().path().to_path_buf(),
             ))
             .unwrap();
-        assert_eq!(vec![0], filetree.state.get_mut().selected());
+        assert_eq!(0, filetree.listing.selected());
     }
 
     #[test]

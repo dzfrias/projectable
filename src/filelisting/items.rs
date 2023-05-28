@@ -7,6 +7,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     iter, mem,
+    ops::RangeInclusive,
     path::{Path, PathBuf},
 };
 
@@ -185,7 +186,7 @@ impl Items {
         self.items.get_mut(index)
     }
 
-    pub fn remove<'a, T>(&mut self, index: T) -> Option<Item>
+    pub fn remove<'a, T>(&mut self, index: T) -> Option<(Item, RangeInclusive<usize>)>
     where
         T: Into<ItemsIndex<'a>>,
     {
@@ -195,7 +196,7 @@ impl Items {
             return None;
         }
         let removed = self.items.remove(index);
-        debug!("removed item at index: {index}");
+        let mut indices_removed = index..=index;
         if let Item::Dir(ref path) = removed {
             // Gets index of the last item that has `path` as one of its ancestors
             let end = self
@@ -204,10 +205,11 @@ impl Items {
                 .skip(index)
                 .position(|item| !item.path().starts_with(path))
                 .unwrap_or(self.items.len() - 1);
-            self.items.drain(index..end + 1);
-            debug!("removed items from index: {index} to {}", end + 1);
+            self.items.drain(index..=end);
+            indices_removed = index..=end + 1;
         }
-        Some(removed)
+        debug!("removed items in range: {indices_removed:?}");
+        Some((removed, indices_removed))
     }
 
     pub fn add(&mut self, item: Item) -> Result<usize> {
@@ -475,7 +477,10 @@ mod tests {
     #[test]
     fn can_remove_files() {
         let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
-        assert_eq!(Some(Item::File("/root/test.txt".into())), items.remove(0));
+        assert_eq!(
+            Some((Item::File("/root/test.txt".into()), 0..=0)),
+            items.remove(0)
+        );
         assert_eq!(vec![Item::File("/root/test2.txt".into())], items.items);
     }
 
@@ -489,7 +494,10 @@ mod tests {
             "/root/test/test2.txt",
             "/root/test/test3.txt",
         ]);
-        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(2));
+        assert_eq!(
+            Some((Item::Dir("/root/test".into()), 2..=5)),
+            items.remove(2)
+        );
         assert_eq!(
             vec![
                 Item::File("/root/test.txt".into()),
@@ -508,14 +516,20 @@ mod tests {
             "/root/test/test2.txt",
             "/root/test/test3.txt",
         ]);
-        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(
+            Some((Item::Dir("/root/test".into()), 1..=4)),
+            items.remove(1)
+        );
         assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
     }
 
     #[test]
     fn can_remove_single_directory() {
         let mut items = Items::new(&["/root/test.txt", "/root/test", "/root/test/test.txt"]);
-        assert_eq!(Some(Item::Dir("/root/test".into())), items.remove(1));
+        assert_eq!(
+            Some((Item::Dir("/root/test".into()), 1..=2)),
+            items.remove(1)
+        );
         assert_eq!(vec![Item::File("/root/test.txt".into()),], items.items);
     }
 

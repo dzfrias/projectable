@@ -1,4 +1,5 @@
 use super::items::*;
+use anyhow::{anyhow, Result};
 use bitvec::prelude::*;
 use log::debug;
 use std::path::Path;
@@ -13,7 +14,6 @@ pub struct FileListing {
     folded: BitVec,
 }
 
-// TODO: Adding/removing files
 // TODO: Only include
 // FIX: Folds are weird when folding in nested fold
 impl FileListing {
@@ -167,6 +167,23 @@ impl FileListing {
             Ok(inserted_at) => self.folded.insert(inserted_at, false),
             Err(err) => debug!("swallowed error: {err}"),
         }
+    }
+
+    pub fn remove<'a, T>(&mut self, index: T) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let (_, removed) = self
+            .items
+            .remove(index)
+            .ok_or_else(|| anyhow!("invalid remove target"))?;
+
+        self.folded.drain(removed);
+        if self.selected >= self.items.len() {
+            self.selected = self.items.len() - 1
+        }
+
+        Ok(())
     }
 
     pub fn fold_all(&mut self) {
@@ -538,5 +555,26 @@ mod tests {
 
         items.fold_all();
         assert_eq!(2, items.len());
+    }
+
+    #[test]
+    fn removing_from_listing_removes_from_folded() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test2.txt",
+            "/root/test2/test.txt",
+        ]);
+
+        items.fold_all();
+        assert!(items.remove(1).is_ok());
+        assert_eq!(
+            vec![
+                &Item::File("/root/test.txt".into()),
+                &Item::Dir("/root/test2".into()),
+            ],
+            items.items()
+        );
+        assert_eq!(bitvec![0, 1, 0], items.folded)
     }
 }
