@@ -264,7 +264,7 @@ impl<'a> IntoIterator for &'a Items {
     type IntoIter = std::slice::Iter<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items().into_iter()
+        self.items().iter()
     }
 }
 
@@ -273,7 +273,7 @@ impl<'a> IntoIterator for &'a mut Items {
     type IntoIter = std::slice::IterMut<'a, Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.items_mut().into_iter()
+        self.items_mut().iter_mut()
     }
 }
 

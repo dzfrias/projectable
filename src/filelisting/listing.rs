@@ -179,7 +179,7 @@ impl FileListing {
 
         self.folded.drain(removed);
         if self.selected >= self.items.len() {
-            self.selected = self.items.len() - 1
+            self.selected = self.items.len() - 1;
         }
 
         Ok(())
@@ -196,12 +196,12 @@ impl FileListing {
             self.folded
                 .get_mut(dir_idx)
                 .expect("folded should be same length as items")
-                .set(true)
+                .set(true);
         }
     }
 
     pub fn unfold_all(&mut self) {
-        self.folded.fill(false)
+        self.folded.fill(false);
     }
 
     fn relative_to_absolute<'a, T>(&self, index: T) -> Option<usize>
