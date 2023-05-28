@@ -219,10 +219,12 @@ mod tests {
     use test_log::test;
 
     fn test_popup() -> FileCmdPopup {
-        let mut config = Config::default();
-        config.special_commands = collect![_:
-            ("*".to_owned(), vec!["command {}".to_owned(), "command2 {} {...}".to_owned(), "command3".to_owned()])
-        ];
+        let config = Config {
+            special_commands: collect![_:
+                ("*".to_owned(), vec!["command {}".to_owned(), "command2 {} {...}".to_owned(), "command3".to_owned()])
+            ],
+            ..Default::default()
+        };
         let mut popup = FileCmdPopup::new(Queue::new(), config.into());
         let path = "test.txt".into();
         popup.open_for(path);
@@ -245,11 +247,13 @@ mod tests {
 
     #[test]
     fn can_open_for_file() {
-        let mut config = Config::default();
-        config.special_commands = collect![_:
-            ("*".to_owned(), vec!["command".to_owned()]),
-            ("not_there.txt".to_owned(), vec!["should_not_be_here".to_owned()])
-        ];
+        let config = Config {
+            special_commands: collect![_:
+                ("*".to_owned(), vec!["command".to_owned()]),
+                ("not_there.txt".to_owned(), vec!["should_not_be_here".to_owned()])
+            ],
+            ..Default::default()
+        };
         let mut popup = FileCmdPopup::new(Queue::new(), config.into());
         let path = "test.txt".into();
         let state = popup.open_for(path);
@@ -320,7 +324,7 @@ mod tests {
         popup.handle_event(&event).unwrap();
         assert!(popup
             .queue
-            .contains(&AppEvent::RunCommand("command test.txt".to_owned())))
+            .contains(&AppEvent::RunCommand("command test.txt".to_owned())));
     }
 
     #[test]
@@ -333,6 +337,6 @@ mod tests {
             .queue
             .contains(&AppEvent::OpenInput(InputOperation::SpecialCommand(
                 "command2 test.txt {...}".to_owned()
-            ))))
+            ))));
     }
 }

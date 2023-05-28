@@ -468,7 +468,7 @@ mod tests {
 
         items.select_next();
         items.toggle_fold();
-        assert!(items.is_folded(items.selected()).unwrap())
+        assert!(items.is_folded(items.selected()).unwrap());
     }
 
     #[test]
@@ -574,6 +574,6 @@ mod tests {
             ],
             items.items()
         );
-        assert_eq!(bitvec![0, 1, 0], items.folded)
+        assert_eq!(bitvec![0, 1, 0], items.folded);
     }
 }

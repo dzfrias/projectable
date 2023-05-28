@@ -48,7 +48,7 @@ mod tests {
             .unwrap()
             .join("AppData\\Roaming\\projectable\\marks.json");
 
-        assert_eq!(correct_path, get_marks_file().unwrap())
+        assert_eq!(correct_path, get_marks_file().unwrap());
     }
 
     #[test]

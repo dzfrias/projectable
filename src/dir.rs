@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(
             path.join("test/keep/keep.txt"),
             dir.nested_child(&[0, 0, 0]).unwrap().path()
-        )
+        );
     }
 
     #[test]
@@ -562,7 +562,7 @@ mod tests {
         assert_eq!(
             Some(vec![0, 0, 0]),
             dir.location_by_path(path.join("test/test/test.txt"))
-        )
+        );
     }
 
     #[test]
@@ -572,7 +572,7 @@ mod tests {
         let dir = DirBuilder::new(temp.path()).build().unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
-        assert_eq!(Some(Vec::new()), dir.location_by_path(path))
+        assert_eq!(Some(Vec::new()), dir.location_by_path(path));
     }
 
     #[test]
@@ -585,7 +585,7 @@ mod tests {
         assert_eq!(
             Some(vec![0, 0]),
             dir.location_by_path(path.join("test/test"))
-        )
+        );
     }
 
     #[test]

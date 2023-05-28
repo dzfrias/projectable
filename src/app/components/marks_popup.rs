@@ -249,7 +249,7 @@ mod tests {
         let mut popup = test_popup();
         popup.delete_selected();
         let marks = popup.marks.borrow();
-        assert_eq!(PathBuf::from("/"), marks[0])
+        assert_eq!(PathBuf::from("/"), marks[0]);
     }
 
     #[test]
@@ -294,7 +294,7 @@ mod tests {
             "/test.txt".into(),
         ]));
         popup.select_last();
-        assert_eq!(2, popup.selected())
+        assert_eq!(2, popup.selected());
     }
 
     #[test]

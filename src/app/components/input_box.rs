@@ -224,9 +224,11 @@ mod tests {
             InputOperation::NewDir { at: "/".into() },
             InputOperation::NewFile { at: "/".into() },
         ] {
-            let mut input_box = InputBox::default();
-            input_box.operation = operation;
-            input_box.text = "should not work /".to_owned();
+            let input_box = InputBox {
+                operation,
+                text: "should not work /".to_owned(),
+                ..Default::default()
+            };
             assert!(!input_box.has_valid_input().expect("should have work"));
         }
     }
@@ -248,9 +250,11 @@ mod tests {
     #[test]
     fn reset_on_esc() {
         let event = input_event!(KeyCode::Esc);
-        let mut input_box = InputBox::default();
-        input_box.text = "text".to_owned();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
+        let mut input_box = InputBox {
+            text: "text".to_owned(),
+            operation: InputOperation::NewFile { at: "/".into() },
+            ..Default::default()
+        };
         input_box.handle_event(&event).expect("should not error");
         assert_eq!(String::new(), input_box.text);
         assert_eq!(InputOperation::NoOperations, input_box.operation);
@@ -269,8 +273,10 @@ mod tests {
     #[test]
     fn takes_input() {
         let events = input_events!(KeyCode::Char('h'), KeyCode::Char('i'));
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
+        let mut input_box = InputBox {
+            operation: InputOperation::NewFile { at: "/".into() },
+            ..Default::default()
+        };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -285,8 +291,10 @@ mod tests {
             KeyCode::Backspace,
             KeyCode::Delete
         );
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
+        let mut input_box = InputBox {
+            operation: InputOperation::NewFile { at: "/".into() },
+            ..Default::default()
+        };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -302,8 +310,10 @@ mod tests {
             kind: KeyEventKind::Press,
             state: KeyEventState::empty(),
         }));
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
+        let mut input_box = InputBox {
+            operation: InputOperation::NewFile { at: "/".into() },
+            ..Default::default()
+        };
         for event in events {
             input_box.handle_event(&event).expect("input should work");
         }
@@ -316,9 +326,11 @@ mod tests {
     #[test]
     fn can_send_new_dir_event() {
         let event = input_event!(KeyCode::Enter);
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewDir { at: "/".into() };
-        input_box.text = "hello_world".to_owned();
+        let mut input_box = InputBox {
+            operation: InputOperation::NewDir { at: "/".into() },
+            text: "hello_world".to_owned(),
+            ..Default::default()
+        };
         input_box.handle_event(&event).expect("input should work");
         assert_eq!(
             AppEvent::NewDir("/hello_world".into()),
@@ -329,9 +341,11 @@ mod tests {
     #[test]
     fn can_send_new_file_event() {
         let event = input_event!(KeyCode::Enter);
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
-        input_box.text = "hello_world.txt".to_owned();
+        let mut input_box = InputBox {
+            operation: InputOperation::NewFile { at: "/".into() },
+            text: "hello_world.txt".to_owned(),
+            ..Default::default()
+        };
         input_box.handle_event(&event).expect("input should work");
         assert_eq!(
             AppEvent::NewFile("/hello_world.txt".into()),
@@ -342,9 +356,11 @@ mod tests {
     #[test]
     fn resets_after_option_entered() {
         let event = input_event!(KeyCode::Enter);
-        let mut input_box = InputBox::default();
-        input_box.operation = InputOperation::NewFile { at: "/".into() };
-        input_box.text = "test".to_owned();
+        let mut input_box = InputBox {
+            operation: InputOperation::NewFile { at: "/".into() },
+            text: "test".to_owned(),
+            ..Default::default()
+        };
         input_box.handle_event(&event).expect("input should work");
         assert!(input_box.text.is_empty());
         assert_eq!(InputOperation::NoOperations, input_box.operation);
@@ -356,24 +372,30 @@ mod tests {
             InputOperation::NewFile { at: "/".into() },
             InputOperation::NewDir { at: "/".into() },
         ] {
-            let mut input_box = InputBox::default();
-            input_box.operation = operation;
-            assert!(!input_box.has_valid_input().expect("should have work"))
+            let input_box = InputBox {
+                operation,
+                ..Default::default()
+            };
+            assert!(!input_box.has_valid_input().expect("should have work"));
         }
     }
 
     #[test]
     fn moving_cursor_does_not_go_past_text_on_right() {
-        let mut input_box = InputBox::default();
-        input_box.text = "testing".to_owned();
+        let mut input_box = InputBox {
+            text: "testing".to_owned(),
+            ..Default::default()
+        };
         input_box.cursor_right();
         assert_eq!(0, input_box.cursor_offset);
     }
 
     #[test]
     fn moving_cursor_does_not_go_past_text_on_left() {
-        let mut input_box = InputBox::default();
-        input_box.text = "test".to_owned();
+        let mut input_box = InputBox {
+            text: "test".to_owned(),
+            ..Default::default()
+        };
         for _ in 0..5 {
             input_box.cursor_left();
         }
@@ -384,9 +406,11 @@ mod tests {
     fn can_send_execute_command_to_queue() {
         let enter = input_event!(KeyCode::Enter);
 
-        let mut input_box = InputBox::default();
-        input_box.text = "testing {}".to_owned();
-        input_box.operation = InputOperation::Command { to: "/".into() };
+        let mut input_box = InputBox {
+            text: "testing {}".to_owned(),
+            operation: InputOperation::Command { to: "/".into() },
+            ..Default::default()
+        };
         input_box.handle_event(&enter).unwrap();
 
         assert_eq!(
@@ -397,9 +421,11 @@ mod tests {
 
     #[test]
     fn deletes_where_cursor_is() {
-        let mut input_box = InputBox::default();
-        input_box.text = "testing".to_owned();
-        input_box.operation = InputOperation::Command { to: "/".into() };
+        let mut input_box = InputBox {
+            text: "testing".to_owned(),
+            operation: InputOperation::Command { to: "/".into() },
+            ..Default::default()
+        };
 
         let events = input_events!(KeyCode::Left, KeyCode::Delete);
         input_box.handle_event(&events[0]).unwrap();
@@ -409,9 +435,11 @@ mod tests {
 
     #[test]
     fn inserts_where_cursor_is() {
-        let mut input_box = InputBox::default();
-        input_box.text = "testing".to_owned();
-        input_box.operation = InputOperation::Command { to: "/".into() };
+        let mut input_box = InputBox {
+            text: "testing".to_owned(),
+            operation: InputOperation::Command { to: "/".into() },
+            ..Default::default()
+        };
 
         let events = input_events!(KeyCode::Left, KeyCode::Char('n'));
         input_box.handle_event(&events[0]).unwrap();
@@ -421,9 +449,11 @@ mod tests {
 
     #[test]
     fn deletes_line_where_cursor_is() {
-        let mut input_box = InputBox::default();
-        input_box.text = "testing".to_owned();
-        input_box.operation = InputOperation::Command { to: "/".into() };
+        let mut input_box = InputBox {
+            text: "testing".to_owned(),
+            operation: InputOperation::Command { to: "/".into() },
+            ..Default::default()
+        };
 
         let events = input_events!(KeyCode::Left, KeyCode::Char('u'); KeyModifiers::CONTROL);
         input_box.handle_event(&events[0]).unwrap();

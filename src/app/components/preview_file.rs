@@ -333,6 +333,6 @@ mod tests {
                 }
             ],
             previewer.scrolls.take()
-        )
+        );
     }
 }

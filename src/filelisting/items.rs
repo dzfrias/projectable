@@ -460,8 +460,7 @@ mod tests {
         );
         for item in items.iter_mut() {
             match item {
-                Item::Dir(path) => *path = PathBuf::new(),
-                Item::File(path) => *path = PathBuf::new(),
+                Item::Dir(path) | Item::File(path) => *path = PathBuf::new(),
             }
         }
         assert_eq!(
@@ -543,21 +542,21 @@ mod tests {
                 Item::File("/root/test2.txt".into())
             ],
             items.items
-        )
+        );
     }
 
     #[test]
     fn adding_duplicate_item_does_not_add_and_is_err() {
         let mut items = Items::new(&["/root/test.txt"]);
         assert!(items.add(Item::File("/root/test.txt".into())).is_err());
-        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items);
     }
 
     #[test]
     fn can_pass_path_into_remove() {
         let mut items = Items::new(&["/root/test.txt", "/root/test2.txt"]);
         assert!(items.remove("/root/test2.txt").is_some());
-        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items)
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items);
     }
 
     #[test]
@@ -583,7 +582,7 @@ mod tests {
                 Item::File("/root/test2/test.txt".into()),
             ],
             items.items
-        )
+        );
     }
 
     #[test]
@@ -602,6 +601,6 @@ mod tests {
         let items = Items::new(&["/root/test.txt", "/root/test2.txt", "/root/foo.txt"])
             .ignore(&["test*"])
             .unwrap();
-        assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items)
+        assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items);
     }
 }

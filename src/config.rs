@@ -818,7 +818,7 @@ mod tests {
         #[cfg(target_os = "macos")]
         let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
 
-        assert_eq!(correct_path, get_config_home().unwrap())
+        assert_eq!(correct_path, get_config_home().unwrap());
     }
 
     #[test]
@@ -860,8 +860,10 @@ mod tests {
 
     #[test]
     fn merge_keeps_lhs_when_rhs_is_default() {
-        let mut lhs = Config::default();
-        lhs.quit = Key::normal('z');
+        let mut lhs = Config {
+            quit: Key::normal('z'),
+            ..Default::default()
+        };
         let rhs = Config::default();
         lhs.merge(rhs);
         assert_eq!(Key::normal('z'), lhs.quit);
@@ -869,10 +871,14 @@ mod tests {
 
     #[test]
     fn merge_has_rhs_take_precedence_over_lhs() {
-        let mut lhs = Config::default();
-        lhs.quit = Key::normal('z');
-        let mut rhs = Config::default();
-        rhs.quit = Key::normal('v');
+        let mut lhs = Config {
+            quit: Key::normal('z'),
+            ..Default::default()
+        };
+        let rhs = Config {
+            quit: Key::normal('v'),
+            ..Default::default()
+        };
         lhs.merge(rhs);
         assert_eq!(Key::normal('v'), lhs.quit);
     }
@@ -880,8 +886,10 @@ mod tests {
     #[test]
     fn merge_has_rhs_override_lhs_when_lhs_is_default() {
         let mut lhs = Config::default();
-        let mut rhs = Config::default();
-        rhs.quit = Key::normal('v');
+        let rhs = Config {
+            quit: Key::normal('v'),
+            ..Default::default()
+        };
         lhs.merge(rhs);
         assert_eq!(Key::normal('v'), lhs.quit);
     }
@@ -906,9 +914,11 @@ mod tests {
 
     #[test]
     fn properly_reports_keybind_conflicts() {
-        let mut config = Config::default();
-        config.help = Key::normal('q');
-        config.down = Key::normal('q');
+        let config = Config {
+            help: Key::normal('q'),
+            down: Key::normal('q'),
+            ..Default::default()
+        };
         assert_eq!(
             vec![KeyConflict {
                 on: &Key::normal('q'),

@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn new_popup_selects_first_item() {
         let popup = PendingPopup::default();
-        assert_eq!(0, popup.selected())
+        assert_eq!(0, popup.selected());
     }
 
     #[test]
@@ -208,8 +208,10 @@ mod tests {
     fn can_go_up_and_down() {
         let down = input_event!(KeyCode::Char('j'));
         let up = input_event!(KeyCode::Char('k'));
-        let mut popup = PendingPopup::default();
-        popup.operation = PendingOperation::DeleteFile("/".into());
+        let mut popup = PendingPopup {
+            operation: PendingOperation::DeleteFile("/".into()),
+            ..Default::default()
+        };
         popup.handle_event(&down).expect("should handle input");
         assert_eq!(1, popup.selected());
         popup.handle_event(&up).expect("should handle input");
@@ -219,8 +221,10 @@ mod tests {
     #[test]
     fn sends_message_on_confirm() {
         let enter = input_event!(KeyCode::Enter);
-        let mut popup = PendingPopup::default();
-        popup.operation = PendingOperation::DeleteFile("/".into());
+        let mut popup = PendingPopup {
+            operation: PendingOperation::DeleteFile("/".into()),
+            ..Default::default()
+        };
         popup.handle_event(&enter).expect("should handle input");
         assert!(popup.queue.pop().is_some());
     }
@@ -228,11 +232,13 @@ mod tests {
     #[test]
     fn sends_no_message_on_deny() {
         let events = input_events!(KeyCode::Char('j'), KeyCode::Enter);
-        let mut popup = PendingPopup::default();
-        popup.operation = PendingOperation::DeleteFile("/".into());
+        let mut popup = PendingPopup {
+            operation: PendingOperation::DeleteFile("/".into()),
+            ..Default::default()
+        };
         for event in events {
             popup.handle_event(&event).expect("should handle input");
         }
-        assert!(popup.queue.pop().is_none())
+        assert!(popup.queue.pop().is_none());
     }
 }

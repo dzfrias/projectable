@@ -196,8 +196,10 @@ mod tests {
 
     #[test]
     fn q_resets() {
-        let mut popup = Popup::default();
-        popup.preset = Preset::Help;
+        let mut popup = Popup {
+            preset: Preset::Help,
+            ..Default::default()
+        };
 
         let q = input_event!(KeyCode::Char('q'));
         popup.handle_event(&q).unwrap();
@@ -206,8 +208,10 @@ mod tests {
 
     #[test]
     fn up_and_down_increment_scroll() {
-        let mut popup = Popup::default();
-        popup.preset = Preset::Help;
+        let mut popup = Popup {
+            preset: Preset::Help,
+            ..Default::default()
+        };
         let [up, down] = input_events!(KeyCode::Char('k'), KeyCode::Char('j'));
         popup.handle_event(&down).unwrap();
         assert_eq!(1, popup.scroll_y.get());
@@ -217,8 +221,10 @@ mod tests {
 
     #[test]
     fn g_and_shift_g_go_all_up_and_all_down() {
-        let mut popup = Popup::default();
-        popup.preset = Preset::Help;
+        let mut popup = Popup {
+            preset: Preset::Help,
+            ..Default::default()
+        };
         let [all_up, all_down] =
             input_events!(KeyCode::Char('g'), KeyCode::Char('G'); KeyModifiers::SHIFT);
         popup.handle_event(&all_down).unwrap();

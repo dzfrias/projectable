@@ -532,7 +532,7 @@ mod tests {
         assert_eq!(
             path.join("test.txt"),
             filetree.get_selected().unwrap().path()
-        )
+        );
     }
 
     #[test]
@@ -666,7 +666,7 @@ mod tests {
         filetree
             .handle_event(&ctrl_n)
             .expect("should be able to handle keypress");
-        assert_eq!(3, filetree.listing.selected())
+        assert_eq!(3, filetree.listing.selected());
     }
 
     #[test]
@@ -701,7 +701,7 @@ mod tests {
             .queue
             .contains(&AppEvent::OpenInput(InputOperation::Command {
                 to: path.join("test.txt")
-            })))
+            })));
     }
 
     #[test]
@@ -716,7 +716,7 @@ mod tests {
             .expect("should be able to handle event");
         assert!(filetree
             .queue
-            .contains(&AppEvent::OpenInput(InputOperation::SearchFiles)))
+            .contains(&AppEvent::OpenInput(InputOperation::SearchFiles)));
     }
 
     #[test]
@@ -752,7 +752,7 @@ mod tests {
         scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         assert!(filetree.open_path(path.join("test")).is_ok());
-        assert_eq!(1, filetree.state.get_mut().get_all_opened().len())
+        assert_eq!(1, filetree.state.get_mut().get_all_opened().len());
     }
 
     #[test]
@@ -804,7 +804,7 @@ mod tests {
         assert!(filetree.handle_event(&event).is_ok());
         assert!(filetree
             .queue
-            .contains(&AppEvent::Mark(path.join("test.txt"))))
+            .contains(&AppEvent::Mark(path.join("test.txt"))));
     }
 
     #[test]
