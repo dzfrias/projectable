@@ -43,6 +43,7 @@ pub struct Filetree {
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
     ignore: Ignore,
+    #[allow(dead_code)]
     marks: Rc<RefCell<Vec<PathBuf>>>,
 }
 
