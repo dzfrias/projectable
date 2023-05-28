@@ -145,6 +145,14 @@ impl Items {
         Ok(self)
     }
 
+    pub fn len(&self) -> usize {
+        self.items().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn items(&self) -> &[Item] {
         &self.items
     }
