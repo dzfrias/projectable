@@ -15,7 +15,6 @@ pub struct FileListing {
 }
 
 // TODO: Only include
-// FIX: Folds are weird when folding in nested fold
 impl FileListing {
     pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
         let items = Items::new(items);
