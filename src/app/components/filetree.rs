@@ -13,12 +13,16 @@ use anyhow::{anyhow, bail, Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
-use ignore::Walk;
+use ignore::{
+    overrides::{Override, OverrideBuilder},
+    Walk, WalkBuilder,
+};
 use itertools::Itertools;
 use log::{debug, info, warn};
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    iter,
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -38,7 +42,6 @@ pub struct Filetree {
     listing: FileListing,
     root_path: PathBuf,
     queue: Queue,
-    only_included: Vec<PathBuf>,
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
@@ -61,7 +64,6 @@ impl Filetree {
             is_focused: true,
             queue: queue.clone(),
             dir: tree,
-            only_included: Vec::new(),
             repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
             config: Rc::new(Config::default()),
@@ -98,12 +100,25 @@ impl Filetree {
             .ignore(&ignore)
             .build()
             .context("failed to build `Dir`")?;
+
+        let overrides = build_override_ignorer(&path, &config.filetree.ignore)?;
+        let mut listing = FileListing::new(
+            &WalkBuilder::new(path.as_ref())
+                .overrides(overrides)
+                .build()
+                .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
+                .filter(|entry_path| entry_path != path.as_ref()) // Ignore root
+                .collect_vec(),
+        );
+        listing.fold_all();
+
         Ok(Filetree {
             repo: if config.filetree.use_git {
                 Repository::open(path.as_ref().join(".git")).ok()
             } else {
                 None
             },
+            listing,
             ignore,
             dir: tree,
             config: Rc::clone(&config),
@@ -119,7 +134,6 @@ impl Filetree {
             .build()
             .context("failed to build `Dir`")?;
         self.dir = tree;
-        self.only_included = Vec::new();
         self.populate_status_cache();
 
         if self.get_selected().is_none() {
@@ -159,31 +173,6 @@ impl Filetree {
         let item = self.dir.nested_child(&state.selected())?;
         self.state.set(state);
         Some(item)
-    }
-
-    pub fn is_searching(&self) -> bool {
-        !self.only_included.is_empty()
-    }
-
-    pub fn only_include(&mut self, include: Vec<PathBuf>) -> Result<()> {
-        self.dir = DirBuilder::new(&self.root_path)
-            .dirs_first(true)
-            .ignore(&self.ignore)
-            .only_include(&include)
-            .build()
-            .with_context(|| {
-                format!("failed to build `Dir` while only-including files: \"{include:?}\"")
-            })?;
-        self.only_included = include;
-
-        if self.get_selected().is_none() {
-            self.state.get_mut().select_first();
-        }
-        if let Some(selected) = self.get_selected() {
-            self.queue
-                .add(AppEvent::PreviewFile(selected.path().to_owned()));
-        }
-        Ok(())
     }
 
     fn populate_status_cache(&mut self) {
@@ -385,12 +374,12 @@ impl Component for Filetree {
                     },
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
                     self.config.filetree.git_filter => {
-                        if let Some(cache) = self.status_cache.as_ref() {
-                            info!("filtered for modified files");
-                            self.only_include(cache.keys().cloned().collect_vec())?;
-                        } else {
+                        self.status_cache.as_ref().map_or_else(|| {
                             warn!("no git status to filter for");
-                        }
+                        }, |_cache| {
+                            info!("filtered for modified files");
+                            todo!("filter for files here");
+                        });
                     },
                     self.config.filetree.search => self
                         .queue
@@ -504,10 +493,26 @@ fn build_filetree<'a>(
     items
 }
 
+/// Builds an `Override` that ignores certain paths
+fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<Override> {
+    let mut override_builder = OverrideBuilder::new(root.as_ref());
+
+    for pat in ignore.iter().map(|x| x.as_str()).chain(iter::once("/.git")) {
+        override_builder
+            .add(&format!("!{pat}"))
+            .with_context(|| format!("failed to add glob for: \"!{pat}\""))?
+            .add(&format!("!{pat}/**"))
+            .with_context(|| format!("failed to add glob for: \"!{pat}/**\""))?;
+    }
+    override_builder
+        .build()
+        .context("failed to build override ignorer")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::components::testing::*;
+    use crate::{app::components::testing::*, config::FiletreeConfig};
     use test_log::test;
 
     #[test]
@@ -720,18 +725,6 @@ mod tests {
     }
 
     #[test]
-    fn can_only_include() {
-        let temp = temp_files!("test.txt", "test2.txt");
-        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-
-        assert!(filetree
-            .only_include(vec![temp.path().join("test.txt")])
-            .is_ok());
-        assert_eq!(1, filetree.dir.iter().len());
-        temp.close().unwrap();
-    }
-
-    #[test]
     fn can_send_toggle_preview_cmd() {
         let temp = temp_files!();
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
@@ -828,5 +821,31 @@ mod tests {
         assert!(filetree
             .queue
             .contains(&AppEvent::PreviewFile(path.join("test.txt"))));
+    }
+
+    #[test]
+    fn can_ignore() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let config = Config {
+            filetree: FiletreeConfig {
+                ignore: vec!["test2.txt".to_owned()],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let filetree = Filetree::from_dir_with_config(
+            temp.path(),
+            Queue::new(),
+            Rc::new(config),
+            Rc::new(RefCell::new(Vec::new())),
+        )
+        .unwrap();
+        scopeguard::guard(temp, |temp| temp.close().unwrap());
+
+        assert_eq!(1, filetree.listing.items().len());
+        assert_eq!(
+            Path::new("test.txt"),
+            filetree.listing.items()[0].path().file_name().unwrap()
+        );
     }
 }

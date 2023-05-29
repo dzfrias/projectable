@@ -1,4 +1,3 @@
-use crate::ignore::IgnoreBuilder;
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use log::debug;
@@ -6,7 +5,7 @@ use std::{
     borrow::Cow,
     cmp::Ordering,
     collections::HashMap,
-    iter, mem,
+    iter,
     ops::RangeInclusive,
     path::{Path, PathBuf},
 };
@@ -139,15 +138,6 @@ impl Items {
             .filter(|item| item.path() != root && item.path().starts_with(&root))
             .collect();
         Self { items, root }
-    }
-
-    pub fn ignore(mut self, globs: &[impl AsRef<str>]) -> Result<Items> {
-        let ignore = IgnoreBuilder::new(&self.root).ignore(globs).build()?;
-        self.items = mem::take(&mut self.items)
-            .into_iter()
-            .filter(|item| !ignore.is_ignored(item.path()))
-            .collect();
-        Ok(self)
     }
 
     pub fn len(&self) -> usize {
@@ -594,13 +584,5 @@ mod tests {
     #[test]
     fn can_pass_empty_into_items() {
         Items::new::<&Path>(&[]);
-    }
-
-    #[test]
-    fn can_ignore_certain_globs() {
-        let items = Items::new(&["/root/test.txt", "/root/test2.txt", "/root/foo.txt"])
-            .ignore(&["test*"])
-            .unwrap();
-        assert_eq!(vec![Item::File("/root/foo.txt".into())], items.items);
     }
 }

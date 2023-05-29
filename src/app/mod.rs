@@ -11,8 +11,7 @@ use crate::{
 use anyhow::{Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
-use itertools::Itertools;
-use log::{debug, info, warn};
+use log::{info, warn};
 use rust_search::SearchBuilder;
 #[cfg(not(target_os = "windows"))]
 use std::env;
@@ -154,22 +153,10 @@ impl App {
                     if results.is_empty() {
                         warn!("no files found when searching");
                     }
-                    self.tree
-                        .only_include(results.iter().map_into().collect_vec())?;
-                    debug!("got results: {results:?}");
-                    if let Some(best_match) = results.get(0) {
-                        self.tree.open_path(best_match)?;
-                    }
+                    todo!("search for files with fuzzy finder here");
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
-                AppEvent::GotoFile(path) => {
-                    if self.tree.is_searching() {
-                        self.tree
-                            .refresh()
-                            .context("problem refreshing filetree while going to file")?;
-                    }
-                    self.tree.open_path(&path)?;
-                }
+                AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
                 AppEvent::Mark(path) => {
                     // Because it's sent from `self.tree`, it has not been deleted in
                     // `self.marks_popup` yet.

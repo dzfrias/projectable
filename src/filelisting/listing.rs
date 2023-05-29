@@ -14,7 +14,6 @@ pub struct FileListing {
     folded: BitVec,
 }
 
-// TODO: Only include
 impl FileListing {
     pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
         let items = Items::new(items);
