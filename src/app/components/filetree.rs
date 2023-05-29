@@ -1,14 +1,11 @@
-#![allow(unused_imports)]
-
 use crate::{
     app::{component::*, InputOperation, PendingOperation},
     config::Config,
-    dir::*,
     external_event::{ExternalEvent, RefreshData},
     filelisting::{self, FileListing},
     queue::{AppEvent, Queue},
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
 use git2::{Repository, Status};
@@ -27,12 +24,12 @@ use std::{
 };
 use tui::{
     backend::Backend,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
-use tui_tree_widget::{Tree, TreeItem, TreeState};
+use tui_tree_widget::TreeState;
 
 pub struct Filetree {
     state: Cell<TreeState>,
@@ -483,6 +480,7 @@ fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<O
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dir::temp_files;
     use crate::{app::components::testing::*, config::FiletreeConfig};
     use test_log::test;
 
