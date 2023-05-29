@@ -16,7 +16,7 @@ use ignore::{
 use itertools::Itertools;
 use log::{debug, info, warn};
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     collections::HashMap,
     iter,
     path::{Path, PathBuf},
@@ -29,10 +29,8 @@ use tui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
-use tui_tree_widget::TreeState;
 
 pub struct Filetree {
-    state: Cell<TreeState>,
     is_focused: bool,
     listing: FileListing,
     root_path: PathBuf,
@@ -46,11 +44,8 @@ pub struct Filetree {
 
 impl Filetree {
     fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
-        let mut state = TreeState::default();
-        state.select_first();
         let mut tree = Filetree {
             root_path: path.as_ref().to_path_buf(),
-            state: state.into(),
             is_focused: true,
             queue: queue.clone(),
             repo: Repository::open(path.as_ref().join(".git")).ok(),
@@ -381,7 +376,7 @@ impl Component for Filetree {
                                 .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
                         }
                     },
-                    self.config.filetree.close_all => self.state.get_mut().close_all(),
+                    self.config.filetree.close_all => self.close_all(),
                     self.config.filetree.open_all => self.open_all(),
                     self.config.filetree.special_command => {
                         if let Some(selected) = self.get_selected() {
@@ -647,7 +642,7 @@ mod tests {
                 .handle_event(&input)
                 .expect("should be able to handle keypress");
         }
-        assert_eq!(0, filetree.state.get_mut().selected()[0]);
+        assert_eq!(0, filetree.listing.selected().unwrap());
     }
 
     #[test]
@@ -698,17 +693,6 @@ mod tests {
     }
 
     #[test]
-    fn can_open_path() {
-        let temp = temp_files!("test/test.txt");
-        let path = temp.path().to_owned();
-        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
-
-        assert!(filetree.open_path(path.join("test")).is_ok());
-        assert_eq!(1, filetree.state.get_mut().get_all_opened().len());
-    }
-
-    #[test]
     fn partial_refresh_delete_goes_to_same_item() {
         let temp = temp_files!("test/test.txt", "test/test2.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
@@ -754,7 +738,7 @@ mod tests {
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.open_all();
-        assert_eq!(3, filetree.state.get_mut().get_all_opened().len());
+        assert_eq!(6, filetree.listing.len());
     }
 
     #[test]
