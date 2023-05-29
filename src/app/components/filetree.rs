@@ -147,6 +147,7 @@ impl Filetree {
         });
     }
 
+    // TODO: select those before it
     pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
         if path.as_ref() == self.root_path {
             return Ok(());
@@ -404,15 +405,6 @@ impl Component for Filetree {
         Ok(())
     }
 }
-
-// fn last_of_path(path: impl AsRef<Path>) -> String {
-//     path.as_ref()
-//         .iter()
-//         .last()
-//         .unwrap_or_default()
-//         .to_string_lossy()
-//         .to_string()
-// }
 
 // fn build_filetree<'a>(
 //     tree: &'a Dir,
