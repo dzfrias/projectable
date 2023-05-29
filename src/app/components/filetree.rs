@@ -147,17 +147,12 @@ impl Filetree {
         });
     }
 
-    // TODO: select those before it
     pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
         if path.as_ref() == self.root_path {
             return Ok(());
         }
-        let open_index = self
-            .listing
-            .iter()
-            .position(|(_, item)| item.path() == path.as_ref())
-            .with_context(|| format!("{} not found in listing", path.as_ref().display()))?;
-        self.listing.select(open_index);
+
+        self.listing.select(path.as_ref());
 
         Ok(())
     }

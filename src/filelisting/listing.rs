@@ -134,6 +134,20 @@ impl FileListing {
     where
         T: Into<ItemsIndex<'a>>,
     {
+        let index = index.into();
+        if let ItemsIndex::Path(path) = &index {
+            // Fold everything before selected
+            for index in self
+                .items
+                .iter()
+                .enumerate()
+                .take_while(|(_, item)| item.path() != path)
+                .filter(|(_, item)| path.starts_with(item.path()))
+                .map(|(idx, _)| idx)
+            {
+                self.folded.get_mut(index).unwrap().set(false);
+            }
+        }
         let index = self.relative_to_absolute(index)?;
         self.selected = index;
         Some(
@@ -590,5 +604,13 @@ mod tests {
         let items = FileListing::default();
         assert!(items.selected().is_none());
         assert!(items.selected_item().is_none());
+    }
+
+    #[test]
+    fn opening_path_opens_all_nested_dirs() {
+        let mut items = FileListing::new(&["/root/test/test/test/test.txt", "/root/test.txt"]);
+
+        assert!(items.select("/root/test/test/test").is_some());
+        assert_eq!(3, items.selected().unwrap());
     }
 }
