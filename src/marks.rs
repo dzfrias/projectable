@@ -59,5 +59,7 @@ mod tests {
             PathBuf::from("./projectable/marks.json"),
             get_marks_file().unwrap()
         );
+        // For test sanitization. Would cause a rare failing test case if not set
+        env::remove_var("XDG_DATA_HOME");
     }
 }

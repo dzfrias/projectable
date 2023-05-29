@@ -14,6 +14,8 @@ use easy_switch::switch;
 use log::info;
 #[cfg(not(target_os = "windows"))]
 use std::env;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::{
     cell::RefCell,
     fs::{self, File},
@@ -126,7 +128,7 @@ impl App {
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
                     #[cfg(target_os = "windows")]
-                    let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
+                    let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
                     #[cfg(not(target_os = "windows"))]
                     let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
                         .arg("-c")
