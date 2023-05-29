@@ -205,11 +205,29 @@ impl Drawable for Filetree {
                         item.path().components().count() - self.listing.root().components().count();
                     const INDENT: usize = 2;
 
-                    ListItem::new(format!("{}{file_name}", " ".repeat(indent_amount * INDENT)))
+                    const CLOSED_SYMBOL: &str = "\u{25b6} ";
+                    const OPENED_SYMBOL: &str = "\u{25bc} ";
+                    let icon = if !item.is_file() {
+                        if self
+                            .listing
+                            .is_folded(item.path())
+                            .expect("item should be in folded")
+                        {
+                            CLOSED_SYMBOL
+                        } else {
+                            OPENED_SYMBOL
+                        }
+                    } else {
+                        ""
+                    };
+                    ListItem::new(format!(
+                        "{}{icon}{file_name}",
+                        " ".repeat(indent_amount * INDENT)
+                    ))
                 })
                 .collect_vec(),
         )
-        .highlight_style(Style::default().bg(Color::Red))
+        .highlight_style(Style::default().bg(Color::LightGreen).fg(Color::Black))
         .block(Block::default().borders(Borders::ALL));
         f.render_stateful_widget(list, area, &mut state);
 
