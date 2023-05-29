@@ -6,7 +6,6 @@ use crate::{
     dir::*,
     external_event::{ExternalEvent, RefreshData},
     filelisting::{self, FileListing},
-    ignore::{Ignore, IgnoreBuilder},
     queue::{AppEvent, Queue},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -38,24 +37,18 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 pub struct Filetree {
     state: Cell<TreeState>,
     is_focused: bool,
-    dir: Dir,
     listing: FileListing,
     root_path: PathBuf,
     queue: Queue,
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
-    ignore: Ignore,
     #[allow(dead_code)]
     marks: Rc<RefCell<Vec<PathBuf>>>,
 }
 
 impl Filetree {
     fn from_dir(path: impl AsRef<Path>, queue: Queue) -> Result<Self> {
-        let tree = DirBuilder::new(path.as_ref())
-            .dirs_first(true)
-            .build()
-            .context("failed to create `Dir` when creating Filetree")?;
         let mut state = TreeState::default();
         state.select_first();
         let mut tree = Filetree {
@@ -63,11 +56,9 @@ impl Filetree {
             state: state.into(),
             is_focused: true,
             queue: queue.clone(),
-            dir: tree,
             repo: Repository::open(path.as_ref().join(".git")).ok(),
             status_cache: None,
             config: Rc::new(Config::default()),
-            ignore: Ignore::default(),
             marks: Default::default(),
             listing: FileListing::new(
                 &Walk::new(path.as_ref())
@@ -90,17 +81,6 @@ impl Filetree {
         config: Rc<Config>,
         marks: Rc<RefCell<Vec<PathBuf>>>,
     ) -> Result<Self> {
-        let ignore = IgnoreBuilder::new(path.as_ref())
-            .ignore(&config.filetree.ignore)
-            .use_gitignore(config.filetree.use_gitignore)
-            .build()
-            .context("failed to create glob ignorer")?;
-        let tree = DirBuilder::new(path.as_ref())
-            .dirs_first(config.filetree.dirs_first)
-            .ignore(&ignore)
-            .build()
-            .context("failed to build `Dir`")?;
-
         let overrides = build_override_ignorer(&path, &config.filetree.ignore)?;
         let mut listing = FileListing::new(
             &WalkBuilder::new(path.as_ref())
@@ -119,8 +99,6 @@ impl Filetree {
                 None
             },
             listing,
-            ignore,
-            dir: tree,
             config: Rc::clone(&config),
             marks,
             ..Self::from_dir(path, queue)?
@@ -128,34 +106,28 @@ impl Filetree {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        let tree = DirBuilder::new(&self.root_path)
-            .dirs_first(self.config.filetree.dirs_first)
-            .ignore(&self.ignore)
-            .build()
-            .context("failed to build `Dir`")?;
-        self.dir = tree;
+        let overrides = build_override_ignorer(&self.root_path, &self.config.filetree.ignore)?;
+        let mut listing = FileListing::new(
+            &WalkBuilder::new(&self.root_path)
+                .overrides(overrides)
+                .build()
+                .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
+                .filter(|entry_path| entry_path != &self.root_path) // Ignore root
+                .collect_vec(),
+        );
+        listing.fold_all();
+        self.listing = listing;
         self.populate_status_cache();
 
-        if self.get_selected().is_none() {
-            self.state.get_mut().select_first();
-        }
         Ok(())
     }
 
     pub fn partial_refresh(&mut self, refresh_data: &RefreshData) -> Result<()> {
         match refresh_data {
             RefreshData::Delete(path) => {
-                if self.ignore.is_ignored(path) {
-                    return Ok(());
-                }
-
                 self.listing.remove(path.as_path())?;
             }
             RefreshData::Add(path) => {
-                if self.ignore.is_ignored(path) {
-                    return Ok(());
-                }
-
                 if path.is_dir() {
                     self.listing.add(filelisting::Item::Dir(path.clone()));
                 } else {
@@ -168,11 +140,8 @@ impl Filetree {
         Ok(())
     }
 
-    pub fn get_selected(&self) -> Option<&Item> {
-        let state = self.state.take();
-        let item = self.dir.nested_child(&state.selected())?;
-        self.state.set(state);
-        Some(item)
+    pub fn get_selected(&self) -> Option<&filelisting::Item> {
+        self.listing.selected_item()
     }
 
     fn populate_status_cache(&mut self) {
@@ -187,59 +156,40 @@ impl Filetree {
     }
 
     pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        let mut location = self
-            .dir
-            .location_by_path(&path)
-            .ok_or(anyhow!("path not found"))?;
-        if location.is_empty() {
+        if path.as_ref() == self.root_path {
             return Ok(());
         }
-        self.state.get_mut().select(location.as_ref());
-        while !location.is_empty() {
-            let next_location = location
-                .split_last()
-                .expect("location should not be empty")
-                .1
-                .to_vec();
-            self.state.get_mut().open(location);
-            location = next_location;
-        }
-        self.queue
-            .add(AppEvent::PreviewFile(path.as_ref().to_path_buf()));
+        let open_index = self
+            .listing
+            .iter()
+            .position(|(_, item)| item.path() == path.as_ref())
+            .with_context(|| format!("{} not found in listing", path.as_ref().display()))?;
+        self.listing.select(open_index);
+
         Ok(())
     }
 
     pub fn open_all(&mut self) {
-        for item in self.dir.walk().filter(|item| matches!(item, Item::Dir(_))) {
-            let loc = self
-                .dir
-                .location_by_path(item.path())
-                .expect("item should be in tree");
-            self.state.get_mut().open(loc);
-        }
+        self.listing.unfold_all();
     }
 
-    pub fn is_ignored(&self, path: impl AsRef<Path>) -> bool {
-        self.ignore.is_ignored(path)
+    pub fn close_all(&mut self) {
+        self.listing.fold_all();
     }
 
-    pub fn open_under(&mut self, location: &mut Vec<usize>) {
-        let Item::Dir(dir) = self.dir.nested_child_mut(location).unwrap() else {
-            return;
-        };
-        for index in 0..dir.iter().len() {
-            location.push(index);
-            self.state.get_mut().open(location.clone());
-            self.open_under(location);
-            location.pop();
-        }
+    pub fn open_under(&mut self, _location: &mut Vec<usize>) {
+        todo!()
+    }
+
+    pub fn close_under(&mut self, _location: &mut Vec<usize>) {
+        todo!()
     }
 }
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
         let mut state = ListState::default();
-        state.select(Some(self.listing.selected()));
+        state.select(self.listing.selected());
         let list = List::new(
             self.listing
                 .items()
@@ -331,8 +281,6 @@ impl Component for Filetree {
             return Ok(());
         }
 
-        let items = build_filetree(&self.dir, None, Rc::clone(&self.config), &[], &[]);
-
         const JUMP_DOWN_AMOUNT: u8 = 3;
         match ev {
             ExternalEvent::RefreshFiletree => self.refresh().context("problem refreshing tree")?,
@@ -353,7 +301,7 @@ impl Component for Filetree {
             }
             ExternalEvent::Crossterm(Event::Key(key)) => {
                 let mut refresh_preview = true;
-                let not_empty = !items.is_empty();
+                let not_empty = !self.listing.is_empty();
                 switch! { key;
                     self.config.all_up => self.listing.select_first(),
                     self.config.all_down => self.listing.select_last(),
@@ -369,8 +317,9 @@ impl Component for Filetree {
                          }
                     },
                     self.config.filetree.delete => {
-                        let item = self.listing.selected_item();
-                        self.queue.add(AppEvent::OpenPopup(PendingOperation::DeleteFile(item.path().to_path_buf())));
+                        if let Some(item) = self.listing.selected_item() {
+                            self.queue.add(AppEvent::OpenPopup(PendingOperation::DeleteFile(item.path().to_path_buf())));
+                        }
                     },
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
                     self.config.filetree.git_filter => {
@@ -389,29 +338,33 @@ impl Component for Filetree {
                         self.refresh().context("problem refreshing filetree")?;
                     },
                     self.config.open => match self.get_selected() {
-                        Some(Item::Dir(_)) => self.listing.toggle_fold(),
-                        Some(Item::File(file)) => self
+                        Some(filelisting::Item::Dir(_)) => self.listing.toggle_fold(),
+                        Some(filelisting::Item::File(file)) => self
                             .queue
-                            .add(AppEvent::OpenFile(file.path().to_path_buf())),
+                            .add(AppEvent::OpenFile(file.clone())),
                         None => {}
                     },
                     self.config.filetree.new_file => {
-                        let is_folded = self.listing.is_folded(self.listing.selected()).unwrap();
-                        let add_path = match self.listing.selected_item() {
-                            filelisting::Item::Dir(dir) if !is_folded => dir,
-                            item => item.path().parent().expect("item should have parent"),
-                        };
-                        self.queue
-                            .add(AppEvent::OpenInput(InputOperation::NewFile { at: add_path.to_path_buf() }));
+                        if let Some(selected) = self.listing.selected() {
+                            let is_folded = self.listing.is_folded(selected).unwrap();
+                            let add_path = match self.listing.selected_item().expect("should exist, checked at top of block") {
+                                filelisting::Item::Dir(dir) if !is_folded => dir,
+                                item => item.path().parent().expect("item should have parent"),
+                            };
+                            self.queue
+                                .add(AppEvent::OpenInput(InputOperation::NewFile { at: add_path.to_path_buf() }));
+                        }
                     },
                     self.config.filetree.new_dir => {
-                        let is_folded = self.listing.is_folded(self.listing.selected()).unwrap();
-                        let add_path = match self.listing.selected_item() {
-                            filelisting::Item::Dir(dir) if !is_folded => dir,
-                            item => item.path().parent().expect("item should have parent"),
-                        };
-                        self.queue
-                            .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
+                        if let Some(selected) = self.listing.selected() {
+                            let is_folded = self.listing.is_folded(selected).unwrap();
+                            let add_path = match self.listing.selected_item().expect("should exist, checked at top of block") {
+                                filelisting::Item::Dir(dir) if !is_folded => dir,
+                                item => item.path().parent().expect("item should have parent"),
+                            };
+                            self.queue
+                                .add(AppEvent::OpenInput(InputOperation::NewDir { at: add_path.to_path_buf() }));
+                        }
                     },
                     self.config.filetree.close_all => self.state.get_mut().close_all(),
                     self.config.filetree.open_all => self.open_all(),
@@ -442,56 +395,56 @@ impl Component for Filetree {
     }
 }
 
-fn last_of_path(path: impl AsRef<Path>) -> String {
-    path.as_ref()
-        .iter()
-        .last()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string()
-}
+// fn last_of_path(path: impl AsRef<Path>) -> String {
+//     path.as_ref()
+//         .iter()
+//         .last()
+//         .unwrap_or_default()
+//         .to_string_lossy()
+//         .to_string()
+// }
 
-fn build_filetree<'a>(
-    tree: &'a Dir,
-    statuses: Option<&HashMap<PathBuf, Status>>,
-    config: Rc<Config>,
-    marks: &[PathBuf],
-    highlight: &[PathBuf],
-) -> Vec<TreeItem<'a>> {
-    let mut items = Vec::new();
-    for item in tree {
-        let style = 'style: {
-            if highlight.iter().any(|path| path == item.path()) {
-                break 'style config.filetree.searched_style.into();
-            }
-            if marks.iter().any(|path| path == item.path()) {
-                break 'style config.filetree.marks_style.into();
-            }
-            statuses.map_or(Style::default(), |statuses| {
-                statuses
-                    .get(item.path())
-                    .map_or(Style::default(), |status| match *status {
-                        Status::WT_NEW => Style::from(config.filetree.git_new_style),
-                        Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
-                        Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-                            Style::from(config.filetree.git_modified_style)
-                        }
-                        _ => Style::default(),
-                    })
-            })
-        };
-        let tree_item = match item {
-            Item::Dir(dir) => TreeItem::new(
-                last_of_path(dir.path()),
-                build_filetree(dir, statuses, Rc::clone(&config), marks, highlight),
-            )
-            .style(style),
-            Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
-        };
-        items.push(tree_item);
-    }
-    items
-}
+// fn build_filetree<'a>(
+//     tree: &'a Dir,
+//     statuses: Option<&HashMap<PathBuf, Status>>,
+//     config: Rc<Config>,
+//     marks: &[PathBuf],
+//     highlight: &[PathBuf],
+// ) -> Vec<TreeItem<'a>> {
+//     let mut items = Vec::new();
+//     for item in tree {
+//         let style = 'style: {
+//             if highlight.iter().any(|path| path == item.path()) {
+//                 break 'style config.filetree.searched_style.into();
+//             }
+//             if marks.iter().any(|path| path == item.path()) {
+//                 break 'style config.filetree.marks_style.into();
+//             }
+//             statuses.map_or(Style::default(), |statuses| {
+//                 statuses
+//                     .get(item.path())
+//                     .map_or(Style::default(), |status| match *status {
+//                         Status::WT_NEW => Style::from(config.filetree.git_new_style),
+//                         Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
+//                         Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+//                             Style::from(config.filetree.git_modified_style)
+//                         }
+//                         _ => Style::default(),
+//                     })
+//             })
+//         };
+//         let tree_item = match item {
+//             Item::Dir(dir) => TreeItem::new(
+//                 last_of_path(dir.path()),
+//                 build_filetree(dir, statuses, Rc::clone(&config), marks, highlight),
+//             )
+//             .style(style),
+//             Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
+//         };
+//         items.push(tree_item);
+//     }
+//     items
+// }
 
 /// Builds an `Override` that ignores certain paths
 fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<Override> {
@@ -514,18 +467,6 @@ mod tests {
     use super::*;
     use crate::{app::components::testing::*, config::FiletreeConfig};
     use test_log::test;
-
-    #[test]
-    fn last_of_path_only_gets_last_part() {
-        let name = last_of_path("t/d/d/s/test.txt");
-        assert_eq!("test.txt".to_owned(), name);
-    }
-
-    #[test]
-    fn last_of_path_works_with_one_part() {
-        let name = last_of_path("test.txt");
-        assert_eq!("test.txt", name);
-    }
 
     #[test]
     fn new_filetree_selects_first() {
@@ -593,7 +534,10 @@ mod tests {
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        assert_eq!(path.join("test"), filetree.listing.selected_item().path());
+        assert_eq!(
+            path.join("test"),
+            filetree.listing.selected_item().unwrap().path()
+        );
 
         let n = input_event!(KeyCode::Char('n'));
         filetree
@@ -639,7 +583,7 @@ mod tests {
             .expect("should be able to handle keypress");
         assert!(filetree
             .listing
-            .is_folded(filetree.listing.selected())
+            .is_folded(filetree.listing.selected().unwrap())
             .unwrap());
     }
 
@@ -671,7 +615,7 @@ mod tests {
         filetree
             .handle_event(&ctrl_n)
             .expect("should be able to handle keypress");
-        assert_eq!(3, filetree.listing.selected());
+        assert_eq!(3, filetree.listing.selected().unwrap());
     }
 
     #[test]
@@ -757,10 +701,15 @@ mod tests {
         filetree.listing.select(1);
         filetree
             .partial_refresh(&RefreshData::Delete(
-                filetree.listing.selected_item().path().to_path_buf(),
+                filetree
+                    .listing
+                    .selected_item()
+                    .unwrap()
+                    .path()
+                    .to_path_buf(),
             ))
             .unwrap();
-        assert_eq!(1, filetree.listing.selected());
+        assert_eq!(1, filetree.listing.selected().unwrap());
     }
 
     #[test]
@@ -772,10 +721,15 @@ mod tests {
         filetree.listing.select(1);
         filetree
             .partial_refresh(&RefreshData::Delete(
-                filetree.listing.selected_item().path().to_path_buf(),
+                filetree
+                    .listing
+                    .selected_item()
+                    .unwrap()
+                    .path()
+                    .to_path_buf(),
             ))
             .unwrap();
-        assert_eq!(0, filetree.listing.selected());
+        assert_eq!(0, filetree.listing.selected().unwrap());
     }
 
     #[test]
@@ -846,6 +800,50 @@ mod tests {
         assert_eq!(
             Path::new("test.txt"),
             filetree.listing.items()[0].path().file_name().unwrap()
+        );
+    }
+
+    #[test]
+    fn can_full_refresh_to_account_for_new_files() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        std::fs::File::create(temp.path().join("new.txt")).unwrap();
+
+        assert_eq!(2, filetree.listing.len());
+        assert!(filetree.refresh().is_ok());
+        assert_eq!(
+            Path::new("new.txt"),
+            filetree
+                .listing
+                .items()
+                .get(2)
+                .unwrap()
+                .path()
+                .file_name()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn can_partial_refresh_to_add_files() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+        std::fs::File::create(temp.path().join("new.txt")).unwrap();
+
+        assert_eq!(2, filetree.listing.len());
+        assert!(filetree
+            .partial_refresh(&RefreshData::Add(temp.join("new.txt")))
+            .is_ok());
+        assert_eq!(
+            Path::new("new.txt"),
+            filetree
+                .listing
+                .items()
+                .get(1)
+                .unwrap()
+                .path()
+                .file_name()
+                .unwrap()
         );
     }
 }

@@ -4,7 +4,7 @@ use bitvec::prelude::*;
 use log::debug;
 use std::path::Path;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FileListing {
     /// The list of files. Everything is absolutely positioned
     items: Items,
@@ -65,7 +65,7 @@ impl FileListing {
     }
 
     pub fn toggle_fold(&mut self) {
-        if self.selected_item().is_file() {
+        if self.selected_item().map_or(true, |item| item.is_file()) {
             return;
         }
         let current = self.folded[self.selected];
@@ -83,23 +83,26 @@ impl FileListing {
         Some(self.folded[idx])
     }
 
-    pub fn selected(&self) -> usize {
-        self.iter()
-            .enumerate()
-            .find_map(|(relative_idx, (abs_index, _))| {
-                if self.selected == abs_index {
-                    Some(relative_idx)
-                } else {
-                    None
-                }
-            })
-            .expect("selection should be in visible items")
+    pub fn selected(&self) -> Option<usize> {
+        if self.is_empty() {
+            return None;
+        }
+        Some(
+            self.iter()
+                .enumerate()
+                .find_map(|(relative_idx, (abs_index, _))| {
+                    if self.selected == abs_index {
+                        Some(relative_idx)
+                    } else {
+                        None
+                    }
+                })
+                .expect("selection should be in visible items"),
+        )
     }
 
-    pub fn selected_item(&self) -> &Item {
-        self.items
-            .get(self.selected)
-            .expect("selected should be in items")
+    pub fn selected_item(&self) -> Option<&Item> {
+        self.items.get(self.selected)
     }
 
     pub fn select_next(&mut self) {
@@ -111,7 +114,7 @@ impl FileListing {
     }
 
     pub fn select_next_n(&mut self, n: usize) {
-        let Some(new_selected) = self.iter().skip(self.selected()).nth(n) else {
+        let Some(new_selected) = self.iter().skip(self.selected().unwrap_or_default()).nth(n) else {
             // Set to last if the jump is over the limit
             self.selected = self.len() - 1;
             return;
@@ -121,7 +124,7 @@ impl FileListing {
 
     pub fn select_prev_n(&mut self, n: usize) {
         // Stop at 0 instead of overflowing
-        let new = self.selected().saturating_sub(n);
+        let new = self.selected().unwrap_or_default().saturating_sub(n);
         self.selected = self
             .relative_to_absolute(new)
             .expect("should be within bounds of listing");
@@ -178,7 +181,7 @@ impl FileListing {
 
         self.folded.drain(removed);
         if self.selected >= self.items.len() {
-            self.selected = self.items.len() - 1;
+            self.selected = self.items.len().saturating_sub(1);
         }
 
         Ok(())
@@ -349,7 +352,7 @@ mod tests {
         ]);
 
         items.select_next_n(100);
-        assert_eq!(5, items.selected());
+        assert_eq!(5, items.selected().unwrap());
     }
 
     #[test]
@@ -362,7 +365,7 @@ mod tests {
         ]);
 
         items.select_prev_n(1);
-        assert_eq!(0, items.selected());
+        assert_eq!(0, items.selected().unwrap());
     }
 
     #[test]
@@ -428,11 +431,11 @@ mod tests {
         ]);
 
         items.fold(1);
-        assert_eq!(0, items.selected());
+        assert_eq!(0, items.selected().unwrap());
         items.select_next_n(2);
-        assert_eq!(2, items.selected());
+        assert_eq!(2, items.selected().unwrap());
         items.select_prev_n(2);
-        assert_eq!(0, items.selected());
+        assert_eq!(0, items.selected().unwrap());
         assert_eq!(&Item::Dir("/root/test2".into()), items.select(2).unwrap());
     }
 
@@ -467,7 +470,7 @@ mod tests {
 
         items.select_next();
         items.toggle_fold();
-        assert!(items.is_folded(items.selected()).unwrap());
+        assert!(items.is_folded(items.selected().unwrap()).unwrap());
     }
 
     #[test]
@@ -574,5 +577,18 @@ mod tests {
             items.items()
         );
         assert_eq!(bitvec![0, 1, 0], items.folded);
+    }
+
+    #[test]
+    fn removing_with_1_item_left_doesnt_panic() {
+        let mut items = FileListing::new(&["/root/test.txt"]);
+        assert!(items.remove(0).is_ok());
+    }
+
+    #[test]
+    fn selected_returns_none_if_empty() {
+        let items = FileListing::default();
+        assert!(items.selected().is_none());
+        assert!(items.selected_item().is_none());
     }
 }

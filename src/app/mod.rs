@@ -11,8 +11,7 @@ use crate::{
 use anyhow::{Context, Result};
 use crossterm::event::Event;
 use easy_switch::switch;
-use log::{info, warn};
-use rust_search::SearchBuilder;
+use log::info;
 #[cfg(not(target_os = "windows"))]
 use std::env;
 use std::{
@@ -99,12 +98,9 @@ impl App {
                         info!("deleted directory \"{}\"", path.display());
                     }
                     self.tree.partial_refresh(&RefreshData::Delete(path))?;
-                    self.previewer.preview_file(
-                        self.tree
-                            .get_selected()
-                            .expect("should have selected after partial refresh")
-                            .path(),
-                    )?;
+                    if let Some(item) = self.tree.get_selected() {
+                        self.previewer.preview_file(item.path())?;
+                    }
                 }
                 AppEvent::OpenFile(path) => {
                     info!("opening file \"{}\"", path.display());
@@ -139,20 +135,7 @@ impl App {
 
                     info!("\n{}", String::from_utf8_lossy(&output.stdout));
                 }
-                AppEvent::SearchFiles(search) => {
-                    info!("searching for: \"{}\"", search);
-                    let mut results = SearchBuilder::default()
-                        .location(&self.path)
-                        .search_input(&search)
-                        .ignore_case()
-                        .hidden()
-                        .build()
-                        .filter(|path| !self.tree.is_ignored(path))
-                        .collect();
-                    rust_search::similarity_sort(&mut results, &search);
-                    if results.is_empty() {
-                        warn!("no files found when searching");
-                    }
+                AppEvent::SearchFiles(_search) => {
                     todo!("search for files with fuzzy finder here");
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
