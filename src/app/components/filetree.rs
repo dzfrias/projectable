@@ -16,7 +16,7 @@ use ignore::{
 use itertools::Itertools;
 use log::{debug, info, warn};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     iter,
     path::{Path, PathBuf},
@@ -38,6 +38,7 @@ pub struct Filetree {
     repo: Option<Repository>,
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
+    state: Cell<ListState>,
     #[allow(dead_code)]
     marks: Rc<RefCell<Vec<PathBuf>>>,
 }
@@ -58,12 +59,14 @@ impl Filetree {
                     .filter(|entry_path| entry_path != path.as_ref())
                     .collect_vec(),
             ),
+            state: ListState::default().into(),
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
             queue.add(AppEvent::PreviewFile(item.path().to_owned()));
         }
         tree.listing.fold_all();
+        tree.sync_selected();
         Ok(tree)
     }
 
@@ -155,6 +158,7 @@ impl Filetree {
         self.listing.select(path.as_ref());
         self.queue
             .add(AppEvent::PreviewFile(path.as_ref().to_path_buf()));
+        self.sync_selected();
 
         Ok(())
     }
@@ -174,12 +178,15 @@ impl Filetree {
     pub fn close_under(&mut self, _location: &mut Vec<usize>) {
         todo!()
     }
+
+    fn sync_selected(&mut self) {
+        self.state.get_mut().select(self.listing.selected());
+    }
 }
 
 impl Drawable for Filetree {
     fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) -> Result<()> {
-        let mut state = ListState::default();
-        state.select(self.listing.selected());
+        let mut state = self.state.take();
         let list = List::new(
             self.listing
                 .items()
@@ -239,6 +246,7 @@ impl Drawable for Filetree {
         .highlight_style(Style::default().bg(Color::LightGreen).fg(Color::Black))
         .block(Block::default().borders(Borders::ALL));
         f.render_stateful_widget(list, area, &mut state);
+        self.state.set(state);
 
         Ok(())
 
@@ -408,6 +416,7 @@ impl Component for Filetree {
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
+                    self.state.get_mut().select(self.listing.selected());
                     return Ok(());
                 }
                 if let Some(item) = self.get_selected() {
@@ -417,6 +426,8 @@ impl Component for Filetree {
             }
             _ => {}
         }
+
+        self.sync_selected();
 
         Ok(())
     }
