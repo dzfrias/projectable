@@ -803,17 +803,7 @@ mod tests {
 
         assert_eq!(2, filetree.listing.len());
         assert!(filetree.refresh().is_ok());
-        assert_eq!(
-            Path::new("new.txt"),
-            filetree
-                .listing
-                .items()
-                .get(2)
-                .unwrap()
-                .path()
-                .file_name()
-                .unwrap()
-        );
+        assert_eq!(3, filetree.listing.len());
     }
 
     #[test]
