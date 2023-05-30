@@ -39,7 +39,6 @@ pub struct Filetree {
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
     state: Cell<ListState>,
-    #[allow(dead_code)]
     marks: Rc<RefCell<Vec<PathBuf>>>,
 }
 
@@ -221,7 +220,7 @@ impl Drawable for Filetree {
                     } else {
                         "  "
                     };
-                    let style =
+                    let style = if !self.marks.borrow().iter().any(|path| path == item.path()) {
                         self.status_cache
                             .as_ref()
                             .map_or(Style::default(), |cache| {
@@ -238,7 +237,10 @@ impl Drawable for Filetree {
                                         _ => Style::default(),
                                     }
                                 })
-                            });
+                            })
+                    } else {
+                        self.config.filetree.marks_style.into()
+                    };
                     ListItem::new(format!(
                         "{}{icon}{file_name}",
                         " ".repeat(indent_amount * INDENT)
