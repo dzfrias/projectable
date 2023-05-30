@@ -253,53 +253,6 @@ impl Drawable for Filetree {
         self.state.set(state);
 
         Ok(())
-
-        // let items = build_filetree(
-        //     &self.dir,
-        //     self.status_cache.as_ref(),
-        //     Rc::clone(&self.config),
-        //     &self.marks.borrow(),
-        //     &self.only_included,
-        // );
-        // let mut state = self.state.take();
-        //
-        // if self.is_searching() {
-        //     let layout = Layout::default()
-        //         .constraints([
-        //             Constraint::Length(1),
-        //             Constraint::Length(1),
-        //             Constraint::Min(1),
-        //         ])
-        //         .margin(1)
-        //         .split(area);
-        //     let block = Block::default()
-        //         .borders(Borders::ALL)
-        //         .border_style(self.config.filetree.border_color.into())
-        //         .title("Files");
-        //     let tree = Tree::new(items).highlight_style(self.config.selected.into());
-        //     let p = Paragraph::new("Some results may be filtered out ('\\' to reset)")
-        //         .alignment(Alignment::Center)
-        //         .wrap(Wrap { trim: true })
-        //         .style(self.config.filetree.filtered_out_message.into());
-        //
-        //     f.render_widget(block, area);
-        //     f.render_widget(p, layout[0]);
-        //     f.render_stateful_widget(tree, layout[2], &mut state);
-        // } else {
-        //     let tree = Tree::new(items)
-        //         .block(
-        //             Block::default()
-        //                 .borders(Borders::ALL)
-        //                 .title("Files")
-        //                 .border_style(self.config.filetree.border_color.into()),
-        //         )
-        //         .highlight_style(self.config.selected.into());
-        //     f.render_stateful_widget(tree, area, &mut state);
-        // }
-        //
-        // self.state.set(state);
-        //
-        // Ok(())
     }
 }
 
