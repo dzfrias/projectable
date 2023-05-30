@@ -84,6 +84,8 @@ pub enum Action {
     FiletreeDiffMode,
     FiletreeSpecialCommand,
     FiletreeMarkSelected,
+    FiletreeCloseUnder,
+    FiletreeOpenUnder,
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,6 +158,8 @@ impl Config {
             ),
             (Action::FiletreeMarkSelected, &self.filetree.mark_selected),
             (Action::OpenMarks, &self.marks.open),
+            (Action::FiletreeOpenUnder, &self.filetree.open_under),
+            (Action::FiletreeCloseUnder, &self.filetree.close_under),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
@@ -340,6 +344,8 @@ pub struct FiletreeConfig {
     pub open_all: Key,
     pub close_all: Key,
     pub mark_selected: Key,
+    pub open_under: Key,
+    pub close_under: Key,
 }
 
 impl Default for FiletreeConfig {
@@ -364,6 +370,8 @@ impl Default for FiletreeConfig {
             diff_mode: Key::normal('t'),
             special_command: Key::normal('v'),
             mark_selected: Key::normal('m'),
+            open_under: Key::normal('l'),
+            close_under: Key::normal('h'),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::default(),
@@ -401,7 +409,9 @@ impl Merge for FiletreeConfig {
             git_modified_style,
             special_command,
             mark_selected,
-            marks_style
+            marks_style,
+            open_under,
+            close_under
         );
     }
 }

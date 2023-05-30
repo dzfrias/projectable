@@ -1,5 +1,5 @@
 use super::items::*;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use bitvec::prelude::*;
 use log::debug;
 use std::path::Path;
@@ -218,6 +218,66 @@ impl FileListing {
 
     pub fn unfold_all(&mut self) {
         self.folded.fill(false);
+    }
+
+    pub fn fold_under<'a, T>(&mut self, index: T) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self
+            .relative_to_absolute(index)
+            .context("invalid fold under target")?;
+        let target_item = self
+            .items
+            .get(index)
+            .expect("should be in items, checked at top of method");
+
+        for target_idx in self
+            .items
+            .iter()
+            .enumerate()
+            .skip(index)
+            .take_while(|(_, item)| item.path().starts_with(target_item.path()))
+            .filter(|(_, item)| !item.is_file())
+            .map(|(idx, _)| idx)
+        {
+            self.folded
+                .get_mut(target_idx)
+                .expect("folded should have same length as items")
+                .set(true);
+        }
+
+        Ok(())
+    }
+
+    pub fn unfold_under<'a, T>(&mut self, index: T) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self
+            .relative_to_absolute(index)
+            .context("invalid fold under target")?;
+        let target_item = self
+            .items
+            .get(index)
+            .expect("should be in items, checked at top of method");
+
+        for target_idx in self
+            .items
+            .iter()
+            .enumerate()
+            .skip(index)
+            .take_while(|(_, item)| item.path().starts_with(target_item.path()))
+            .filter(|(_, item)| !item.is_file())
+            .map(|(idx, _)| idx)
+        {
+            self.folded
+                .get_mut(target_idx)
+                .expect("folded should have same length as items")
+                .set(false);
+        }
+
+        Ok(())
     }
 
     fn relative_to_absolute<'a, T>(&self, index: T) -> Option<usize>
@@ -629,5 +689,32 @@ mod tests {
         items.select_next();
 
         assert_eq!(4, items.selected().unwrap());
+    }
+
+    #[test]
+    fn can_fold_recursively_under_certain_paths() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test/test.txt",
+            "/root/test/test2/test.txt",
+            "/root/test2/test.txt",
+        ]);
+
+        assert!(items.fold_under(1).is_ok());
+        assert_eq!(bitvec![0, 1, 1, 0, 1, 0, 0, 0], items.folded);
+    }
+
+    #[test]
+    fn can_unfold_recursively_under_certain_paths() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test/test.txt",
+            "/root/test/test2/test.txt",
+            "/root/test2/test.txt",
+        ]);
+
+        items.fold_all();
+        assert!(items.unfold_under(1).is_ok());
+        assert_eq!(bitvec![0, 0, 0, 0, 0, 0, 1, 0], items.folded);
     }
 }

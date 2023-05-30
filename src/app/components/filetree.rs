@@ -171,12 +171,16 @@ impl Filetree {
         self.listing.fold_all();
     }
 
-    pub fn open_under(&mut self, _location: &mut Vec<usize>) {
-        todo!()
+    pub fn open_under(&mut self) {
+        self.listing
+            .selected()
+            .map(|selected| self.listing.unfold_under(selected));
     }
 
-    pub fn close_under(&mut self, _location: &mut Vec<usize>) {
-        todo!()
+    pub fn close_under(&mut self) {
+        self.listing
+            .selected()
+            .map(|selected| self.listing.fold_under(selected));
     }
 
     fn sync_selected(&mut self) {
@@ -413,6 +417,8 @@ impl Component for Filetree {
                             self.queue.add(AppEvent::Mark(selected.path().to_path_buf()));
                         }
                     },
+                    self.config.filetree.open_under => self.open_under(),
+                    self.config.filetree.close_under => self.close_under(),
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
