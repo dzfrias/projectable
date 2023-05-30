@@ -2,7 +2,7 @@ use crate::{
     app::{component::*, InputOperation, PendingOperation},
     config::Config,
     external_event::{ExternalEvent, RefreshData},
-    filelisting::{self, FileListing},
+    filelisting::{FileListing, Item},
     queue::{AppEvent, Queue},
 };
 use anyhow::{bail, Context, Result};
@@ -121,9 +121,9 @@ impl Filetree {
             }
             RefreshData::Add(path) => {
                 if path.is_dir() {
-                    self.listing.add(filelisting::Item::Dir(path.clone()));
+                    self.listing.add(Item::Dir(path.clone()));
                 } else {
-                    self.listing.add(filelisting::Item::File(path.clone()));
+                    self.listing.add(Item::File(path.clone()));
                 }
                 self.populate_status_cache();
             }
@@ -132,7 +132,7 @@ impl Filetree {
         Ok(())
     }
 
-    pub fn get_selected(&self) -> Option<&filelisting::Item> {
+    pub fn get_selected(&self) -> Option<&Item> {
         self.listing.selected_item()
     }
 
@@ -344,8 +344,8 @@ impl Component for Filetree {
                         self.refresh().context("problem refreshing filetree")?;
                     },
                     self.config.open => match self.get_selected() {
-                        Some(filelisting::Item::Dir(_)) => self.listing.toggle_fold(),
-                        Some(filelisting::Item::File(file)) => self
+                        Some(Item::Dir(_)) => self.listing.toggle_fold(),
+                        Some(Item::File(file)) => self
                             .queue
                             .add(AppEvent::OpenFile(file.clone())),
                         None => {}
@@ -354,7 +354,7 @@ impl Component for Filetree {
                         if let Some(selected) = self.listing.selected() {
                             let is_folded = self.listing.is_folded(selected).unwrap();
                             let add_path = match self.listing.selected_item().expect("should exist, checked at top of block") {
-                                filelisting::Item::Dir(dir) if !is_folded => dir,
+                                Item::Dir(dir) if !is_folded => dir,
                                 item => item.path().parent().expect("item should have parent"),
                             };
                             self.queue
@@ -365,7 +365,7 @@ impl Component for Filetree {
                         if let Some(selected) = self.listing.selected() {
                             let is_folded = self.listing.is_folded(selected).unwrap();
                             let add_path = match self.listing.selected_item().expect("should exist, checked at top of block") {
-                                filelisting::Item::Dir(dir) if !is_folded => dir,
+                                Item::Dir(dir) if !is_folded => dir,
                                 item => item.path().parent().expect("item should have parent"),
                             };
                             self.queue
