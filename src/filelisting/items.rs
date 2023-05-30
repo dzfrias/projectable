@@ -97,7 +97,12 @@ impl Items {
         for file in files {
             let file = file.as_ref();
             if file.parent().is_none() || file.is_relative() {
-                panic!("should not be given root or relative file as a item");
+                panic!(
+                    "should not be given root or relative file ({}) as a item - root: {} - relative: {}",
+                    file.display(),
+                    file.parent().is_none(),
+                    file.is_relative(),
+                );
             }
 
             root = root
