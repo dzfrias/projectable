@@ -153,6 +153,8 @@ impl Filetree {
         }
 
         self.listing.select(path.as_ref());
+        self.queue
+            .add(AppEvent::PreviewFile(path.as_ref().to_path_buf()));
 
         Ok(())
     }
