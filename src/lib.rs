@@ -89,10 +89,8 @@
 
 pub mod app;
 pub mod config;
-pub mod dir;
 pub mod external_event;
 pub mod filelisting;
-pub mod ignore;
 pub mod marks;
 pub mod queue;
 pub mod ui;

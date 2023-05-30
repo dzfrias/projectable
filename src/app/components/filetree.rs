@@ -439,9 +439,24 @@ fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<O
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dir::temp_files;
     use crate::{app::components::testing::*, config::FiletreeConfig};
     use test_log::test;
+
+    /// Create temporary files and return the temp dir
+    macro_rules! temp_files {
+    ($($name:expr),*) => {
+            {
+                #[allow(unused_imports)]
+                use ::assert_fs::prelude::*;
+
+                let __temp = ::assert_fs::TempDir::new().unwrap();
+                $(
+                    __temp.child($name).touch().unwrap();
+                 )*
+                __temp
+            }
+        };
+    }
 
     #[test]
     fn new_filetree_selects_first() {
