@@ -35,6 +35,7 @@ mod tests {
             PathBuf::from("./projectable/marks.json"),
             get_marks_file().unwrap()
         );
+        env::remove_var("PROJECTABLE_DATA_DIR");
     }
 
     #[test]
