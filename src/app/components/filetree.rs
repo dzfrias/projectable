@@ -208,10 +208,30 @@ impl Drawable for Filetree {
                     } else {
                         ""
                     };
+                    let style =
+                        self.status_cache
+                            .as_ref()
+                            .map_or(Style::default(), |cache| {
+                                cache.get(item.path()).map_or(Style::default(), |status| {
+                                    match *status {
+                                        Status::WT_NEW => {
+                                            Style::from(self.config.filetree.git_new_style)
+                                        }
+                                        Status::WT_MODIFIED => {
+                                            Style::from(self.config.filetree.git_modified_style)
+                                        }
+                                        Status::INDEX_MODIFIED | Status::INDEX_NEW => {
+                                            Style::from(self.config.filetree.git_modified_style)
+                                        }
+                                        _ => Style::default(),
+                                    }
+                                })
+                            });
                     ListItem::new(format!(
                         "{}{icon}{file_name}",
                         " ".repeat(indent_amount * INDENT)
                     ))
+                    .style(style)
                 })
                 .collect_vec(),
         )
@@ -400,48 +420,6 @@ impl Component for Filetree {
         Ok(())
     }
 }
-
-// fn build_filetree<'a>(
-//     tree: &'a Dir,
-//     statuses: Option<&HashMap<PathBuf, Status>>,
-//     config: Rc<Config>,
-//     marks: &[PathBuf],
-//     highlight: &[PathBuf],
-// ) -> Vec<TreeItem<'a>> {
-//     let mut items = Vec::new();
-//     for item in tree {
-//         let style = 'style: {
-//             if highlight.iter().any(|path| path == item.path()) {
-//                 break 'style config.filetree.searched_style.into();
-//             }
-//             if marks.iter().any(|path| path == item.path()) {
-//                 break 'style config.filetree.marks_style.into();
-//             }
-//             statuses.map_or(Style::default(), |statuses| {
-//                 statuses
-//                     .get(item.path())
-//                     .map_or(Style::default(), |status| match *status {
-//                         Status::WT_NEW => Style::from(config.filetree.git_new_style),
-//                         Status::WT_MODIFIED => Style::from(config.filetree.git_modified_style),
-//                         Status::INDEX_MODIFIED | Status::INDEX_NEW => {
-//                             Style::from(config.filetree.git_modified_style)
-//                         }
-//                         _ => Style::default(),
-//                     })
-//             })
-//         };
-//         let tree_item = match item {
-//             Item::Dir(dir) => TreeItem::new(
-//                 last_of_path(dir.path()),
-//                 build_filetree(dir, statuses, Rc::clone(&config), marks, highlight),
-//             )
-//             .style(style),
-//             Item::File(file) => TreeItem::new_leaf(last_of_path(file.path())).style(style),
-//         };
-//         items.push(tree_item);
-//     }
-//     items
-// }
 
 /// Builds an `Override` that ignores certain paths
 fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<Override> {
