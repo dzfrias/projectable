@@ -26,9 +26,11 @@ pub struct Marks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use test_log::test;
 
     #[test]
+    #[serial]
     fn getting_marks_file_uses_custom_environment_variable() {
         env::set_var("PROJECTABLE_DATA_DIR", ".");
         assert_eq!(
@@ -39,6 +41,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn gets_correct_data_location() {
         #[cfg(not(target_os = "windows"))]
         let correct_path = dirs_next::home_dir()
@@ -53,6 +56,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     #[cfg(target_os = "macos")]
     fn getting_correct_data_location_looks_at_xdg_data_home() {
         env::set_var("XDG_DATA_HOME", ".");
