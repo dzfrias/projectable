@@ -116,7 +116,7 @@ impl FileListing {
     pub fn select_next_n(&mut self, n: usize) {
         let Some(new_selected) = self.iter().skip(self.selected().unwrap_or_default()).nth(n) else {
             // Set to last if the jump is over the limit
-            self.selected = self.len() - 1;
+            self.selected = self.relative_to_absolute(self.len() - 1).unwrap_or_default();
             return;
         };
         self.selected = new_selected.0;
@@ -612,5 +612,22 @@ mod tests {
 
         assert!(items.select("/root/test/test/test").is_some());
         assert_eq!(3, items.selected().unwrap());
+    }
+
+    #[test]
+    fn going_past_selection_with_fold_does_not_panic() {
+        let mut items = FileListing::new(&[
+            "/root/test.txt",
+            "/root/test/test.txt",
+            "/root/test/test/test.txt",
+            "/root/test/test2/test.txt",
+        ]);
+
+        items.fold_all();
+        items.unfold(1);
+        items.select_last();
+        items.select_next();
+
+        assert_eq!(4, items.selected().unwrap());
     }
 }
