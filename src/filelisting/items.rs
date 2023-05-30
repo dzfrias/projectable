@@ -96,12 +96,12 @@ impl Items {
         // This loop will fill up `items` in the form of (DIR, Vec<CHILDREN>).
         for file in files {
             let file = file.as_ref();
-            if file.parent().is_none() || file.is_relative() {
+            if file.parent().is_none() || !file.has_root() {
                 panic!(
                     "should not be given root or relative file ({}) as a item - root: {} - relative: {}",
                     file.display(),
                     file.parent().is_none(),
-                    file.is_relative(),
+                    !file.has_root(),
                 );
             }
 
