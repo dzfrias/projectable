@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     iter,
     ops::RangeInclusive,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -95,16 +95,14 @@ impl Items {
         let mut items: HashMap<PathBuf, Vec<Item>> = HashMap::new();
         // This loop will fill up `items` in the form of (DIR, Vec<CHILDREN>).
         for file in files {
-            let file = file.as_ref();
-            if file.parent().is_none() || !file.has_root() {
-                panic!(
-                    "should not be given root or relative file ({}) as a item - root: {} - relative: {}",
-                    file.display(),
-                    file.parent().is_none(),
-                    !file.has_root(),
-                );
+            if file.as_ref().components().count() == 1
+                && file.as_ref().components().next() == Some(Component::RootDir)
+            {
+                root = file.as_ref().to_path_buf();
+                continue;
             }
 
+            let file = file.as_ref();
             root = root
                 .ancestors()
                 .find(|ancestor| file.starts_with(ancestor))
@@ -126,11 +124,7 @@ impl Items {
             }
             // Put file in `items` under its parent
             items
-                .entry(
-                    file.parent()
-                        .expect("item should have parent, checked at top of loop")
-                        .to_path_buf(),
-                )
+                .entry(file.parent().unwrap_or(&Path::new("")).to_path_buf())
                 .or_default()
                 .push(Item::File(file.to_path_buf()));
         }
@@ -436,10 +430,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn panic_on_building_with_root() {
-        let files = &["/"];
-        Items::new(files);
+    fn does_not_panic_building_with_root() {
+        let items = Items::new(&["/", "/test.txt", "/test2.txt"]);
+        assert_eq!(
+            vec![
+                Item::File("/test.txt".into()),
+                Item::File("/test2.txt".into())
+            ],
+            items.items
+        );
     }
 
     #[test]
@@ -581,13 +580,20 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn new_items_panic_with_relative_path() {
-        Items::new(&["relative.txt"]);
+    fn can_pass_empty_into_items() {
+        Items::new::<&Path>(&[]);
     }
 
     #[test]
-    fn can_pass_empty_into_items() {
-        Items::new::<&Path>(&[]);
+    fn works_with_relative_paths() {
+        let items = Items::new(&["relative.txt", "test/relative.txt"]);
+        assert_eq!(
+            vec![
+                Item::File("relative.txt".into()),
+                Item::Dir("test".into()),
+                Item::File("test/relative.txt".into())
+            ],
+            items.items
+        );
     }
 }
