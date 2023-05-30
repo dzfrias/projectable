@@ -206,7 +206,7 @@ impl Drawable for Filetree {
                             OPENED_SYMBOL
                         }
                     } else {
-                        ""
+                        "  "
                     };
                     let style =
                         self.status_cache
