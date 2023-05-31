@@ -124,7 +124,7 @@ impl Items {
             }
             // Put file in `items` under its parent
             items
-                .entry(file.parent().unwrap_or(&Path::new("")).to_path_buf())
+                .entry(file.parent().unwrap_or(Path::new("")).to_path_buf())
                 .or_default()
                 .push(Item::File(file.to_path_buf()));
         }
