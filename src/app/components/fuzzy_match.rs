@@ -12,7 +12,7 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Corner, Direction, Layout, Rect},
     style::{Color, Style},
-    text::Span,
+    text::{Span, Spans},
     widgets::{Block, Borders, Clear, List, ListItem, ListState},
     Frame,
 };
@@ -181,12 +181,34 @@ impl Drawable for FuzzyMatcher {
         let options = List::new(
             self.compute_best_matches()
                 .into_iter()
-                .map(|item| ListItem::new(Span::styled(item.0, Style::default())))
+                .enumerate()
+                .map(|(index, item)| {
+                    ListItem::new(Spans::from(
+                        item.0
+                            .chars()
+                            .enumerate()
+                            .map(|(c_idx, c)| {
+                                Span::styled(
+                                    c.to_string(),
+                                    if item.1.contains(&c_idx) {
+                                        Style::default().fg(Color::Red)
+                                    } else if self.selected().is_some()
+                                        && self.selected().unwrap() == index
+                                    {
+                                        Style::default().fg(Color::Black)
+                                    } else {
+                                        Style::default()
+                                    },
+                                )
+                            })
+                            .collect_vec(),
+                    ))
+                })
                 .collect_vec(),
         )
         .block(Block::default().borders(Borders::ALL))
         .start_corner(Corner::BottomLeft)
-        .highlight_style(Style::default().fg(Color::Black).bg(Color::LightGreen));
+        .highlight_style(Style::default().bg(Color::LightGreen));
         let mut state = self.state.take();
         f.render_widget(self.area.widget(), prompt_area);
         f.render_stateful_widget(options, options_area, &mut state);
