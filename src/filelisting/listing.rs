@@ -30,7 +30,7 @@ impl FileListing {
     }
 
     pub fn all_items(&self) -> &[Item] {
-        &self.items.items()
+        self.items.items()
     }
 
     pub fn len(&self) -> usize {
