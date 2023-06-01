@@ -324,9 +324,7 @@ impl Component for Filetree {
                             todo!("filter for files here");
                         });
                     },
-                    self.config.filetree.search => self
-                        .queue
-                        .add(AppEvent::OpenInput(InputOperation::SearchFiles)),
+                    self.config.filetree.search => self.queue.add(AppEvent::SearchFiles(self.listing.all_items().iter().map(|item| item.path().to_path_buf()).collect())),
                     self.config.filetree.clear => {
                         info!("refreshed filetree");
                         self.refresh().context("problem refreshing filetree")?;
@@ -627,9 +625,7 @@ mod tests {
         filetree
             .handle_event(&slash)
             .expect("should be able to handle event");
-        assert!(filetree
-            .queue
-            .contains(&AppEvent::OpenInput(InputOperation::SearchFiles)));
+        assert!(filetree.queue.contains(&AppEvent::SearchFiles(Vec::new())));
     }
 
     #[test]

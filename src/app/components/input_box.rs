@@ -27,7 +27,6 @@ pub enum InputOperation {
         to: PathBuf,
     },
     SpecialCommand(String),
-    SearchFiles,
     #[default]
     NoOperations,
 }
@@ -133,9 +132,6 @@ impl Component for InputBox {
                             let cmd = self.text.replace("{}", &to.display().to_string());
                             self.queue.add(AppEvent::RunCommand(cmd));
                         }
-                        InputOperation::SearchFiles => {
-                            self.queue.add(AppEvent::SearchFiles(self.text.clone()));
-                        }
                         InputOperation::SpecialCommand(cmd) => {
                             let full_cmd = cmd.replace("{...}", self.text.as_str());
                             self.queue.add(AppEvent::RunCommand(full_cmd));
@@ -179,7 +175,6 @@ impl Drawable for InputBox {
             InputOperation::SpecialCommand(_) => "Command Input",
             InputOperation::NewDir { .. } => "New Directory",
             InputOperation::NewFile { .. } => "New File",
-            InputOperation::SearchFiles => "Search",
             InputOperation::NoOperations => unreachable!("checked at top of method"),
         };
         let mut textarea = TextArea::default();

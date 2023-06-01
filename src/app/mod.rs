@@ -50,6 +50,7 @@ pub struct App {
     text_popup: Popup,
     file_cmd_popup: FileCmdPopup,
     marks_popup: MarksPopup,
+    fuzzy_matcher: FuzzyMatcher,
     config: Rc<Config>,
 }
 
@@ -79,6 +80,7 @@ impl App {
             config: Rc::clone(&config),
             marks_popup: MarksPopup::new(marks, queue.clone(), Rc::clone(&config), path),
             file_cmd_popup: FileCmdPopup::new(queue.clone(), Rc::clone(&config)),
+            fuzzy_matcher: FuzzyMatcher::new(queue.clone()),
             queue,
         })
     }
@@ -137,11 +139,28 @@ impl App {
 
                     info!("\n{}", String::from_utf8_lossy(&output.stdout));
                 }
-                AppEvent::SearchFiles(_search) => {
-                    todo!("search for files with fuzzy finder here");
+                AppEvent::SearchFiles(files) => {
+                    self.fuzzy_matcher.open_path(
+                        files
+                            .into_iter()
+                            .map(|path| {
+                                path.strip_prefix(self.path())
+                                    .expect("path should start with root")
+                                    .display()
+                                    .to_string()
+                            })
+                            .collect(),
+                    );
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
-                AppEvent::GotoFile(path) => self.tree.open_path(&path)?,
+                AppEvent::GotoFile(path) => {
+                    let path = if path.is_relative() {
+                        self.path().join(path)
+                    } else {
+                        path
+                    };
+                    self.tree.open_path(path)?;
+                }
                 AppEvent::Mark(path) => {
                     // Because it's sent from `self.tree`, it has not been deleted in
                     // `self.marks_popup` yet.
@@ -155,6 +174,7 @@ impl App {
                     info!("deleted mark: \"{}\"", path.display());
                     return Ok(Some(TerminalEvent::DeleteMark(path)));
                 }
+                AppEvent::OpenFuzzy(items, operation) => self.fuzzy_matcher.start(items, operation),
             }
         }
 
@@ -166,13 +186,15 @@ impl App {
             || self.input_box.visible()
             || self.text_popup.visible()
             || self.file_cmd_popup.visible()
-            || self.marks_popup.visible();
+            || self.marks_popup.visible()
+            || self.fuzzy_matcher.visible();
         // Do not give the Filetree or previewer focus if there are any popups open
         self.tree.focus(!popup_open);
         self.previewer.focus(!popup_open);
 
         self.pending.handle_event(ev)?;
         self.input_box.handle_event(ev)?;
+        self.fuzzy_matcher.handle_event(ev)?;
         self.tree.handle_event(ev)?;
         self.previewer.handle_event(ev)?;
         self.text_popup.handle_event(ev)?;
@@ -240,6 +262,7 @@ impl Drawable for App {
         self.text_popup.draw(f, area)?;
         self.file_cmd_popup.draw(f, area)?;
         self.marks_popup.draw(f, area)?;
+        self.fuzzy_matcher.draw(f, area)?;
 
         Ok(())
     }

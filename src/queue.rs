@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::VecDeque, path::PathBuf, rc::Rc};
 
-use crate::app::{InputOperation, PendingOperation};
+use crate::app::{FuzzyOperation, InputOperation, PendingOperation};
 
 /// Single-threaded queue for events within the app
 #[derive(Debug, Clone)]
@@ -40,10 +40,11 @@ pub enum AppEvent {
     NewDir(PathBuf),
     PreviewFile(PathBuf),
     RunCommand(String),
-    SearchFiles(String),
+    SearchFiles(Vec<PathBuf>),
     TogglePreviewMode,
     SpecialCommand(PathBuf),
     GotoFile(PathBuf),
     Mark(PathBuf),
     DeleteMark(PathBuf),
+    OpenFuzzy(Vec<String>, FuzzyOperation),
 }

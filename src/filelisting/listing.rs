@@ -29,6 +29,10 @@ impl FileListing {
         self.iter().map(|(_, item)| item).collect()
     }
 
+    pub fn all_items(&self) -> &[Item] {
+        &self.items.items()
+    }
+
     pub fn len(&self) -> usize {
         // Doesn't take len of `self.items()` because the Iter<'_> doesn't allocate
         self.iter().count()
