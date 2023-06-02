@@ -4,7 +4,7 @@ mod components;
 use self::component::{Component, Drawable};
 pub use self::components::*;
 use crate::{
-    config::Config,
+    config::{Config, Key},
     external_event::{ExternalEvent, RefreshData},
     queue::{AppEvent, Queue},
 };
@@ -209,6 +209,7 @@ impl App {
                 self.config.quit => self.should_quit = true,
                 self.config.help => self.text_popup.preset = Preset::Help,
                 self.config.marks.open => self.marks_popup.open(),
+                Key::esc() => self.should_quit = true,
             }
         }
         Ok(())

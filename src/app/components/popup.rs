@@ -1,6 +1,6 @@
 use crate::{
     app::component::{Component, Drawable},
-    config::Config,
+    config::{Config, Key},
     external_event::ExternalEvent,
     ui,
 };
@@ -62,6 +62,7 @@ impl Component for Popup {
                 self.config.all_up => *self.scroll_y.get_mut() = 0,
                 self.config.all_down => *self.scroll_y.get_mut() = u16::MAX,
                 self.config.quit => self.preset = Preset::Nothing,
+                Key::esc() => self.preset = Preset::Nothing,
             }
         }
 

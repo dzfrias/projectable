@@ -1,6 +1,6 @@
 use crate::{
     app::component::{Component, Drawable},
-    config::Config,
+    config::{Config, Key},
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
     ui,
@@ -132,6 +132,13 @@ impl FileCmdPopup {
             .get_mut()
             .select(Some(opened.0.commands.len() - 1));
     }
+
+    fn close(&mut self) {
+        let Some(opened) = self.opened.take() else {
+            return;
+        };
+        self.registry.push(opened.0);
+    }
 }
 
 impl Component for FileCmdPopup {
@@ -153,12 +160,8 @@ impl Component for FileCmdPopup {
                 self.config.up => self.select_prev(),
                 self.config.all_up => self.select_first(),
                 self.config.all_down => self.select_last(),
-                self.config.quit => {
-                    let Some(opened) = self.opened.take() else {
-                        unreachable!("checked at top of method");
-                    };
-                    self.registry.push(opened.0);
-                },
+                self.config.quit => self.close(),
+                Key::esc() => self.close(),
                 self.config.open => {
                     let Some(opened) = self.opened.take() else {
                         unreachable!("checked at top of method");

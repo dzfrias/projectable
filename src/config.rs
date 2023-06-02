@@ -763,6 +763,13 @@ impl Key {
         }
     }
 
+    pub fn esc() -> Self {
+        Self {
+            code: KeyCode::Esc,
+            mods: KeyModifiers::empty(),
+        }
+    }
+
     pub fn key_code(code: KeyCode) -> Self {
         Self {
             code,

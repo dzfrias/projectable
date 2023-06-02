@@ -1,5 +1,5 @@
 use crate::app::component::{Component, Drawable};
-use crate::config::Config;
+use crate::config::{Config, Key};
 use crate::{
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
@@ -105,6 +105,7 @@ impl Component for PendingPopup {
                 self.config.down => self.select_next(),
                 self.config.up => self.select_prev(),
                 self.config.quit => self.reset_work(),
+                Key::esc() => self.reset_work(),
                 self.config.open => {
                     let selected = self
                         .state
