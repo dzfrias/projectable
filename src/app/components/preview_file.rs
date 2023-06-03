@@ -7,13 +7,16 @@ use crate::{
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
+use duct::cmd;
 use easy_switch::switch;
 use log::trace;
 #[cfg(not(target_os = "windows"))]
 use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
-use std::{cell::Cell, collections::VecDeque, path::Path, process::Command, rc::Rc};
+#[cfg(target_os = "windows")]
+use std::process::Command;
+use std::{cell::Cell, collections::VecDeque, path::Path, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -116,19 +119,18 @@ impl PreviewFile {
             .raw_arg(&format!("/C {replaced}"))
             .output()
             .with_context(|| format!("problem running preview command with {replaced}"))?;
-        #[cfg(not(target_os = "windows"))]
-        let out = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-            .arg("-c")
-            .arg(&replaced)
-            .output()
-            .with_context(|| format!("problem running preview command with {replaced}"))?;
+        let out = cmd!(
+            env::var("SHELL").unwrap_or("sh".to_owned()),
+            "-c",
+            &replaced
+        )
+        .unchecked()
+        .stderr_to_stdout()
+        .read()
+        .with_context(|| format!("problem running preview command with {replaced}"))?;
 
         trace!("ran preview command: \"{replaced}\"");
-        self.contents = if out.stdout.is_empty() && !out.stderr.is_empty() {
-            String::from_utf8_lossy(&out.stderr).to_string()
-        } else {
-            String::from_utf8_lossy(&out.stdout).to_string()
-        };
+        self.contents = out;
         Ok(())
     }
 

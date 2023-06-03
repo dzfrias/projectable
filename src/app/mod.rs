@@ -10,17 +10,19 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use crossterm::event::Event;
+use duct::cmd;
 use easy_switch::switch;
 use log::info;
 #[cfg(not(target_os = "windows"))]
 use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+use std::process::Command;
 use std::{
     cell::RefCell,
     fs::{self, File},
     path::{Path, PathBuf},
-    process::Command,
     rc::Rc,
 };
 use tui::{
@@ -132,12 +134,16 @@ impl App {
                     #[cfg(target_os = "windows")]
                     let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
                     #[cfg(not(target_os = "windows"))]
-                    let output = Command::new(env::var("SHELL").unwrap_or("sh".to_owned()))
-                        .arg("-c")
-                        .arg(&cmd)
-                        .output()?;
+                    let mut output = cmd!(env::var("SHELL").unwrap_or("sh".to_owned()), "-c", &cmd)
+                        .stderr_to_stdout()
+                        .unchecked()
+                        .read()?;
+                    if output.is_empty() {
+                        output.push(' ');
+                    }
 
-                    info!("\n{}", String::from_utf8_lossy(&output.stdout));
+                    info!("output:");
+                    info!("{output}");
                 }
                 AppEvent::SearchFiles(files) => {
                     self.fuzzy_matcher.open_path(

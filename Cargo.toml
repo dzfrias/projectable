@@ -11,6 +11,7 @@ collect-all = "0.1.0"
 crossbeam-channel = "0.5.7"
 crossterm = "0.25"
 dirs-next = "2.0.0"
+duct = "0.13.6"
 easy-cast = "0.5.2"
 easy_switch = "0.1.0"
 fuzzy-matcher = "0.3.7"
@@ -30,7 +31,7 @@ serial_test = "2.0.0"
 strum = { version = "0.24.1", features = ["derive"] }
 toml = "0.7.3"
 tui = { version = "0.19.0", features = ["serde"] }
-tui-logger = "0.8.3"
+tui-logger = "0.9"
 tui-textarea = "0.2.0"
 
 [dev-dependencies]
