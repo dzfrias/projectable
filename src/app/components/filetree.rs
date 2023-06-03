@@ -100,15 +100,7 @@ impl Filetree {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        let overrides = build_override_ignorer(&self.root_path, &self.config.filetree.ignore)?;
-        let mut listing = FileListing::new(
-            &WalkBuilder::new(&self.root_path)
-                .overrides(overrides)
-                .build()
-                .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
-                .filter(|entry_path| entry_path != &self.root_path) // Ignore root
-                .collect_vec(),
-        );
+        let mut listing = FileListing::new(&self.build_walkbuilder()?.collect_vec());
         listing.fold_all();
         self.listing = listing;
         self.populate_status_cache();
@@ -136,17 +128,6 @@ impl Filetree {
 
     pub fn get_selected(&self) -> Option<&Item> {
         self.listing.selected_item()
-    }
-
-    fn populate_status_cache(&mut self) {
-        self.status_cache = self.repo.as_ref().and_then(|repo| {
-            repo.statuses(None).ok().map(|statuses| {
-                statuses
-                    .iter()
-                    .map(|status| (self.root_path.join(status.path().unwrap()), status.status()))
-                    .collect::<HashMap<PathBuf, Status>>()
-            })
-        });
     }
 
     pub fn open_path(&mut self, path: impl AsRef<Path>) -> Result<()> {
@@ -182,8 +163,43 @@ impl Filetree {
             .map(|selected| self.listing.fold_under(selected));
     }
 
+    pub fn filter_include(&mut self, items: &[PathBuf]) -> Result<()> {
+        let items = self
+            .build_walkbuilder()?
+            .filter(|entry_path| {
+                items
+                    .iter()
+                    .any(|path| path == entry_path || entry_path.starts_with(path))
+            })
+            .collect_vec();
+
+        self.listing = FileListing::new(&items);
+
+        Ok(())
+    }
+
+    fn populate_status_cache(&mut self) {
+        self.status_cache = self.repo.as_ref().and_then(|repo| {
+            repo.statuses(None).ok().map(|statuses| {
+                statuses
+                    .iter()
+                    .map(|status| (self.root_path.join(status.path().unwrap()), status.status()))
+                    .collect::<HashMap<PathBuf, Status>>()
+            })
+        });
+    }
+
     fn sync_selected(&mut self) {
         self.state.get_mut().select(self.listing.selected());
+    }
+
+    fn build_walkbuilder(&self) -> Result<impl Iterator<Item = PathBuf> + '_> {
+        let overrides = build_override_ignorer(&self.root_path, &self.config.filetree.ignore)?;
+        Ok(WalkBuilder::new(&self.root_path)
+            .overrides(overrides)
+            .build()
+            .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
+            .filter(|entry_path| entry_path != &self.root_path))
     }
 }
 
@@ -317,12 +333,12 @@ impl Component for Filetree {
                     },
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
                     self.config.filetree.git_filter => {
-                        self.status_cache.as_ref().map_or_else(|| {
-                            warn!("no git status to filter for");
-                        }, |_cache| {
+                        if let Some(cache) = self.status_cache.as_ref() {
                             info!("filtered for modified files");
-                            todo!("filter for files here");
-                        });
+                            self.filter_include(cache.keys().cloned().collect_vec().as_ref())?;
+                        } else {
+                            warn!("no git status to filter for");
+                        }
                     },
                     self.config.filetree.search => self.queue.add(AppEvent::SearchFiles(self.listing.all_items().iter().map(|item| item.path().to_path_buf()).collect())),
                     self.config.filetree.clear => {
@@ -783,6 +799,20 @@ mod tests {
                 .path()
                 .file_name()
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn can_filter_include_certain_files() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+
+        assert!(filetree
+            .filter_include(&[temp.path().join("test.txt")])
+            .is_ok());
+        assert_eq!(
+            vec![&Item::File(temp.path().join("test.txt"))],
+            filetree.listing.items()
         );
     }
 }

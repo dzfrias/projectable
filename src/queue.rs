@@ -47,4 +47,5 @@ pub enum AppEvent {
     Mark(PathBuf),
     DeleteMark(PathBuf),
     OpenFuzzy(Vec<String>, FuzzyOperation),
+    FilterFor(Vec<PathBuf>),
 }

@@ -175,6 +175,7 @@ impl App {
                     return Ok(Some(TerminalEvent::DeleteMark(path)));
                 }
                 AppEvent::OpenFuzzy(items, operation) => self.fuzzy_matcher.start(items, operation),
+                AppEvent::FilterFor(items) => self.tree.filter_include(&items)?,
             }
         }
 
