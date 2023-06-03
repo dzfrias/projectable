@@ -7,6 +7,7 @@ use crate::{
 use ansi_to_tui::IntoText;
 use anyhow::{bail, Context, Result};
 use crossterm::event::{Event, MouseEventKind};
+#[cfg(not(target_os = "windows"))]
 use duct::cmd;
 use easy_switch::switch;
 use log::trace;

@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use crossterm::event::Event;
+#[cfg(not(target_os = "windows"))]
 use duct::cmd;
 use easy_switch::switch;
 use log::info;
