@@ -114,11 +114,15 @@ impl PreviewFile {
         };
 
         #[cfg(target_os = "windows")]
-        let out = Command::new("cmd.exe")
-            // See https://github.com/rust-lang/rust/issues/92939
-            .raw_arg(&format!("/C {replaced}"))
-            .output()
-            .with_context(|| format!("problem running preview command with {replaced}"))?;
+        let out = {
+            let out = Command::new("cmd.exe")
+                // See https://github.com/rust-lang/rust/issues/92939
+                .raw_arg(&format!("/C {replaced}"))
+                .output()
+                .with_context(|| format!("problem running preview command with {replaced}"))?;
+            String::from_utf8_lossy(out);
+        };
+        #[cfg(not(target_os = "windows"))]
         let out = cmd!(
             env::var("SHELL").unwrap_or("sh".to_owned()),
             "-c",

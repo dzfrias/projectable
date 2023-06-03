@@ -132,18 +132,30 @@ impl App {
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
                     #[cfg(target_os = "windows")]
-                    let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
-                    #[cfg(not(target_os = "windows"))]
-                    let mut output = cmd!(env::var("SHELL").unwrap_or("sh".to_owned()), "-c", &cmd)
-                        .stderr_to_stdout()
-                        .unchecked()
-                        .read()?;
-                    if output.is_empty() {
-                        output.push(' ');
+                    {
+                        let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
+                        info!("output:");
+                        if output.stdout.is_empty() && !output.stderr.is_empty() {
+                            info!("{}", String::from_utf8_lossy(output.stderr));
+                        } else {
+                            info!("{}", String::from_utf8_lossy(output.stdout));
+                        }
                     }
 
-                    info!("output:");
-                    info!("{output}");
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let mut output =
+                            cmd!(env::var("SHELL").unwrap_or("sh".to_owned()), "-c", &cmd)
+                                .stderr_to_stdout()
+                                .unchecked()
+                                .read()?;
+                        if output.is_empty() {
+                            output.push(' ');
+                        }
+
+                        info!("output:");
+                        info!("{output}");
+                    }
                 }
                 AppEvent::SearchFiles(files) => {
                     self.fuzzy_matcher.open_path(
