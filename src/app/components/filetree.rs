@@ -778,7 +778,7 @@ mod tests {
             filetree
                 .listing
                 .items()
-                .get(1)
+                .get(0)
                 .unwrap()
                 .path()
                 .file_name()

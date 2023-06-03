@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use itertools::Itertools;
 use log::debug;
 use std::{
@@ -206,11 +206,16 @@ impl Items {
             bail!("cannot add duplicate item");
         }
 
+        if item.path().parent().unwrap_or(Path::new("")) == self.root() {
+            self.items.insert(0, item);
+            return Ok(0);
+        }
+
         let insertion_index = self
             .items
             .iter()
             .position(|existing_item| item.path().parent().unwrap() == existing_item.path())
-            .unwrap_or_default()
+            .context("item's parent not found")?
             + 1;
         self.items.insert(insertion_index, item);
         Ok(insertion_index)
@@ -532,8 +537,8 @@ mod tests {
         assert!(items.add(Item::File("/root/test2.txt".into())).is_ok());
         assert_eq!(
             vec![
+                Item::File("/root/test2.txt".into()),
                 Item::File("/root/test.txt".into()),
-                Item::File("/root/test2.txt".into())
             ],
             items.items
         );
@@ -595,5 +600,13 @@ mod tests {
             ],
             items.items
         );
+    }
+
+    #[test]
+    fn adding_item_with_no_parent_throws_error() {
+        let mut items = Items::new(&["/root/test.txt", "/root/testing.txt"]);
+        assert!(items
+            .add(Item::File("/root/testing/test.txt".into()))
+            .is_err());
     }
 }
