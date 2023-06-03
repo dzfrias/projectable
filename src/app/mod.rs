@@ -136,9 +136,9 @@ impl App {
                         let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
                         info!("output:");
                         if output.stdout.is_empty() && !output.stderr.is_empty() {
-                            info!("{}", String::from_utf8_lossy(output.stderr));
+                            info!("{}", String::from_utf8_lossy(&output.stderr));
                         } else {
-                            info!("{}", String::from_utf8_lossy(output.stdout));
+                            info!("{}", String::from_utf8_lossy(&output.stdout));
                         }
                     }
 

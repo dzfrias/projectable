@@ -120,7 +120,7 @@ impl PreviewFile {
                 .raw_arg(&format!("/C {replaced}"))
                 .output()
                 .with_context(|| format!("problem running preview command with {replaced}"))?;
-            String::from_utf8_lossy(out);
+            String::from_utf8_lossy(out)
         };
         #[cfg(not(target_os = "windows"))]
         let out = cmd!(
