@@ -187,6 +187,13 @@ impl Items {
         let removed = self.items.remove(index);
         let mut indices_removed = index..=index;
         if let Item::Dir(ref path) = removed {
+            if self
+                .items
+                .get(index)
+                .is_some_and(|item| !item.path().starts_with(path))
+            {
+                return Some((removed, indices_removed));
+            }
             // Gets index of the last item that has `path` as one of its ancestors
             let end = self
                 .items
@@ -608,5 +615,13 @@ mod tests {
         assert!(items
             .add(Item::File("/root/testing/test.txt".into()))
             .is_err());
+    }
+
+    #[test]
+    fn deleting_dir_that_comes_before_file_does_not_delete_the_file() {
+        let mut items = Items::new(&["/root/test.txt"]);
+        items.add(Item::Dir("/root/test".into())).unwrap();
+        assert!(items.remove(0).is_some());
+        assert_eq!(vec![Item::File("/root/test.txt".into())], items.items);
     }
 }
