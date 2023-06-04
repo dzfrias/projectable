@@ -192,7 +192,7 @@ impl FileListing {
     where
         T: Into<ItemsIndex<'a>>,
     {
-        let (_, removed) = self
+        let removed = self
             .items
             .remove(index)
             .ok_or_else(|| anyhow!("invalid remove target"))?;
