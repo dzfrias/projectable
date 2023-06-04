@@ -179,8 +179,9 @@ impl FileListing {
     }
 
     pub fn add(&mut self, item: Item) {
+        let is_dir = !item.is_file();
         match self.items.add(item) {
-            Ok(inserted_at) => self.folded.insert(inserted_at, false),
+            Ok(inserted_at) => self.folded.insert(inserted_at, is_dir),
             Err(err) => debug!("swallowed error: {err}"),
         }
     }
@@ -717,5 +718,12 @@ mod tests {
         items.fold_all();
         assert!(items.unfold_under(1).is_ok());
         assert_eq!(bitvec![0, 0, 0, 0, 0, 0, 1, 0], items.folded);
+    }
+
+    #[test]
+    fn adding_dir_starts_it_as_folded() {
+        let mut items = FileListing::new(&["/root/test.txt"]);
+        items.add(Item::Dir("/root/dir".into()));
+        assert!(items.folded.first().is_some_and(|is_folded| *is_folded));
     }
 }
