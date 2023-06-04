@@ -146,6 +146,7 @@ impl App {
                         let mut output =
                             cmd!(env::var("SHELL").unwrap_or("sh".to_owned()), "-c", &cmd)
                                 .stderr_to_stdout()
+                                .stdin_null()
                                 .unchecked()
                                 .read()?;
                         if output.is_empty() {
