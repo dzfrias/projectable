@@ -158,7 +158,7 @@ impl App {
                     }
                 }
                 AppEvent::RunCommandWithTmux(cmd, opts) => {
-                    if !env::var("TMUX").is_ok() {
+                    if env::var("TMUX").is_err() {
                         error!("not in tmux session");
                         continue;
                     }
