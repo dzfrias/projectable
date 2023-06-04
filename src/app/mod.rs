@@ -10,11 +10,9 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use crossterm::event::Event;
-#[cfg(not(target_os = "windows"))]
 use duct::cmd;
 use easy_switch::switch;
 use log::{error, info, warn};
-#[cfg(not(target_os = "windows"))]
 use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
