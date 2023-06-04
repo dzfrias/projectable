@@ -125,6 +125,9 @@ impl Filetree {
         match refresh_data {
             RefreshData::Delete(path) => {
                 self.listing.remove(path.as_path())?;
+                if self.get_selected().is_some_and(|item| item.path() == path) {
+                    self.queue.add(AppEvent::PreviewFile(path.to_path_buf()));
+                }
             }
             RefreshData::Add(path) => {
                 if path.is_dir() {
@@ -133,6 +136,9 @@ impl Filetree {
                     self.listing.add(Item::File(path.clone()));
                 }
                 self.populate_status_cache();
+                if self.get_selected().is_some_and(|item| item.path() == path) {
+                    self.queue.add(AppEvent::PreviewFile(path.to_path_buf()));
+                }
             }
         }
 
