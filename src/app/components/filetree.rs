@@ -30,6 +30,12 @@ use tui::{
     Frame,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HiddenVisibility {
+    Visible,
+    Hidden,
+}
+
 pub struct Filetree {
     is_focused: bool,
     listing: FileListing,
@@ -40,6 +46,7 @@ pub struct Filetree {
     config: Rc<Config>,
     state: Cell<ListState>,
     marks: Rc<RefCell<Vec<PathBuf>>>,
+    is_showing_hidden: bool,
 }
 
 impl Filetree {
@@ -59,6 +66,7 @@ impl Filetree {
                     .collect_vec(),
             ),
             state: ListState::default().into(),
+            is_showing_hidden: false,
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -100,7 +108,11 @@ impl Filetree {
     }
 
     pub fn refresh(&mut self) -> Result<()> {
-        let mut listing = FileListing::new(&self.build_walkbuilder()?.collect_vec());
+        let mut listing = FileListing::new(
+            &self
+                .build_walkbuilder(HiddenVisibility::Hidden)?
+                .collect_vec(),
+        );
         listing.fold_all();
         self.listing = listing;
         self.populate_status_cache();
@@ -165,7 +177,7 @@ impl Filetree {
 
     pub fn filter_include(&mut self, items: &[PathBuf]) -> Result<()> {
         let items = self
-            .build_walkbuilder()?
+            .build_walkbuilder(HiddenVisibility::Hidden)?
             .filter(|entry_path| {
                 items
                     .iter()
@@ -174,6 +186,24 @@ impl Filetree {
             .collect_vec();
 
         self.listing = FileListing::new(&items);
+
+        Ok(())
+    }
+
+    pub fn toggle_dotfiles(&mut self) -> Result<()> {
+        let items = self
+            .build_walkbuilder(if self.is_showing_hidden {
+                HiddenVisibility::Hidden
+            } else {
+                HiddenVisibility::Visible
+            })?
+            .collect_vec();
+        self.is_showing_hidden = !self.is_showing_hidden;
+
+        self.listing = FileListing::new(&items);
+        self.listing.fold_all();
+
+        info!("toggling visibility of dotfiles");
 
         Ok(())
     }
@@ -193,10 +223,14 @@ impl Filetree {
         self.state.get_mut().select(self.listing.selected());
     }
 
-    fn build_walkbuilder(&self) -> Result<impl Iterator<Item = PathBuf> + '_> {
+    fn build_walkbuilder(
+        &self,
+        show_dotfiles: HiddenVisibility,
+    ) -> Result<impl Iterator<Item = PathBuf> + '_> {
         let overrides = build_override_ignorer(&self.root_path, &self.config.filetree.ignore)?;
         Ok(WalkBuilder::new(&self.root_path)
             .overrides(overrides)
+            .hidden(show_dotfiles != HiddenVisibility::Visible)
             .build()
             .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
             .filter(|entry_path| entry_path != &self.root_path))
@@ -388,6 +422,7 @@ impl Component for Filetree {
                     },
                     self.config.filetree.open_under => self.open_under(),
                     self.config.filetree.close_under => self.close_under(),
+                    self.config.filetree.show_dotfiles => self.toggle_dotfiles()?,
                     _ => refresh_preview = false,
                 }
                 if !refresh_preview {
@@ -812,6 +847,37 @@ mod tests {
             .is_ok());
         assert_eq!(
             vec![&Item::File(temp.path().join("test.txt"))],
+            filetree.listing.items()
+        );
+    }
+
+    #[test]
+    fn can_show_hidden_files() {
+        let temp = temp_files!("test.txt", ".test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+
+        assert_eq!(1, filetree.listing.len());
+        assert!(filetree.toggle_dotfiles().is_ok());
+        assert_eq!(
+            vec![
+                &Item::File(temp.join(".test2.txt")),
+                &Item::File(temp.join("test.txt")),
+            ],
+            filetree.listing.items()
+        );
+    }
+
+    #[test]
+    fn toggles_hidden_files() {
+        let temp = temp_files!("test.txt", ".test2.txt");
+        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
+
+        assert_eq!(1, filetree.listing.len());
+        assert!(filetree.toggle_dotfiles().is_ok());
+        assert_eq!(2, filetree.listing.len());
+        assert!(filetree.toggle_dotfiles().is_ok());
+        assert_eq!(
+            vec![&Item::File(temp.join("test.txt"))],
             filetree.listing.items()
         );
     }

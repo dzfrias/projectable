@@ -86,6 +86,7 @@ pub enum Action {
     FiletreeMarkSelected,
     FiletreeCloseUnder,
     FiletreeOpenUnder,
+    FiletreeShowDotfiles,
 }
 
 #[derive(Debug, Deserialize)]
@@ -160,6 +161,7 @@ impl Config {
             (Action::OpenMarks, &self.marks.open),
             (Action::FiletreeOpenUnder, &self.filetree.open_under),
             (Action::FiletreeCloseUnder, &self.filetree.close_under),
+            (Action::FiletreeShowDotfiles, &self.filetree.show_dotfiles),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
@@ -346,6 +348,7 @@ pub struct FiletreeConfig {
     pub mark_selected: Key,
     pub open_under: Key,
     pub close_under: Key,
+    pub show_dotfiles: Key,
 }
 
 impl Default for FiletreeConfig {
@@ -372,6 +375,7 @@ impl Default for FiletreeConfig {
             mark_selected: Key::normal('m'),
             open_under: Key::normal('l'),
             close_under: Key::normal('h'),
+            show_dotfiles: Key::normal('.'),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::default(),
@@ -411,7 +415,8 @@ impl Merge for FiletreeConfig {
             mark_selected,
             marks_style,
             open_under,
-            close_under
+            close_under,
+            show_dotfiles
         );
     }
 }
