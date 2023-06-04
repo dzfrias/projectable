@@ -322,7 +322,9 @@ pub struct FiletreeConfig {
     pub ignore: Vec<String>,
     pub use_gitignore: bool,
     pub refresh_time: u64,
+    // TODO: Actually implement
     pub dirs_first: bool,
+    pub show_hidden_by_default: bool,
 
     pub filtered_out_message: Style,
     pub border_color: Style,
@@ -357,6 +359,7 @@ impl Default for FiletreeConfig {
             use_git: true,
             use_gitignore: true,
             dirs_first: true,
+            show_hidden_by_default: false,
             ignore: Vec::new(),
             refresh_time: 1000,
             down_three: Key::ctrl('n'),
@@ -416,7 +419,8 @@ impl Merge for FiletreeConfig {
             marks_style,
             open_under,
             close_under,
-            show_dotfiles
+            show_dotfiles,
+            show_hidden_by_default
         );
     }
 }

@@ -87,6 +87,7 @@ impl Filetree {
         let mut listing = FileListing::new(
             &WalkBuilder::new(path.as_ref())
                 .overrides(overrides)
+                .hidden(!config.filetree.show_hidden_by_default)
                 .build()
                 .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
                 .filter(|entry_path| entry_path != path.as_ref()) // Ignore root
@@ -880,5 +881,26 @@ mod tests {
             vec![&Item::File(temp.join("test.txt"))],
             filetree.listing.items()
         );
+    }
+
+    #[test]
+    fn can_show_hidden_on_initialization() {
+        let temp = temp_files!("test.txt", ".test2.txt");
+        let config = Config {
+            filetree: FiletreeConfig {
+                show_hidden_by_default: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let filetree = Filetree::from_dir_with_config(
+            temp.path(),
+            Queue::new(),
+            Rc::new(config),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert_eq!(2, filetree.listing.len());
     }
 }
