@@ -6,14 +6,14 @@ pub use self::components::*;
 use crate::{
     config::{Config, Key},
     external_event::{ExternalEvent, RefreshData},
-    queue::{AppEvent, Queue},
+    queue::{AppEvent, Queue, TmuxOpts},
 };
 use anyhow::{Context, Result};
 use crossterm::event::Event;
 #[cfg(not(target_os = "windows"))]
 use duct::cmd;
 use easy_switch::switch;
-use log::info;
+use log::{error, info, warn};
 #[cfg(not(target_os = "windows"))]
 use std::env;
 #[cfg(target_os = "windows")]
@@ -157,6 +157,32 @@ impl App {
                         info!("output:");
                         info!("{output}");
                     }
+                }
+                AppEvent::RunCommandWithTmux(cmd, opts) => {
+                    if !env::var("TMUX").is_ok() {
+                        error!("not in tmux session");
+                        continue;
+                    }
+
+                    let cmd_expr = match opts {
+                        TmuxOpts::NewWindow => cmd!("command", "tmux", "new-window", cmd),
+                        TmuxOpts::VerticalSplit => {
+                            cmd!("command", "tmux", "split-window", "-h", cmd)
+                        }
+                        TmuxOpts::HorizontalSplit => {
+                            cmd!("command", "tmux", "split-window", "-v", cmd)
+                        }
+                        TmuxOpts::FloatingWindow => {
+                            cmd!("command", "tmux", "display-popup", "-E", cmd)
+                        }
+                    };
+                    let out = cmd_expr.stderr_to_stdout().unchecked().read()?;
+                    if out.is_empty() {
+                        continue;
+                    }
+
+                    info!("opening tmux window");
+                    warn!("{out}");
                 }
                 AppEvent::SearchFiles(files) => {
                     self.fuzzy_matcher.open_path(

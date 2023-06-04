@@ -1,7 +1,7 @@
-use crate::app::component::{Component, Drawable};
 use crate::{
+    app::component::{Component, Drawable},
     external_event::ExternalEvent,
-    queue::{AppEvent, Queue},
+    queue::{AppEvent, Queue, TmuxOpts},
     ui,
 };
 use anyhow::Result;
@@ -113,8 +113,31 @@ impl Component for InputBox {
                     key: Key::Right, ..
                 } => self.cursor_right(),
                 Input { key: Key::Left, .. } => self.cursor_left(),
+                // TODO: Keybinds to customize
                 Input {
-                    key: Key::Enter, ..
+                    key: Key::Char(key),
+                    alt: false,
+                    ctrl: true,
+                } if matches!(key, 'v' | 'x' | 'n' | 'f') => {
+                    if let InputOperation::Command { to } = &self.operation {
+                        let cmd = self.text.replace("{}", &to.display().to_string());
+                        self.queue.add(AppEvent::RunCommandWithTmux(
+                            cmd,
+                            match key {
+                                'v' => TmuxOpts::VerticalSplit,
+                                'x' => TmuxOpts::HorizontalSplit,
+                                'n' => TmuxOpts::NewWindow,
+                                'f' => TmuxOpts::FloatingWindow,
+                                _ => unreachable!("in match guard"),
+                            },
+                        ));
+                        self.reset();
+                    }
+                }
+                Input {
+                    key: Key::Enter,
+                    alt: false,
+                    ctrl: false,
                 } if self
                     .has_valid_input()
                     .expect("should not be called with no work") =>
@@ -454,5 +477,21 @@ mod tests {
         input_box.handle_event(&events[0]).unwrap();
         input_box.handle_event(&events[1]).unwrap();
         assert_eq!("g".to_owned(), input_box.text);
+    }
+
+    #[test]
+    fn can_send_tmux_command() {
+        let mut input_box = InputBox {
+            text: "testing".to_owned(),
+            operation: InputOperation::Command { to: "/".into() },
+            ..Default::default()
+        };
+
+        let event = input_event!(KeyCode::Char('v'); KeyModifiers::CONTROL);
+        assert!(input_box.handle_event(&event).is_ok());
+        assert!(input_box.queue.contains(&AppEvent::RunCommandWithTmux(
+            "testing".to_owned(),
+            TmuxOpts::VerticalSplit
+        )));
     }
 }

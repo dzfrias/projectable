@@ -40,6 +40,7 @@ pub enum AppEvent {
     NewDir(PathBuf),
     PreviewFile(PathBuf),
     RunCommand(String),
+    RunCommandWithTmux(String, TmuxOpts),
     SearchFiles(Vec<PathBuf>),
     TogglePreviewMode,
     SpecialCommand(PathBuf),
@@ -48,4 +49,12 @@ pub enum AppEvent {
     DeleteMark(PathBuf),
     OpenFuzzy(Vec<String>, FuzzyOperation),
     FilterFor(Vec<PathBuf>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TmuxOpts {
+    VerticalSplit,
+    HorizontalSplit,
+    NewWindow,
+    FloatingWindow,
 }
