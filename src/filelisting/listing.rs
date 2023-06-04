@@ -91,18 +91,15 @@ impl FileListing {
         if self.is_empty() {
             return None;
         }
-        Some(
-            self.iter()
-                .enumerate()
-                .find_map(|(relative_idx, (abs_index, _))| {
-                    if self.selected == abs_index {
-                        Some(relative_idx)
-                    } else {
-                        None
-                    }
-                })
-                .expect("selection should be in visible items"),
-        )
+        self.iter()
+            .enumerate()
+            .find_map(|(relative_idx, (abs_index, _))| {
+                if self.selected == abs_index {
+                    Some(relative_idx)
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn selected_item(&self) -> Option<&Item> {
