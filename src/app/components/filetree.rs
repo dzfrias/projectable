@@ -256,8 +256,8 @@ impl Drawable for Filetree {
                         item.path().components().count() - self.listing.root().components().count();
                     const INDENT: usize = 2;
 
-                    const CLOSED_SYMBOL: &str = "\u{25b6} ";
-                    const OPENED_SYMBOL: &str = "\u{25bc} ";
+                    const CLOSED_SYMBOL: char = '\u{25b6}';
+                    const OPENED_SYMBOL: char = '\u{25bc}';
                     let icon = if !item.is_file() {
                         if self
                             .listing
@@ -269,7 +269,15 @@ impl Drawable for Filetree {
                             OPENED_SYMBOL
                         }
                     } else {
-                        "  "
+                        self.status_cache.as_ref().map_or(' ', |cache| {
+                            cache.get(item.path()).map_or(' ', |status| match *status {
+                                Status::WT_NEW => '+',
+                                Status::INDEX_MODIFIED
+                                | Status::INDEX_NEW
+                                | Status::WT_MODIFIED => '~',
+                                _ => ' ',
+                            })
+                        })
                     };
                     let style = if !self.marks.borrow().iter().any(|path| path == item.path()) {
                         self.status_cache
@@ -293,7 +301,7 @@ impl Drawable for Filetree {
                         self.config.filetree.marks_style.into()
                     };
                     ListItem::new(format!(
-                        "{}{icon}{file_name}",
+                        "{}{icon} {file_name}",
                         " ".repeat(indent_amount * INDENT)
                     ))
                     .style(style)
