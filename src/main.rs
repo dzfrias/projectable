@@ -4,7 +4,7 @@ use log::{error, warn, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, Merge},
-    external_event::{self, PollState},
+    external_event,
     marks::{self, Marks},
 };
 use std::{
@@ -17,6 +17,10 @@ use std::{
     path::PathBuf,
     process::Command,
     rc::Rc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use crossterm::{
@@ -143,7 +147,8 @@ fn run_app(
     let (event_send, event_recv) = unbounded();
     let _watcher =
         external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
-    let poll_state = external_event::crossterm_watch(event_send);
+    let stop = Arc::new(AtomicBool::new(false));
+    let mut input_handle = external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
 
     let mut first_run = true;
     loop {
@@ -172,9 +177,14 @@ fn run_app(
                         terminal.clear().expect("error clearing terminal");
                     }
                     let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
-                    *poll_state.lock().expect("error locking mutex") = PollState::Paused;
+                    // Join the input receiving thread by setting `stop_flag` to true
+                    stop.store(true, Ordering::Release);
+                    input_handle.join().expect("error joining thread");
                     Command::new(editor).arg(path).status()?;
-                    *poll_state.lock().expect("error locking mutex") = PollState::Polling;
+                    // Resume input receiving thread again
+                    stop.store(false, Ordering::Release);
+                    input_handle =
+                        external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
                 }
                 TerminalEvent::WriteMark(path) => match get_marks() {
                     Ok(mut marks) => {
