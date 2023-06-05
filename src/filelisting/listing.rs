@@ -88,9 +88,6 @@ impl FileListing {
     }
 
     pub fn selected(&self) -> Option<usize> {
-        if self.is_empty() {
-            return None;
-        }
         self.iter()
             .enumerate()
             .find_map(|(relative_idx, (abs_index, _))| {
