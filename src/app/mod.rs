@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use crossterm::event::Event;
-use duct::cmd;
+use duct::{cmd, Expression};
 use easy_switch::switch;
 use log::{error, info, warn};
 use std::env;
@@ -38,6 +38,8 @@ pub enum TerminalEvent {
     OpenFile(PathBuf),
     WriteMark(PathBuf),
     DeleteMark(PathBuf),
+    RunCommandThreaded(Expression),
+    StopAllCommands,
 }
 
 pub struct App {
@@ -130,32 +132,24 @@ impl App {
                     .context("failed to preview while resolving event queue")?,
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
-                    #[cfg(target_os = "windows")]
-                    {
-                        let output = Command::new("cmd.exe").raw_arg("/C {cmd}").output()?;
-                        info!("output:");
-                        if output.stdout.is_empty() && !output.stderr.is_empty() {
-                            info!("{}", String::from_utf8_lossy(&output.stderr));
-                        } else {
-                            info!("{}", String::from_utf8_lossy(&output.stdout));
-                        }
-                    }
-
                     #[cfg(not(target_os = "windows"))]
-                    {
-                        let mut output =
-                            cmd!(env::var("SHELL").unwrap_or("sh".to_owned()), "-c", &cmd)
-                                .stderr_to_stdout()
-                                .stdin_null()
-                                .unchecked()
-                                .read()?;
-                        if output.is_empty() {
-                            output.push(' ');
-                        }
+                    let cmd = cmd!(
+                        env::var("SHELL").unwrap_or_else(|_| "sh".to_owned()),
+                        "-c",
+                        &cmd
+                    );
+                    #[cfg(target_os = "windows")]
+                    let cmd = cmd!("cmd.exe", "/C", &cmd);
 
-                        info!("output:");
-                        info!("{output}");
-                    }
+                    self.text_popup.preset = Preset::RunningCommand;
+
+                    return Ok(Some(TerminalEvent::RunCommandThreaded(
+                        cmd.stdout_capture()
+                            .stderr_capture()
+                            .stderr_to_stdout()
+                            .stdin_null()
+                            .unchecked(),
+                    )));
                 }
                 AppEvent::RunCommandWithTmux(cmd, opts) => {
                     if env::var("TMUX").is_err() {
@@ -220,6 +214,10 @@ impl App {
                 }
                 AppEvent::OpenFuzzy(items, operation) => self.fuzzy_matcher.start(items, operation),
                 AppEvent::FilterFor(items) => self.tree.filter_include(&items)?,
+                AppEvent::StopAllCommands => {
+                    self.text_popup.preset = Preset::Nothing;
+                    return Ok(Some(TerminalEvent::StopAllCommands));
+                },
             }
         }
 
@@ -246,16 +244,25 @@ impl App {
         self.file_cmd_popup.handle_event(ev)?;
         self.marks_popup.handle_event(ev)?;
 
-        if popup_open {
-            return Ok(());
-        }
-        if let ExternalEvent::Crossterm(Event::Key(key)) = ev {
-            switch! { key;
-                self.config.quit => self.should_quit = true,
-                self.config.help => self.text_popup.preset = Preset::Help,
-                self.config.marks.open => self.marks_popup.open(),
-                Key::esc() => self.should_quit = true,
+        match ev {
+            ExternalEvent::Crossterm(Event::Key(key)) => {
+                if popup_open {
+                    return Ok(());
+                }
+                switch! { key;
+                    self.config.quit => self.should_quit = true,
+                    self.config.help => self.text_popup.preset = Preset::Help,
+                    self.config.marks.open => self.marks_popup.open(),
+                    Key::esc() => self.should_quit = true,
+                    Key::ctrl('c') => self.queue.add(AppEvent::StopAllCommands),
+                }
             }
+            ExternalEvent::CommandOutput(out) => {
+                self.text_popup.preset = Preset::Nothing;
+                info!("output:");
+                info!("{out}");
+            }
+            _ => (),
         }
         Ok(())
     }

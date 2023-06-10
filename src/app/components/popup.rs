@@ -20,6 +20,7 @@ use tui::{
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum Preset {
     Help,
+    RunningCommand,
     #[default]
     Nothing,
 }
@@ -76,7 +77,7 @@ impl Drawable for Popup {
             return Ok(());
         }
 
-        let (text, title, len) = match self.preset {
+        let (text, title, height) = match self.preset {
             Preset::Help => {
                 let keybinds = [
                     (self.config.open.to_string(), "Open file/toggle opened"),
@@ -133,7 +134,6 @@ impl Drawable for Popup {
                     .map(|(key, _)| key.len())
                     .max()
                     .expect("should not be empty");
-                let len = keybinds.len() as u16;
                 (
                     keybinds
                         .into_iter()
@@ -149,13 +149,21 @@ impl Drawable for Popup {
                         })
                         .collect_vec(),
                     "Help",
-                    len,
+                    35,
                 )
             }
+            Preset::RunningCommand => (
+                vec![Spans::from(vec![Span::raw(
+                    "Command in-progress. Press CTRL-C to quit",
+                )])],
+                "Command",
+                3,
+            ),
             Preset::Nothing => unreachable!("checked at top of method"),
         };
 
-        let area = ui::centered_rect_absolute(70, 35, area);
+        let len = text.len() as u16;
+        let area = ui::centered_rect_absolute(70, height, area);
         let scroll = {
             if len < area.height {
                 self.scroll_y.set(0);

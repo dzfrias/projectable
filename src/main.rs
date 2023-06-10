@@ -21,6 +21,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use crossterm::{
@@ -147,8 +148,12 @@ fn run_app(
     let (event_send, event_recv) = unbounded();
     let _watcher =
         external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
+
     let stop = Arc::new(AtomicBool::new(false));
     let mut input_handle = external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
+
+    // When set to true, will stop any running child processes of projectable
+    let thread_stop = Arc::new(AtomicBool::new(false));
 
     let mut first_run = true;
     loop {
@@ -202,6 +207,16 @@ fn run_app(
                     }
                     Err(err) => error!("{err}"),
                 },
+                TerminalEvent::RunCommandThreaded(expr) => {
+                    thread_stop.store(false, Ordering::Release);
+                    external_event::run_cmd(
+                        expr,
+                        event_send.clone(),
+                        Duration::from_millis(300),
+                        thread_stop.clone(),
+                    )?
+                }
+                TerminalEvent::StopAllCommands => thread_stop.store(true, Ordering::Release),
                 TerminalEvent::DeleteMark(path) => match get_marks() {
                     Ok(mut marks) => {
                         match marks.marks.entry(app.path().to_path_buf()) {
