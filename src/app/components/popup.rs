@@ -108,6 +108,10 @@ impl Drawable for Popup {
                         self.config.filetree.git_filter.to_string(),
                         "Filter for files with new git changes",
                     ),
+                    (
+                        self.config.filetree.show_dotfiles.to_string(),
+                        "Show dotfiles",
+                    ),
                     (self.config.filetree.exec_cmd.to_string(), "Execute command"),
                     (
                         self.config.filetree.special_command.to_string(),
@@ -120,6 +124,14 @@ impl Drawable for Popup {
                     (
                         self.config.filetree.close_all.to_string(),
                         "Close all directories",
+                    ),
+                    (
+                        self.config.filetree.close_under.to_string(),
+                        "Close all under directory",
+                    ),
+                    (
+                        self.config.filetree.open_under.to_string(),
+                        "Open all under directory",
                     ),
                     (
                         self.config.filetree.mark_selected.to_string(),
