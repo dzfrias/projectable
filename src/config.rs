@@ -87,6 +87,7 @@ pub enum Action {
     FiletreeCloseUnder,
     FiletreeOpenUnder,
     FiletreeShowDotfiles,
+    KillProcesses,
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,6 +100,7 @@ pub struct Config {
     pub all_down: Key,
     pub all_up: Key,
     pub open: Key,
+    pub kill_processes: Key,
     #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
 
@@ -162,6 +164,7 @@ impl Config {
             (Action::FiletreeOpenUnder, &self.filetree.open_under),
             (Action::FiletreeCloseUnder, &self.filetree.close_under),
             (Action::FiletreeShowDotfiles, &self.filetree.show_dotfiles),
+            (Action::KillProcesses, &self.kill_processes),
         ];
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
@@ -199,7 +202,8 @@ impl Merge for Config {
             open,
             selected,
             popup_border_style,
-            help_key_style
+            help_key_style,
+            kill_processes
         );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
@@ -219,6 +223,7 @@ impl Default for Config {
             open: Key::key_code(KeyCode::Enter),
             all_up: Key::normal('g'),
             all_down: Key::normal('G'),
+            kill_processes: Key::ctrl('c'),
             special_commands: Self::default_special_commands(),
             selected: Style::bg(Color::Black, Color::LightGreen),
             popup_border_style: Style::default(),

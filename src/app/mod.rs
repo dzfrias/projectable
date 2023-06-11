@@ -254,7 +254,7 @@ impl App {
                     self.config.help => self.text_popup.preset = Preset::Help,
                     self.config.marks.open => self.marks_popup.open(),
                     Key::esc() => self.should_quit = true,
-                    Key::ctrl('c') => self.queue.add(AppEvent::StopAllCommands),
+                    self.config.kill_processes => self.queue.add(AppEvent::StopAllCommands),
                 }
             }
             ExternalEvent::CommandOutput(out) => {
