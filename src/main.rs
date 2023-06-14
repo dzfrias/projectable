@@ -216,6 +216,24 @@ fn run_app(
                         thread_stop.clone(),
                     )?
                 }
+                TerminalEvent::RunCommand(expr) => {
+                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+                    disable_raw_mode()?;
+                    defer! {
+                        execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture).expect("error setting up screen");
+                        enable_raw_mode().expect("error enabling raw mode");
+                        io::stdout().execute(EnterAlternateScreen).expect("error entering alternate screen");
+                        terminal.clear().expect("error clearing terminal");
+                    }
+                    // Join the input receiving thread by setting `stop_flag` to true
+                    stop.store(true, Ordering::Release);
+                    input_handle.join().expect("error joining thread");
+                    expr.start()?.wait()?;
+                    // Resume input receiving thread again
+                    stop.store(false, Ordering::Release);
+                    input_handle =
+                        external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
+                }
                 TerminalEvent::StopAllCommands => thread_stop.store(true, Ordering::Release),
                 TerminalEvent::DeleteMark(path) => match get_marks() {
                     Ok(mut marks) => {

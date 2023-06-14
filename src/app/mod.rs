@@ -39,6 +39,7 @@ pub enum TerminalEvent {
     WriteMark(PathBuf),
     DeleteMark(PathBuf),
     RunCommandThreaded(Expression),
+    RunCommand(Expression),
     StopAllCommands,
 }
 
@@ -132,24 +133,33 @@ impl App {
                     .context("failed to preview while resolving event queue")?,
                 AppEvent::TogglePreviewMode => self.previewer.toggle_mode(),
                 AppEvent::RunCommand(cmd) => {
+                    // Strip !!, and if it exists, run in foreground, not background
+                    let (threaded, cmd) = cmd
+                        .strip_prefix("!!")
+                        .map(|s| (false, s))
+                        .unwrap_or((true, &cmd));
+
                     #[cfg(not(target_os = "windows"))]
                     let cmd = cmd!(
                         env::var("SHELL").unwrap_or_else(|_| "sh".to_owned()),
                         "-c",
-                        &cmd
+                        cmd
                     );
                     #[cfg(target_os = "windows")]
-                    let cmd = cmd!("cmd.exe", "/C", &cmd);
+                    let cmd = cmd!("cmd.exe", "/C", cmd);
 
-                    self.text_popup.preset = Preset::RunningCommand;
-
-                    return Ok(Some(TerminalEvent::RunCommandThreaded(
-                        cmd.stdout_capture()
-                            .stderr_capture()
-                            .stderr_to_stdout()
-                            .stdin_null()
-                            .unchecked(),
-                    )));
+                    if threaded {
+                        self.text_popup.preset = Preset::RunningCommand;
+                        return Ok(Some(TerminalEvent::RunCommandThreaded(
+                            cmd.stdout_capture()
+                                .stderr_capture()
+                                .stderr_to_stdout()
+                                .stdin_null()
+                                .unchecked(),
+                        )));
+                    } else {
+                        return Ok(Some(TerminalEvent::RunCommand(cmd)));
+                    };
                 }
                 AppEvent::RunCommandWithTmux(cmd, opts) => {
                     if env::var("TMUX").is_err() {
