@@ -438,7 +438,23 @@ impl Component for Filetree {
                     self.config.filetree.open_under => self.open_under(),
                     self.config.filetree.close_under => self.close_under(),
                     self.config.filetree.show_dotfiles => self.toggle_dotfiles()?,
-                    _ => refresh_preview = false,
+                    _ => {
+                        let key: crate::config::Key = key.into();
+                        if let Some(cmd) = self.config.commands.get(&key) {
+                            if let Some(selected) = self.get_selected() {
+                                let new_cmd =
+                                    cmd.replace("{}", &selected.path().as_os_str().to_string_lossy());
+                                if new_cmd.contains("{...}") {
+                                    self.queue
+                                        .add(AppEvent::OpenInput(InputOperation::SpecialCommand(new_cmd)));
+                                } else {
+                                    self.queue.add(AppEvent::RunCommand(new_cmd));
+                                }
+                            }
+                        };
+
+                        refresh_preview = false;
+                    },
                 }
                 if !refresh_preview {
                     self.state.get_mut().select(self.listing.selected());
@@ -478,6 +494,7 @@ fn build_override_ignorer(root: impl AsRef<Path>, ignore: &[String]) -> Result<O
 mod tests {
     use super::*;
     use crate::{app::components::testing::*, config::FiletreeConfig};
+    use collect_all::collect;
     use test_log::test;
 
     /// Create temporary files and return the temp dir
@@ -916,5 +933,62 @@ mod tests {
         .unwrap();
 
         assert_eq!(2, filetree.listing.len());
+    }
+
+    #[test]
+    fn arbitrary_keys_are_fed_into_custom_commands() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let config = Config {
+            commands: collect![HashMap<_, _>: (crate::config::Key::normal('z'), "testing".to_owned())],
+            ..Default::default()
+        };
+        let mut filetree = Filetree::from_dir_with_config(
+            temp.path(),
+            Queue::new(),
+            Rc::new(config),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert!(filetree
+            .handle_event(&input_event!(KeyCode::Char('z')))
+            .is_ok());
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::RunCommand("testing".to_owned())))
+    }
+
+    #[test]
+    fn custom_commands_are_performed_with_substitutions() {
+        let temp = temp_files!("test.txt", "test2.txt");
+        let config = Config {
+            commands: collect![HashMap<_, _>:
+                (crate::config::Key::normal('z'), "vim {}".to_owned()),
+                (crate::config::Key::normal('x'), "nvim {...}".to_owned())],
+            ..Default::default()
+        };
+        let mut filetree = Filetree::from_dir_with_config(
+            temp.path(),
+            Queue::new(),
+            Rc::new(config),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert!(filetree
+            .handle_event(&input_event!(KeyCode::Char('z')))
+            .is_ok());
+        assert!(filetree.queue.contains(&AppEvent::RunCommand(format!(
+            "vim {}",
+            temp.join("test2.txt").display()
+        ))));
+        assert!(filetree
+            .handle_event(&input_event!(KeyCode::Char('x')))
+            .is_ok());
+        assert!(filetree
+            .queue
+            .contains(&AppEvent::OpenInput(InputOperation::SpecialCommand(
+                "nvim {...}".to_owned()
+            ))));
     }
 }

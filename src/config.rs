@@ -8,7 +8,7 @@ use serde::{
     Deserialize, Deserializer,
 };
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     env,
     fmt::{self, Display},
     path::PathBuf,
@@ -59,9 +59,9 @@ macro_rules! merge {
 }
 
 /// Every possible key action that can be pressed and is not part of a popup
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
 #[strum(serialize_all = "snake_case")]
-pub enum Action {
+pub enum Action<'a> {
     Quit,
     Help,
     PreviewDown,
@@ -88,6 +88,7 @@ pub enum Action {
     FiletreeOpenUnder,
     FiletreeShowDotfiles,
     KillProcesses,
+    Arbitrary(&'a str),
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,6 +104,7 @@ pub struct Config {
     pub kill_processes: Key,
     #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
+    pub commands: HashMap<Key, String>,
 
     pub selected: Style,
     pub popup_border_style: Style,
@@ -135,7 +137,7 @@ impl Config {
     }
 
     pub fn check_conflicts(&self) -> Vec<KeyConflict> {
-        let keys = [
+        let mut keys = vec![
             (Action::Quit, &self.quit),
             (Action::Help, &self.help),
             (Action::Down, &self.down),
@@ -166,13 +168,19 @@ impl Config {
             (Action::FiletreeShowDotfiles, &self.filetree.show_dotfiles),
             (Action::KillProcesses, &self.kill_processes),
         ];
+        // Put custom key binds actions
+        keys.extend(
+            self.commands
+                .iter()
+                .map(|(key, cmd)| (Action::Arbitrary(cmd), key)),
+        );
         let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
         for (name, key) in keys {
-            // Update uses
-            uses.entry(key)
-                .and_modify(|actions| actions.push(name))
-                .or_insert_with(|| vec![name]);
+            match uses.entry(key) {
+                Entry::Occupied(mut actions) => actions.get_mut().push(name),
+                Entry::Vacant(slot) => drop(slot.insert(vec![name])),
+            }
         }
 
         uses.into_iter()
@@ -203,7 +211,8 @@ impl Merge for Config {
             selected,
             popup_border_style,
             help_key_style,
-            kill_processes
+            kill_processes,
+            commands
         );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
@@ -232,6 +241,7 @@ impl Default for Config {
                 bg: Color::Reset,
                 mods: Modifier(TuiModifier::BOLD),
             },
+            commands: HashMap::new(),
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
@@ -244,7 +254,7 @@ impl Default for Config {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyConflict<'a> {
     on: &'a Key,
-    conflictors: Vec<Action>,
+    conflictors: Vec<Action<'a>>,
 }
 
 impl Display for KeyConflict<'_> {
@@ -792,6 +802,15 @@ impl Key {
     }
 }
 
+impl From<&KeyEvent> for Key {
+    fn from(value: &KeyEvent) -> Self {
+        Self {
+            code: value.code,
+            mods: value.modifiers,
+        }
+    }
+}
+
 impl PartialEq<&KeyEvent> for Key {
     fn eq(&self, other: &&KeyEvent) -> bool {
         self == *other
@@ -978,5 +997,23 @@ mod tests {
     fn stringifies_keys_properly_with_one_mod() {
         let key = Key::ctrl('j');
         assert_eq!("ctrl-j", &key.to_string());
+    }
+
+    #[test]
+    fn merges_custom_keybinds() {
+        let config = Config {
+            commands: collect![HashMap<_, _>: (Key::normal('v'), "echo testing".to_owned())],
+            ..Default::default()
+        };
+        assert_eq!(
+            vec![KeyConflict {
+                on: &Key::normal('v'),
+                conflictors: vec![
+                    Action::FiletreeSpecialCommand,
+                    Action::Arbitrary("echo testing"),
+                ]
+            }],
+            config.check_conflicts()
+        );
     }
 }

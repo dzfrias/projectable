@@ -217,7 +217,7 @@ impl App {
                 AppEvent::StopAllCommands => {
                     self.text_popup.preset = Preset::Nothing;
                     return Ok(Some(TerminalEvent::StopAllCommands));
-                },
+                }
             }
         }
 
@@ -255,7 +255,7 @@ impl App {
                     self.config.marks.open => self.marks_popup.open(),
                     Key::esc() => self.should_quit = true,
                     self.config.kill_processes => self.queue.add(AppEvent::StopAllCommands),
-                }
+                };
             }
             ExternalEvent::CommandOutput(out) => {
                 self.text_popup.preset = Preset::Nothing;
