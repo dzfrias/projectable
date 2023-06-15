@@ -6,6 +6,7 @@ pub use self::components::*;
 use crate::{
     config::{Config, Key},
     external_event::{ExternalEvent, RefreshData},
+    marks::Marks,
     queue::{AppEvent, Queue, TmuxOpts},
 };
 use anyhow::{Context, Result};
@@ -36,8 +37,6 @@ use tui_logger::{TuiLoggerLevelOutput as LoggerLevel, TuiLoggerWidget as Logger}
 #[derive(Debug)]
 pub enum TerminalEvent {
     OpenFile(PathBuf),
-    WriteMark(PathBuf),
-    DeleteMark(PathBuf),
     RunCommandThreaded(Expression),
     RunCommand(Expression),
     StopAllCommands,
@@ -63,7 +62,7 @@ impl App {
         path: PathBuf,
         cwd: impl AsRef<Path>,
         config: Rc<Config>,
-        marks: Rc<RefCell<Vec<PathBuf>>>,
+        marks: Rc<RefCell<Marks>>,
     ) -> Result<Self> {
         let queue = Queue::new();
         let mut tree = Filetree::from_dir_with_config(
@@ -210,17 +209,8 @@ impl App {
                     self.tree.open_path(path)?;
                 }
                 AppEvent::Mark(path) => {
-                    // Because it's sent from `self.tree`, it has not been deleted in
-                    // `self.marks_popup` yet.
-                    self.marks_popup.add_mark(path.clone());
                     info!("marked: \"{}\"", path.display());
-                    return Ok(Some(TerminalEvent::WriteMark(path)));
-                }
-                AppEvent::DeleteMark(path) => {
-                    // Because it's sent from `self.marks_popup,` we can assume it's been deleted
-                    // internally already, just not in the file
-                    info!("deleted mark: \"{}\"", path.display());
-                    return Ok(Some(TerminalEvent::DeleteMark(path)));
+                    self.marks_popup.add_mark(path);
                 }
                 AppEvent::OpenFuzzy(items, operation) => self.fuzzy_matcher.start(items, operation),
                 AppEvent::FilterFor(items) => self.tree.filter_include(&items)?,

@@ -1,5 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, path::PathBuf};
+use anyhow::{Context, Result};
+use std::{
+    collections::HashMap,
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 
 pub fn get_marks_file() -> Option<PathBuf> {
     if let Some(dir) = env::var_os("PROJECTABLE_DATA_DIR") {
@@ -17,10 +21,74 @@ pub fn get_marks_file() -> Option<PathBuf> {
     Some(dir.join("projectable/marks.json"))
 }
 
-#[derive(Debug, Deserialize, Default, Serialize)]
-#[serde(default)]
+#[derive(Debug)]
 pub struct Marks {
-    pub marks: HashMap<PathBuf, Vec<PathBuf>>,
+    project: PathBuf,
+    pub marks: Vec<PathBuf>,
+}
+
+impl Default for Marks {
+    fn default() -> Self {
+        Self {
+            project: PathBuf::new(),
+            marks: Vec::new(),
+        }
+    }
+}
+
+impl Marks {
+    pub fn from_marks_file(project: impl AsRef<Path>) -> Result<Self> {
+        get_marks_file()
+            .map(|path| -> Result<Marks> {
+                let contents = fs::read_to_string(path).unwrap_or(String::from("{}"));
+                let mut all_marks: HashMap<PathBuf, Vec<PathBuf>> =
+                    serde_json::from_str(&contents)?;
+                Ok(Marks {
+                    project: project.as_ref().to_path_buf(),
+                    marks: all_marks.remove(project.as_ref()).unwrap_or_default(),
+                })
+            })
+            .unwrap_or(Ok(Marks {
+                project: project.as_ref().to_path_buf(),
+                marks: Vec::new(),
+            }))
+    }
+
+    pub fn write(&self) -> Result<()> {
+        let mut all_marks = get_marks_file()
+            .map(|path| -> Result<HashMap<PathBuf, Vec<PathBuf>>> {
+                let contents = match fs::read_to_string(&path) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        if err.kind() == io::ErrorKind::NotFound {
+                            fs::create_dir_all(
+                                path.parent().expect("marks file should have parent"),
+                            )
+                            .context("error creating marks dir")?;
+                            return Ok(HashMap::new());
+                        } else {
+                            return Err(err.into());
+                        }
+                    }
+                };
+                let marks: HashMap<PathBuf, Vec<PathBuf>> = serde_json::from_str(&contents)?;
+                Ok(marks)
+            })
+            .unwrap_or(Ok(HashMap::default()))
+            .context("error writing marks file")?;
+        all_marks.insert(self.project.to_path_buf(), self.marks.clone());
+        let json = serde_json::to_string(&all_marks)?;
+        fs::write(
+            get_marks_file().expect("should not error here, would have errored earlier"),
+            json,
+        )
+        .context("error writing marks file")?;
+        Ok(())
+    }
+
+    pub fn project(&self) -> &Path {
+        &self.project
+    }
 }
 
 #[cfg(test)]

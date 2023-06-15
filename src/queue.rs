@@ -46,7 +46,6 @@ pub enum AppEvent {
     SpecialCommand(PathBuf),
     GotoFile(PathBuf),
     Mark(PathBuf),
-    DeleteMark(PathBuf),
     OpenFuzzy(Vec<String>, FuzzyOperation),
     FilterFor(Vec<PathBuf>),
     StopAllCommands,

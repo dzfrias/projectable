@@ -5,14 +5,12 @@ use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, Merge},
     external_event,
-    marks::{self, Marks},
+    marks::Marks,
 };
 use std::{
     cell::RefCell,
-    collections::hash_map::Entry,
-    env,
-    fs::{self, File},
-    io::{self, Stdout, Write},
+    env, fs,
+    io::{self, Stdout},
     panic,
     path::PathBuf,
     process::Command,
@@ -67,16 +65,15 @@ fn main() -> Result<()> {
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
     let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
-    let mut all_marks = get_marks()?;
-    let project_marks = all_marks.marks.remove(&root).unwrap_or_default();
+    let marks = Rc::new(RefCell::new(Marks::from_marks_file(&root)?));
     let mut app = App::new(
         root,
         env::current_dir()?,
         Rc::clone(&config),
-        Rc::new(RefCell::new(project_marks)),
+        Rc::clone(&marks),
     )
     .context("failed to create app")?;
-    run_app(&mut terminal, &mut app, Rc::clone(&config))?;
+    run_app(&mut terminal, &mut app, Rc::clone(&config), marks)?;
 
     Ok(())
 }
@@ -99,21 +96,6 @@ fn get_config() -> Result<Config> {
     }
 
     Ok(config)
-}
-
-fn get_marks() -> Result<Marks> {
-    marks::get_marks_file()
-        .map(|path| -> Result<Marks> {
-            if !path.exists() {
-                fs::create_dir_all(path.parent().expect("data dir should have parent"))?;
-                let mut file = File::create(path)?;
-                file.write_all(b"{}")?;
-                return Ok(Marks::default());
-            }
-            let contents = fs::read_to_string(path)?;
-            Ok(serde_json::from_str(&contents)?)
-        })
-        .unwrap_or(Ok(Marks::default()))
 }
 
 /// Get the project root. This function searches for a `.git` directory. Errors if the current
@@ -143,6 +125,7 @@ fn run_app(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut App,
     config: Rc<Config>,
+    marks: Rc<RefCell<Marks>>,
 ) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = unbounded();
@@ -191,22 +174,6 @@ fn run_app(
                     input_handle =
                         external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
                 }
-                TerminalEvent::WriteMark(path) => match get_marks() {
-                    Ok(mut marks) => {
-                        match marks.marks.entry(app.path().to_path_buf()) {
-                            Entry::Vacant(entry) => drop(entry.insert(vec![path])),
-                            Entry::Occupied(mut entry) => {
-                                if !entry.get().contains(&path) {
-                                    entry.get_mut().push(path)
-                                }
-                            }
-                        }
-                        if let Err(err) = write_marks(&marks) {
-                            error!("{err}")
-                        }
-                    }
-                    Err(err) => error!("{err}"),
-                },
                 TerminalEvent::RunCommandThreaded(expr) => {
                     thread_stop.store(false, Ordering::Release);
                     external_event::run_cmd(
@@ -235,27 +202,6 @@ fn run_app(
                         external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
                 }
                 TerminalEvent::StopAllCommands => thread_stop.store(true, Ordering::Release),
-                TerminalEvent::DeleteMark(path) => match get_marks() {
-                    Ok(mut marks) => {
-                        match marks.marks.entry(app.path().to_path_buf()) {
-                            Entry::Vacant(_) => {
-                                error!("trying to delete mark that doesn't exist")
-                            }
-                            Entry::Occupied(mut entry) => {
-                                let position = entry.get().iter().position(|p| p == &path);
-                                if let Some(position) = position {
-                                    entry.get_mut().remove(position);
-                                } else {
-                                    error!("trying to delete mark that doesn't exist")
-                                }
-                            }
-                        }
-                        if let Err(err) = write_marks(&marks) {
-                            error!("{err}")
-                        }
-                    }
-                    Err(err) => error!("{err}"),
-                },
             },
             Err(err) => {
                 error!("{err:#}");
@@ -265,18 +211,10 @@ fn run_app(
         terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
 
         if app.should_quit() {
+            marks.borrow_mut().write()?;
             return Ok(());
         }
     }
-}
-
-fn write_marks(marks: &Marks) -> Result<()> {
-    let json = serde_json::to_string(&marks)?;
-    fs::write(
-        marks::get_marks_file().expect("should not error here, would have errored earlier"),
-        json,
-    )?;
-    Ok(())
 }
 
 fn shut_down() {

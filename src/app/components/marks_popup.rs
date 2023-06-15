@@ -2,6 +2,7 @@ use crate::{
     app::component::{Component, Drawable},
     config::Config,
     external_event::ExternalEvent,
+    marks::Marks,
     queue::{AppEvent, Queue},
     ui,
 };
@@ -23,7 +24,7 @@ use tui::{
 
 pub struct MarksPopup {
     // Must be an Rc<RefCell> so marks can be updated in filetree when changed
-    marks: Rc<RefCell<Vec<PathBuf>>>,
+    marks: Rc<RefCell<Marks>>,
     queue: Queue,
     open: bool,
     config: Rc<Config>,
@@ -43,12 +44,7 @@ impl Default for MarksPopup {
 }
 
 impl MarksPopup {
-    pub fn new(
-        marks: Rc<RefCell<Vec<PathBuf>>>,
-        queue: Queue,
-        config: Rc<Config>,
-        root: PathBuf,
-    ) -> Self {
+    pub fn new(marks: Rc<RefCell<Marks>>, queue: Queue, config: Rc<Config>, root: PathBuf) -> Self {
         let mut state = ListState::default();
         state.select(Some(0));
         Self {
@@ -72,16 +68,16 @@ impl MarksPopup {
 
     pub fn add_mark(&mut self, path: PathBuf) {
         // Not a HashSet so it can be well-ordered
-        if self.marks.borrow().contains(&path) {
+        if self.marks.borrow().marks.contains(&path) {
             return;
         }
-        self.marks.borrow_mut().push(path);
+        self.marks.borrow_mut().marks.push(path);
     }
 
-    fn delete_selected(&mut self) {
-        self.marks.borrow_mut().remove(self.selected());
+    pub fn delete_selected(&mut self) {
+        self.marks.borrow_mut().marks.remove(self.selected());
         if let Some(selected) = self.state.get_mut().selected() {
-            if selected >= self.marks.borrow().len() {
+            if selected >= self.marks.borrow().marks.len() {
                 self.select_first();
             }
         } else {
@@ -98,7 +94,7 @@ impl MarksPopup {
 
     fn select_next(&mut self) {
         let current = self.selected();
-        if self.marks.borrow().is_empty() || current == self.marks.borrow().len() - 1 {
+        if self.marks.borrow().marks.is_empty() || current == self.marks.borrow().marks.len() - 1 {
             return;
         }
         self.state.get_mut().select(Some(current + 1));
@@ -117,12 +113,12 @@ impl MarksPopup {
     }
 
     fn select_last(&mut self) {
-        if self.marks.borrow().is_empty() {
+        if self.marks.borrow().marks.is_empty() {
             return;
         }
         self.state
             .get_mut()
-            .select(Some(self.marks.borrow().len() - 1));
+            .select(Some(self.marks.borrow().marks.len() - 1));
     }
 }
 
@@ -134,6 +130,7 @@ impl Drawable for MarksPopup {
 
         let marks = self.marks.borrow();
         let marks = marks
+            .marks
             .iter()
             .map(|mark| {
                 ListItem::new(if self.config.marks.relative {
@@ -185,7 +182,7 @@ impl Component for MarksPopup {
                 self.config.open => {
                     let selected = {
                         let marks = self.marks.borrow();
-                        let selected = marks.get(self.selected()).cloned();
+                        let selected = marks.marks.get(self.selected()).cloned();
                         selected
                     };
                     // Will be `None` if there are no marks
@@ -197,12 +194,11 @@ impl Component for MarksPopup {
                 self.config.marks.delete => {
                     let selected = {
                         let marks = self.marks.borrow();
-                        let selected = marks.get(self.selected()).cloned();
+                        let selected = marks.marks.get(self.selected()).cloned();
                         selected
                     };
                     // Will be `None` if there are no marks
-                    if let Some(selected) = selected {
-                        self.queue.add(AppEvent::DeleteMark(selected));
+                    if selected.is_some() {
                         self.delete_selected();
                     }
                 },
@@ -220,8 +216,11 @@ mod tests {
     use test_log::test;
 
     fn test_popup() -> MarksPopup {
+        let mut marks = Marks::default();
+        marks.marks.push(".".into());
+        marks.marks.push("/".into());
         let mut popup = MarksPopup::new(
-            Rc::new(RefCell::new(vec![".".into(), "/".into()])),
+            Rc::new(RefCell::new(marks)),
             Queue::new(),
             Rc::new(Config::default()),
             ".".into(),
@@ -239,16 +238,16 @@ mod tests {
     #[test]
     fn adding_marks_is_unique() {
         let mut popup = test_popup();
-        assert_eq!(2, popup.marks.borrow().len());
+        assert_eq!(2, popup.marks.borrow().marks.len());
         popup.add_mark(".".into());
-        assert_eq!(2, popup.marks.borrow().len());
+        assert_eq!(2, popup.marks.borrow().marks.len());
     }
 
     #[test]
     fn can_delete_marks() {
         let mut popup = test_popup();
         popup.delete_selected();
-        let marks = popup.marks.borrow();
+        let marks = &popup.marks.borrow().marks;
         assert_eq!(PathBuf::from("/"), marks[0]);
     }
 
@@ -288,11 +287,11 @@ mod tests {
     #[test]
     fn can_select_last() {
         let mut popup = test_popup();
-        popup.marks = Rc::new(RefCell::new(vec![
-            ".".into(),
-            "/".into(),
-            "/test.txt".into(),
-        ]));
+        let mut marks = Marks::default();
+        marks
+            .marks
+            .extend([".".into(), "/".into(), "/test.txt".into()]);
+        popup.marks = Rc::new(RefCell::new(marks));
         popup.select_last();
         assert_eq!(2, popup.selected());
     }

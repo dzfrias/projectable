@@ -3,6 +3,7 @@ use crate::{
     config::Config,
     external_event::{ExternalEvent, RefreshData},
     filelisting::{FileListing, Item},
+    marks::Marks,
     queue::{AppEvent, Queue},
 };
 use anyhow::{bail, Context, Result};
@@ -45,7 +46,7 @@ pub struct Filetree {
     status_cache: Option<HashMap<PathBuf, Status>>,
     config: Rc<Config>,
     state: Cell<ListState>,
-    marks: Rc<RefCell<Vec<PathBuf>>>,
+    marks: Rc<RefCell<Marks>>,
     is_showing_hidden: bool,
 }
 
@@ -81,7 +82,7 @@ impl Filetree {
         path: impl AsRef<Path>,
         queue: Queue,
         config: Rc<Config>,
-        marks: Rc<RefCell<Vec<PathBuf>>>,
+        marks: Rc<RefCell<Marks>>,
     ) -> Result<Self> {
         let overrides = build_override_ignorer(&path, &config.filetree.ignore)?;
         let mut listing = FileListing::new(
@@ -285,7 +286,13 @@ impl Drawable for Filetree {
                             })
                         })
                     };
-                    let style = if !self.marks.borrow().iter().any(|path| path == item.path()) {
+                    let style = if !self
+                        .marks
+                        .borrow()
+                        .marks
+                        .iter()
+                        .any(|path| path == item.path())
+                    {
                         self.status_cache
                             .as_ref()
                             .map_or(Style::default(), |cache| {
@@ -823,7 +830,7 @@ mod tests {
             temp.path(),
             Queue::new(),
             Rc::new(config),
-            Rc::new(RefCell::new(Vec::new())),
+            Rc::new(RefCell::new(Marks::default())),
         )
         .unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
