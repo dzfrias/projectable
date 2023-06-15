@@ -967,7 +967,7 @@ mod tests {
 
     #[test]
     fn custom_commands_are_performed_with_substitutions() {
-        let temp = temp_files!("test.txt", "test2.txt");
+        let temp = temp_files!("test.txt");
         let config = Config {
             commands: collect![HashMap<_, _>:
                 (crate::config::Key::normal('z'), "vim {}".to_owned()),
@@ -987,7 +987,7 @@ mod tests {
             .is_ok());
         assert!(filetree.queue.contains(&AppEvent::RunCommand(format!(
             "vim {}",
-            temp.join("test2.txt").display()
+            temp.join("test.txt").display()
         ))));
         assert!(filetree
             .handle_event(&input_event!(KeyCode::Char('x')))
