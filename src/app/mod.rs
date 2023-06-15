@@ -135,8 +135,7 @@ impl App {
                     // Strip !!, and if it exists, run in foreground, not background
                     let (threaded, cmd) = cmd
                         .strip_prefix("!!")
-                        .map(|s| (false, s))
-                        .unwrap_or((true, &cmd));
+                        .map_or((true, cmd.as_str()), |s| (false, s));
 
                     #[cfg(not(target_os = "windows"))]
                     let cmd = cmd!(

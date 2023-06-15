@@ -962,7 +962,7 @@ mod tests {
             .is_ok());
         assert!(filetree
             .queue
-            .contains(&AppEvent::RunCommand("testing".to_owned())))
+            .contains(&AppEvent::RunCommand("testing".to_owned())));
     }
 
     #[test]

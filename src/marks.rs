@@ -76,7 +76,7 @@ impl Marks {
             })
             .unwrap_or(Ok(HashMap::default()))
             .context("error writing marks file")?;
-        all_marks.insert(self.project.to_path_buf(), self.marks.clone());
+        all_marks.insert(self.project.clone(), self.marks.clone());
         let json = serde_json::to_string(&all_marks)?;
         fs::write(
             get_marks_file().expect("should not error here, would have errored earlier"),
@@ -210,7 +210,7 @@ mod tests {
         marks.marks.push("mark".into());
         assert!(marks.write().is_ok());
         let contents = fs::read_to_string(temp.child("projectable/marks.json")).unwrap();
-        assert_eq!("{\"/\":[\"mark\"]}", contents)
+        assert_eq!("{\"/\":[\"mark\"]}", contents);
     }
 
     #[test]
