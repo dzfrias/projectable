@@ -94,8 +94,23 @@ impl Marks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_fs::{
+        prelude::{FileWriteStr, PathChild},
+        TempDir,
+    };
+    use scopeguard::defer;
     use serial_test::serial;
     use test_log::test;
+
+    fn temp_marks(content: &str) -> TempDir {
+        let temp = TempDir::new().expect("should have no error create temp dir");
+        temp.child("projectable/marks.json")
+            .write_str(content)
+            .unwrap();
+        env::set_var("PROJECTABLE_DATA_DIR", temp.path());
+
+        temp
+    }
 
     #[test]
     #[serial]
@@ -134,5 +149,92 @@ mod tests {
         );
         // For test sanitization. Would cause a rare failing test case if not set
         env::remove_var("XDG_DATA_HOME");
+    }
+
+    #[test]
+    #[serial]
+    fn can_create_marks_from_file() {
+        let temp = TempDir::new().expect("should have no error create temp dir");
+        temp.child("projectable/marks.json")
+            .write_str("{}")
+            .unwrap();
+        env::set_var("PROJECTABLE_DATA_DIR", temp.path());
+        defer! {
+            env::remove_var("PROJECTABLE_DATA_DIR");
+        }
+
+        let marks = Marks::from_marks_file("/").expect("should not error");
+        assert!(marks.marks.is_empty());
+        assert_eq!(Path::new("/"), marks.project);
+    }
+
+    #[test]
+    #[serial]
+    fn can_create_marks_from_file_with_marks() {
+        let temp = TempDir::new().expect("should have no error create temp dir");
+        temp.child("projectable/marks.json")
+            .write_str("{\"/\": [\"mark\"]}")
+            .unwrap();
+        env::set_var("PROJECTABLE_DATA_DIR", temp.path());
+        defer! {
+            env::remove_var("PROJECTABLE_DATA_DIR");
+        }
+
+        let marks = Marks::from_marks_file("/").expect("should not error");
+        assert_eq!(vec![PathBuf::from("mark")], marks.marks);
+        assert_eq!(Path::new("/"), marks.project);
+    }
+
+    #[test]
+    #[serial]
+    fn marks_dont_interfere_with_marks_from_other_projects() {
+        temp_marks("{\"/not_this_project\": [\"mark\"]}");
+        defer! {
+            env::remove_var("PROJECTABLE_DATA_DIR");
+        }
+
+        let marks = Marks::from_marks_file("/").expect("should not error");
+        assert!(marks.marks.is_empty());
+        assert_eq!(Path::new("/"), marks.project);
+    }
+
+    #[test]
+    #[serial]
+    fn can_write_marks() {
+        let temp = temp_marks("{}");
+        defer! {
+            env::remove_var("PROJECTABLE_DATA_DIR");
+        }
+
+        let mut marks = Marks::from_marks_file("/").unwrap();
+        marks.marks.push("mark".into());
+        assert!(marks.write().is_ok());
+        let contents = fs::read_to_string(temp.child("projectable/marks.json")).unwrap();
+        assert_eq!("{\"/\":[\"mark\"]}", contents)
+    }
+
+    #[test]
+    #[serial]
+    fn writing_marks_doesnt_override_other_projects() {
+        let temp = temp_marks("{\"/other_project\": [\"mark\"]}");
+        defer! {
+            env::remove_var("PROJECTABLE_DATA_DIR");
+        }
+
+        let mut marks = Marks::from_marks_file("/").unwrap();
+        marks.marks.push("other_mark".into());
+        assert!(marks.write().is_ok());
+        let contents = fs::read_to_string(temp.child("projectable/marks.json")).unwrap();
+        let project_marks =
+            serde_json::from_str::<HashMap<PathBuf, Vec<PathBuf>>>(&contents).unwrap();
+        assert_eq!(2, project_marks.len());
+        assert_eq!(
+            Some(&vec![PathBuf::from("other_mark")]),
+            project_marks.get(Path::new("/"))
+        );
+        assert_eq!(
+            Some(&vec![PathBuf::from("mark")]),
+            project_marks.get(Path::new("/other_project"))
+        );
     }
 }
