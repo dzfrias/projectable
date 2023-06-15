@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail, Error};
 use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use itertools::Itertools;
 use log::LevelFilter;
 use serde::{
@@ -11,7 +12,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     env,
     fmt::{self, Display},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 use strum::Display;
@@ -91,6 +92,58 @@ pub enum Action<'a> {
     Arbitrary(&'a str),
 }
 
+#[derive(Debug, Clone)]
+pub struct GlobList(GlobSet);
+
+impl GlobList {
+    pub fn is_match<P: AsRef<Path>>(&self, path: P) -> bool {
+        self.0.is_match(path)
+    }
+}
+
+impl Default for GlobList {
+    fn default() -> Self {
+        Self(
+            GlobSetBuilder::new()
+                .add(Glob::new("**/.git").expect("should be valid pattern"))
+                .build()
+                .expect("should build static globset correctly"),
+        )
+    }
+}
+
+impl<'de> Deserialize<'de> for GlobList {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct GlobListVisitor;
+
+        impl<'de> Visitor<'de> for GlobListVisitor {
+            type Value = GlobList;
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let mut set = GlobSetBuilder::new();
+                while let Some(pat) = seq.next_element::<String>()? {
+                    // Add **/ before for ease of use
+                    set.add(Glob::new(&format!("**/{pat}")).map_err(de::Error::custom)?);
+                }
+
+                Ok(GlobList(set.build().map_err(de::Error::custom)?))
+            }
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "a sequence of glob patterns")
+            }
+        }
+
+        deserializer.deserialize_seq(GlobListVisitor)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
@@ -105,6 +158,7 @@ pub struct Config {
     #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
     pub commands: HashMap<Key, String>,
+    pub project_roots: GlobList,
 
     pub selected: Style,
     pub popup_border_style: Style,
@@ -242,6 +296,7 @@ impl Default for Config {
                 mods: Modifier(TuiModifier::BOLD),
             },
             commands: HashMap::new(),
+            project_roots: GlobList::default(),
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),

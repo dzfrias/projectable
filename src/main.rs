@@ -3,7 +3,7 @@ use crossbeam_channel::unbounded;
 use log::{error, warn, LevelFilter};
 use projectable::{
     app::{component::Drawable, App, TerminalEvent},
-    config::{self, Config, Merge},
+    config::{self, Config, GlobList, Merge},
     external_event,
     marks::Marks,
 };
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
     }
 
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
-    let root = find_project_root()?.ok_or(anyhow!("not in a project!"))?;
+    let root = find_project_root(&config.project_roots)?.ok_or(anyhow!("not in a project!"))?;
     let marks = Rc::new(RefCell::new(Marks::from_marks_file(&root)?));
     let mut app = App::new(
         root,
@@ -100,11 +100,15 @@ fn get_config() -> Result<Config> {
 
 /// Get the project root. This function searches for a `.git` directory. Errors if the current
 /// directory is invalid, and returns `None` if there was no root found.
-fn find_project_root() -> Result<Option<PathBuf>> {
+fn find_project_root(globs: &GlobList) -> Result<Option<PathBuf>> {
     let start = env::current_dir()?;
-    Ok(start
-        .ancestors()
-        .find_map(|path| path.join(".git").is_dir().then(|| path.to_path_buf())))
+    Ok(start.ancestors().find_map(|path| {
+        fs::read_dir(path)
+            .ok()?
+            .filter_map(|entry| entry.ok())
+            .any(|entry| globs.is_match(entry.path()))
+            .then(|| path.to_path_buf())
+    }))
 }
 
 /// Gets the local configuration file. Errors if the current directory is invalid, and returns
