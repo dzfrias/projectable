@@ -1220,6 +1220,7 @@ dependencies = [
  "ignore",
  "itertools",
  "log",
+ "nom",
  "notify",
  "rust_search",
  "scopeguard",

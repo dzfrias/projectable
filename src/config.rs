@@ -1,9 +1,18 @@
-use anyhow::{anyhow, bail, Error};
+use anyhow::Error;
 use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use itertools::Itertools;
 use log::LevelFilter;
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_while_m_n},
+    character::complete::{digit1, multispace0},
+    combinator::{map_res, opt},
+    multi::{separated_list0, separated_list1},
+    sequence::{delimited, tuple},
+    IResult,
+};
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer,
@@ -646,18 +655,41 @@ impl FromStr for Color {
             "lightblue" => Self::LightBlue,
             "lightmagenta" => Self::LightMagenta,
             "lightcyan" => Self::LightCyan,
-            mut string => {
-                const MESSAGE: &str = "invalid color";
-                let replaced = string.replace(' ', "");
-                string = replaced
-                    .strip_prefix("rgb(")
-                    .ok_or(anyhow!(MESSAGE))?
-                    .strip_suffix(')')
-                    .ok_or(anyhow!(MESSAGE))?;
-                let mut rgb_vec = Vec::with_capacity(3);
-                rgb_vec.extend(string.split(',').filter_map(|v| v.parse::<u8>().ok()));
-                let [red, green, blue] = rgb_vec[..] else { bail!(MESSAGE) };
-                Self::Rgb(red, green, blue)
+            _ => {
+                fn hex_primary(input: &str) -> IResult<&str, u8> {
+                    map_res(take_while_m_n(2, 2, |c: char| c.is_digit(16)), |input| {
+                        u8::from_str_radix(input, 16)
+                    })(input)
+                }
+                fn hex_color(input: &str) -> IResult<&str, Color> {
+                    let (input, _) = tag("#")(input)?;
+                    let (input, (red, green, blue)) =
+                        tuple((hex_primary, hex_primary, hex_primary))(input)?;
+
+                    Ok((input, Color::Rgb(red, green, blue)))
+                }
+                fn u8_digit(input: &str) -> IResult<&str, u8> {
+                    map_res(digit1, |s: &str| s.parse())(input)
+                }
+                fn rgb_color(input: &str) -> IResult<&str, Color> {
+                    let (input, _) = delimited(multispace0, tag("rgb"), multispace0)(input)?;
+                    let (input, _) = delimited(multispace0, tag("("), multispace0)(input)?;
+                    let (input, digits) = separated_list1(
+                        delimited(multispace0, tag(","), multispace0),
+                        u8_digit,
+                    )(input)?;
+                    let (input, _) = delimited(multispace0, tag(")"), multispace0)(input)?;
+
+                    let [r, g, b] = digits[..] else {
+                        return Err(nom::Err::Error(nom::error::Error { input, code: nom::error::ErrorKind::SeparatedList }));
+                    };
+
+                    Ok((input, Color::Rgb(r, g, b)))
+                }
+
+                // Turn into owned string so it is 'static (for anyhow)
+                let (_, color) = alt((hex_color, rgb_color))(s).map_err(|err| err.to_owned())?;
+                color
             }
         })
     }
@@ -767,31 +799,7 @@ impl<'de> Visitor<'de> for KeyVisitor {
     where
         E: de::Error,
     {
-        let mut split = s.split('-').rev();
-        let key = split.next().ok_or(E::custom("key cannot be empty"))?;
-        let code = match key {
-            "down" => KeyCode::Down,
-            "up" => KeyCode::Up,
-            "left" => KeyCode::Left,
-            "right" => KeyCode::Right,
-            "enter" => KeyCode::Enter,
-            "backspace" => KeyCode::Backspace,
-            "tab" => KeyCode::Tab,
-            "backtab" => KeyCode::BackTab,
-            k => {
-                if k.len() > 1 || key.is_empty() {
-                    return Err(E::custom("invalid key"));
-                }
-                KeyCode::Char(k.chars().next().expect("should have at least on char"))
-            }
-        };
-        let mods = split.try_fold(KeyModifiers::NONE, |acc, modifier| match modifier {
-            "ctrl" => Ok(acc | KeyModifiers::CONTROL),
-            "alt" => Ok(acc | KeyModifiers::ALT),
-            _ => Err(E::custom("invalid modifier")),
-        })?;
-
-        Ok(Key { code, mods })
+        s.parse::<Key>().map_err(|err| E::custom(err.to_string()))
     }
 }
 
@@ -799,6 +807,64 @@ impl<'de> Visitor<'de> for KeyVisitor {
 pub struct Key {
     pub code: KeyCode,
     pub mods: KeyModifiers,
+}
+
+impl FromStr for Key {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn parse_keycode(input: &str) -> IResult<&str, KeyCode> {
+            let (input, key) = alt((
+                tag("down"),
+                tag("up"),
+                tag("left"),
+                tag("right"),
+                tag("enter"),
+                tag("backspace"),
+                tag("tab"),
+                tag("backtab"),
+                take_while_m_n(1, 1, |c: char| c.is_ascii_alphabetic()),
+            ))(input)?;
+
+            let code = match key {
+                "down" => KeyCode::Down,
+                "up" => KeyCode::Up,
+                "left" => KeyCode::Left,
+                "right" => KeyCode::Right,
+                "enter" => KeyCode::Enter,
+                "backspace" => KeyCode::Backspace,
+                "tab" => KeyCode::Tab,
+                "backtab" => KeyCode::BackTab,
+                k if k.len() == 1 => {
+                    KeyCode::Char(k.chars().next().expect("checked in match guard"))
+                }
+                _ => unreachable!("checked in alt combinator"),
+            };
+
+            Ok((input, code))
+        }
+        fn parse_mods(input: &str) -> IResult<&str, KeyModifiers> {
+            let (input, mods_str) =
+                separated_list0(tag("-"), alt((tag("ctrl"), tag("alt"))))(input)?;
+            let (input, _) = opt(tag("-"))(input)?;
+
+            let mods =
+                mods_str
+                    .into_iter()
+                    .fold(KeyModifiers::NONE, |acc, modifier| match modifier {
+                        "ctrl" => acc | KeyModifiers::CONTROL,
+                        "alt" => acc | KeyModifiers::ALT,
+                        _ => unreachable!(),
+                    });
+
+            Ok((input, mods))
+        }
+
+        let (input, mods) = parse_mods(s).map_err(|err| err.to_owned())?;
+        let (_, code) = parse_keycode(input).map_err(|err| err.to_owned())?;
+
+        Ok(Key { code, mods })
+    }
 }
 
 impl Display for Key {
@@ -901,7 +967,13 @@ mod tests {
     use test_log::test;
 
     #[test]
-    fn parse_rgb_from_color_string() {
+    fn parse_rgb_from_hex_form() {
+        let color = "#010203";
+        assert_eq!(Color::Rgb(1, 2, 3), color.parse().unwrap());
+    }
+
+    #[test]
+    fn parse_rgb_from_function_form() {
         let color = "rgb(1, 2, 3)";
         assert_eq!(Color::Rgb(1, 2, 3), color.parse().unwrap());
     }
@@ -1070,5 +1142,76 @@ mod tests {
             }],
             config.check_conflicts()
         );
+    }
+
+    #[test]
+    fn can_parse_key_with_no_mods() {
+        let keys = ["a", "b", "z", "r", "d"];
+
+        for key in keys {
+            let k = key.parse::<Key>().expect("key should parse correctly");
+            assert_eq!(
+                Key {
+                    code: KeyCode::Char(key.chars().next().unwrap()),
+                    mods: KeyModifiers::NONE
+                },
+                k
+            );
+        }
+    }
+
+    #[test]
+    fn can_parse_special_keys() {
+        let tests = [
+            ("tab", KeyCode::Tab),
+            ("backtab", KeyCode::BackTab),
+            ("enter", KeyCode::Enter),
+            ("up", KeyCode::Up),
+        ];
+
+        for (input, expected) in tests {
+            assert_eq!(
+                expected,
+                input.parse::<Key>().expect("should parse correctly").code
+            )
+        }
+    }
+
+    #[test]
+    fn can_parse_keys_with_mods() {
+        let tests = [
+            (
+                "ctrl-y",
+                Key {
+                    code: KeyCode::Char('y'),
+                    mods: KeyModifiers::CONTROL,
+                },
+            ),
+            (
+                "ctrl-b",
+                Key {
+                    code: KeyCode::Char('b'),
+                    mods: KeyModifiers::CONTROL,
+                },
+            ),
+            (
+                "alt-y",
+                Key {
+                    code: KeyCode::Char('y'),
+                    mods: KeyModifiers::ALT,
+                },
+            ),
+            (
+                "ctrl-alt-y",
+                Key {
+                    code: KeyCode::Char('y'),
+                    mods: KeyModifiers::CONTROL | KeyModifiers::ALT,
+                },
+            ),
+        ];
+
+        for (input, expected) in tests {
+            assert_eq!(expected, input.parse::<Key>().expect("should parse"))
+        }
     }
 }
