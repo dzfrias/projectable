@@ -11,7 +11,7 @@ use nom::{
     combinator::{map_res, opt},
     multi::{separated_list0, separated_list1},
     sequence::{delimited, tuple},
-    IResult,
+    AsChar, IResult,
 };
 use serde::{
     de::{self, Visitor},
@@ -657,7 +657,7 @@ impl FromStr for Color {
             "lightcyan" => Self::LightCyan,
             _ => {
                 fn hex_primary(input: &str) -> IResult<&str, u8> {
-                    map_res(take_while_m_n(2, 2, |c: char| c.is_digit(16)), |input| {
+                    map_res(take_while_m_n(2, 2, |c: char| c.is_hex_digit()), |input| {
                         u8::from_str_radix(input, 16)
                     })(input)
                 }
@@ -1173,7 +1173,7 @@ mod tests {
             assert_eq!(
                 expected,
                 input.parse::<Key>().expect("should parse correctly").code
-            )
+            );
         }
     }
 
@@ -1211,7 +1211,7 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            assert_eq!(expected, input.parse::<Key>().expect("should parse"))
+            assert_eq!(expected, input.parse::<Key>().expect("should parse"));
         }
     }
 }
