@@ -1,5 +1,6 @@
 use crate::{
     app::component::{Component, Drawable},
+    config::Config,
     external_event::ExternalEvent,
     queue::{AppEvent, Queue},
     ui,
@@ -7,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher as Matcher};
 use itertools::Itertools;
-use std::cell::Cell;
+use std::{cell::Cell, rc::Rc};
 use tui::{
     backend::Backend,
     layout::{Constraint, Corner, Direction, Layout, Rect},
@@ -29,6 +30,7 @@ pub struct FuzzyMatcher {
     area: TextArea<'static>,
     operation: FuzzyOperation,
     state: Cell<ListState>,
+    config: Rc<Config>,
     queue: Queue,
 }
 
@@ -41,7 +43,15 @@ impl FuzzyMatcher {
             area: textarea,
             operation: FuzzyOperation::None,
             state: ListState::default().into(),
+            config: Rc::new(Config::default()),
             queue,
+        }
+    }
+
+    pub fn new_with_config(queue: Queue, config: Rc<Config>) -> Self {
+        Self {
+            config,
+            ..Self::new(queue)
         }
     }
 
@@ -191,7 +201,7 @@ impl Drawable for FuzzyMatcher {
                                 Span::styled(
                                     c.to_string(),
                                     if item.1.contains(&c_idx) {
-                                        Style::default().fg(Color::Red)
+                                        Style::default().fg(Color::Blue)
                                     } else if self.selected().is_some()
                                         && self.selected().unwrap() == index
                                     {
@@ -208,7 +218,7 @@ impl Drawable for FuzzyMatcher {
         )
         .block(Block::default().borders(Borders::ALL))
         .start_corner(Corner::BottomLeft)
-        .highlight_style(Style::default().bg(Color::LightGreen));
+        .highlight_style(self.config.selected.into());
         let mut state = self.state.take();
         f.render_widget(self.area.widget(), prompt_area);
         f.render_stateful_widget(options, options_area, &mut state);

@@ -83,7 +83,7 @@ impl App {
             config: Rc::clone(&config),
             marks_popup: MarksPopup::new(marks, queue.clone(), Rc::clone(&config), path),
             file_cmd_popup: FileCmdPopup::new(queue.clone(), Rc::clone(&config)),
-            fuzzy_matcher: FuzzyMatcher::new(queue.clone()),
+            fuzzy_matcher: FuzzyMatcher::new_with_config(queue.clone(), Rc::clone(&config)),
             queue,
         })
     }
