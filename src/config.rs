@@ -29,7 +29,7 @@ use tui::style::{Color as TuiColor, Modifier as TuiModifier, Style as TuiStyle};
 
 pub fn get_config_home() -> Option<PathBuf> {
     if let Some(config_dir) = env::var_os("PROJECTABLE_CONFIG_DIR") {
-        return Some(PathBuf::from(config_dir).join("projectable"));
+        return Some(PathBuf::from(config_dir));
     }
 
     #[cfg(target_os = "macos")]
@@ -970,6 +970,8 @@ impl<'de> Deserialize<'de> for Key {
 mod tests {
     use super::*;
     use crossterm::event::{KeyEventKind, KeyEventState};
+    use scopeguard::defer;
+    use serial_test::serial;
     use test_log::test;
 
     #[test]
@@ -991,6 +993,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn get_config_home_gets_right_config_dir_on_all_platforms() {
         #[cfg(target_os = "linux")]
         let correct_path = dirs_next::home_dir().unwrap().join(".config/projectable");
@@ -1005,19 +1008,24 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn uses_env_var_for_config_home_if_set() {
         env::set_var("PROJECTABLE_CONFIG_DIR", "path");
+        defer! {
+            env::remove_var("PROJECTABLE_CONFIG_DIR");
+        }
 
-        assert_eq!(
-            PathBuf::from("path/projectable"),
-            get_config_home().unwrap()
-        );
+        assert_eq!(PathBuf::from("path"), get_config_home().unwrap());
     }
 
     #[test]
+    #[serial]
     #[cfg(target_os = "macos")]
     fn use_xdg_config_home_on_mac() {
         env::set_var("XDG_CONFIG_HOME", "path");
+        defer! {
+            env::remove_var("XDG_CONFIG_HOME");
+        }
 
         assert_eq!(
             PathBuf::from("path/projectable"),

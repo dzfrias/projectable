@@ -7,7 +7,7 @@ use std::{
 
 pub fn get_marks_file() -> Option<PathBuf> {
     if let Some(dir) = env::var_os("PROJECTABLE_DATA_DIR") {
-        return Some(PathBuf::from(dir).join("projectable/marks.json"));
+        return Some(PathBuf::from(dir).join("marks.json"));
     }
 
     #[cfg(target_os = "macos")]
@@ -104,9 +104,7 @@ mod tests {
 
     fn temp_marks(content: &str) -> TempDir {
         let temp = TempDir::new().expect("should have no error create temp dir");
-        temp.child("projectable/marks.json")
-            .write_str(content)
-            .unwrap();
+        temp.child("./marks.json").write_str(content).unwrap();
         env::set_var("PROJECTABLE_DATA_DIR", temp.path());
 
         temp
@@ -116,10 +114,7 @@ mod tests {
     #[serial]
     fn getting_marks_file_uses_custom_environment_variable() {
         env::set_var("PROJECTABLE_DATA_DIR", ".");
-        assert_eq!(
-            PathBuf::from("./projectable/marks.json"),
-            get_marks_file().unwrap()
-        );
+        assert_eq!(PathBuf::from("./marks.json"), get_marks_file().unwrap());
         env::remove_var("PROJECTABLE_DATA_DIR");
     }
 
@@ -172,7 +167,7 @@ mod tests {
     #[serial]
     fn can_create_marks_from_file_with_marks() {
         let temp = TempDir::new().expect("should have no error create temp dir");
-        temp.child("projectable/marks.json")
+        temp.child("marks.json")
             .write_str("{\"/\": [\"mark\"]}")
             .unwrap();
         env::set_var("PROJECTABLE_DATA_DIR", temp.path());
@@ -209,7 +204,7 @@ mod tests {
         let mut marks = Marks::from_marks_file("/").unwrap();
         marks.marks.push("mark".into());
         assert!(marks.write().is_ok());
-        let contents = fs::read_to_string(temp.child("projectable/marks.json")).unwrap();
+        let contents = fs::read_to_string(temp.child("marks.json")).unwrap();
         assert_eq!("{\"/\":[\"mark\"]}", contents);
     }
 
@@ -224,7 +219,7 @@ mod tests {
         let mut marks = Marks::from_marks_file("/").unwrap();
         marks.marks.push("other_mark".into());
         assert!(marks.write().is_ok());
-        let contents = fs::read_to_string(temp.child("projectable/marks.json")).unwrap();
+        let contents = fs::read_to_string(temp.child("./marks.json")).unwrap();
         let project_marks =
             serde_json::from_str::<HashMap<PathBuf, Vec<PathBuf>>>(&contents).unwrap();
         assert_eq!(2, project_marks.len());
