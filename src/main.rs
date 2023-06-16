@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
+use clap::Parser;
 use crossbeam_channel::unbounded;
 use log::{error, warn, LevelFilter};
 use projectable::{
@@ -31,48 +32,54 @@ use crossterm::{
 use scopeguard::{defer, defer_on_success};
 use tui::{backend::CrosstermBackend, Terminal};
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    dir: Option<PathBuf>,
+
+    #[arg(long)]
+    debug: bool,
+}
+
 fn main() -> Result<()> {
-    // Setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let args = Args::parse();
+
+    // Set up raw mode, etc.
+    setup()?;
 
     // Restore terminal
     defer_on_success! {
         shut_down();
     }
 
-    panic::set_hook(Box::new(|info| {
-        shut_down();
-        let meta = human_panic::metadata!();
-        let file_path = human_panic::handle_dump(&meta, info);
-        human_panic::print_msg(file_path, &meta)
-            .expect("human-panic: printing error message to console failed");
-    }));
-
     let config = Rc::new(get_config()?);
 
+    // Logging setup
     #[cfg(debug_assertions)]
     tui_logger::init_logger(LevelFilter::Debug).unwrap();
     #[cfg(not(debug_assertions))]
-    tui_logger::init_logger(config.log.log_level).unwrap();
-
+    if !args.debug {
+        tui_logger::init_logger(config.log.log_level).unwrap();
+    } else {
+        tui_logger::init_logger(LevelFilter::Debug).unwrap();
+    }
     tui_logger::set_default_level(LevelFilter::Trace);
+
+    // Check keybind conflicts
     let conflicts = config.check_conflicts();
     for conflict in conflicts {
         warn!("{conflict}");
     }
 
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout))?;
+    // Create tui terminal and app
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     let root = find_project_root(&config.project_roots)?.ok_or(anyhow!("not in a project!"))?;
+    let dir = args.dir.map_or(env::current_dir()?, |dir| root.join(dir));
     let marks = Rc::new(RefCell::new(Marks::from_marks_file(&root)?));
-    let mut app = App::new(
-        root,
-        env::current_dir()?,
-        Rc::clone(&config),
-        Rc::clone(&marks),
-    )
-    .context("failed to create app")?;
+    let mut app = App::new(root, dir, Rc::clone(&config), Rc::clone(&marks))
+        .context("failed to create app")?;
+
+    // Begin app event loop
     run_app(&mut terminal, &mut app, Rc::clone(&config), marks)?;
 
     Ok(())
@@ -219,6 +226,23 @@ fn run_app(
             return Ok(());
         }
     }
+}
+
+fn setup() -> Result<()> {
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    panic::set_hook(Box::new(|info| {
+        shut_down();
+        let meta = human_panic::metadata!();
+        let file_path = human_panic::handle_dump(&meta, info);
+        human_panic::print_msg(file_path, &meta)
+            .expect("human-panic: printing error message to console failed");
+    }));
+
+    Ok(())
 }
 
 fn shut_down() {
