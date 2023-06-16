@@ -15,9 +15,11 @@ use nom::{
 };
 use serde::{
     de::{self, Visitor},
-    Deserialize, Deserializer,
+    ser::SerializeSeq,
+    Deserialize, Deserializer, Serialize,
 };
 use std::{
+    borrow::Cow,
     collections::{hash_map::Entry, HashMap},
     env,
     fmt::{self, Display},
@@ -153,7 +155,18 @@ impl<'de> Deserialize<'de> for GlobList {
     }
 }
 
-#[derive(Debug, Deserialize)]
+impl Serialize for GlobList {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(1))?;
+        seq.serialize_element("**/.git")?;
+        seq.end()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
     pub quit: Key,
@@ -345,7 +358,7 @@ impl KeyConflict<'_> {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct PreviewConfig {
     pub preview_cmd: String,
@@ -394,7 +407,7 @@ impl Merge for PreviewConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct FiletreeConfig {
     pub use_git: bool,
@@ -511,7 +524,7 @@ impl Merge for FiletreeConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct LogConfig {
     pub log_level: LevelFilter,
@@ -545,7 +558,7 @@ impl Merge for LogConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct MarksConfig {
     pub marks_dir: Option<PathBuf>,
@@ -710,7 +723,35 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+impl Serialize for Color {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = match self {
+            Self::Black => Cow::Borrowed("black"),
+            Self::Red => Cow::Borrowed("red"),
+            Self::Green => Cow::Borrowed("green"),
+            Self::Yellow => Cow::Borrowed("yellow"),
+            Self::Blue => Cow::Borrowed("blue"),
+            Self::Magenta => Cow::Borrowed("magenta"),
+            Self::Cyan => Cow::Borrowed("cyan"),
+            Self::White => Cow::Borrowed("white"),
+            Self::Reset => Cow::Borrowed("none"),
+            Self::LightRed => Cow::Borrowed("lightred"),
+            Self::LightGreen => Cow::Borrowed("lightgreen"),
+            Self::LightYellow => Cow::Borrowed("lightyellow"),
+            Self::LightBlue => Cow::Borrowed("lightblue"),
+            Self::LightMagenta => Cow::Borrowed("lightmagenta"),
+            Self::LightCyan => Cow::Borrowed("lightcyan"),
+            Self::Rgb(r, g, b) => Cow::Owned(format!("rgb({r}, {g}, {b})")),
+        };
+
+        serializer.serialize_str(&s)
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy, Serialize)]
 #[serde(deny_unknown_fields)]
 #[serde(default)]
 pub struct Style {
@@ -790,6 +831,22 @@ impl<'de> Deserialize<'de> for Modifier {
         }
 
         deserializer.deserialize_seq(ModifierVistor)
+    }
+}
+
+impl Serialize for Modifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        if self.0 & TuiModifier::BOLD == TuiModifier::BOLD {
+            seq.serialize_element("bold")?;
+        }
+        if self.0 & TuiModifier::ITALIC == TuiModifier::ITALIC {
+            seq.serialize_element("italic")?;
+        }
+        seq.end()
     }
 }
 
@@ -964,6 +1021,16 @@ impl<'de> Deserialize<'de> for Key {
         D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_str(KeyVisitor)
+    }
+}
+
+impl Serialize for Key {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
     }
 }
 

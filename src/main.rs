@@ -6,7 +6,7 @@ use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, GlobList, Merge},
     external_event,
-    marks::Marks,
+    marks::{self, Marks},
 };
 use std::{
     cell::RefCell,
@@ -39,10 +39,40 @@ struct Args {
 
     #[arg(long)]
     debug: bool,
+    #[arg(short, long)]
+    config: bool,
+    #[arg(long)]
+    marks_file: bool,
+    #[arg(long)]
+    write_config: bool,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    if args.config {
+        println!(
+            "{}",
+            config::get_config_home()
+                .context("could not find config home")?
+                .display()
+        );
+        return Ok(());
+    } else if args.marks_file {
+        println!(
+            "{}",
+            marks::get_marks_file()
+                .context("could not find config home")?
+                .display()
+        );
+        return Ok(());
+    } else if args.write_config {
+        let config_file = config::get_config_home()
+            .context("could not find config home")?
+            .join("config.toml");
+        let new_config = Config::default();
+
+        fs::write(config_file, toml::to_string(&new_config)?)?;
+    }
 
     // Set up raw mode, etc.
     setup()?;
