@@ -26,7 +26,7 @@ use std::{
 use tui::{
     backend::Backend,
     layout::Rect,
-    style::{Color, Style},
+    style::Style,
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
