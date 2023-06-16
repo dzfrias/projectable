@@ -37,13 +37,13 @@ use tui::{backend::CrosstermBackend, Terminal};
 struct Args {
     dir: Option<PathBuf>,
 
-    #[arg(long)]
+    #[arg(long, help = "Debug mode")]
     debug: bool,
-    #[arg(short, long)]
+    #[arg(short, long, help = "Print config location")]
     config: bool,
-    #[arg(long)]
+    #[arg(long, help = "Print marks file location")]
     marks_file: bool,
-    #[arg(long)]
+    #[arg(long, help = "Create a default config")]
     write_config: bool,
 }
 
