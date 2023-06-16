@@ -505,7 +505,8 @@ impl Merge for FiletreeConfig {
             open_under,
             close_under,
             show_dotfiles,
-            show_hidden_by_default
+            show_hidden_by_default,
+            dir_style
         );
     }
 }
