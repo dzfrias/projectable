@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::LevelFilter;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while_m_n},
+    bytes::complete::{tag, take, take_while_m_n},
     character::complete::{digit1, multispace0},
     combinator::{map_res, opt},
     multi::{separated_list0, separated_list1},
@@ -887,7 +887,7 @@ impl FromStr for Key {
                 tag("backspace"),
                 tag("tab"),
                 tag("backtab"),
-                take_while_m_n(1, 1, |c: char| c.is_ascii_alphabetic()),
+                take(1usize),
             ))(input)?;
 
             let code = match key {
@@ -1228,7 +1228,7 @@ mod tests {
 
     #[test]
     fn can_parse_key_with_no_mods() {
-        let keys = ["a", "b", "z", "r", "d"];
+        let keys = ["a", "b", "z", "r", "d", "?"];
 
         for key in keys {
             let k = key.parse::<Key>().expect("key should parse correctly");
