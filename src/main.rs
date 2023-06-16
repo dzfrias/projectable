@@ -71,7 +71,9 @@ fn main() -> Result<()> {
             .join("config.toml");
         let new_config = Config::default();
 
-        fs::write(config_file, toml::to_string(&new_config)?)?;
+        fs::write(&config_file, toml::to_string(&new_config)?)?;
+        println!("Wrote to config file at {}!", config_file.display());
+        return Ok(());
     }
 
     // Set up raw mode, etc.
