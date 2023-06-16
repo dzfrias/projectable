@@ -483,7 +483,7 @@ impl Default for FiletreeConfig {
             dir_style: Style {
                 color: Color::Blue,
                 bg: Color::Reset,
-                mods: Modifier(TuiModifier::BOLD),
+                mods: Modifier(TuiModifier::ITALIC),
             },
         }
     }
