@@ -297,7 +297,7 @@ impl Default for Config {
             all_down: Key::normal('G'),
             kill_processes: Key::ctrl('c'),
             special_commands: Self::default_special_commands(),
-            selected: Style::bg(Color::Black, Color::LightGreen),
+            selected: Style::bg(Color::Black, Color::Magenta),
             popup_border_style: Style::default(),
             help_key_style: Style {
                 color: Color::LightCyan,
@@ -371,8 +371,8 @@ impl Default for PreviewConfig {
             up_key: Key::ctrl('u'),
             scroll_amount: 10,
             border_color: Style::default(),
-            scroll_bar_color: Style::default(),
-            unreached_bar_color: Style::default(),
+            scroll_bar_color: Style::color(Color::Magenta),
+            unreached_bar_color: Style::color(Color::Blue),
         }
     }
 }
@@ -412,6 +412,7 @@ pub struct FiletreeConfig {
     pub git_modified_style: Style,
     pub marks_style: Style,
     pub searched_style: Style,
+    pub dir_style: Style,
 
     pub special_command: Key,
     pub down_three: Key,
@@ -460,12 +461,17 @@ impl Default for FiletreeConfig {
             show_dotfiles: Key::normal('.'),
 
             filtered_out_message: Style::color(Color::Yellow),
-            border_color: Style::default(),
+            border_color: Style::color(Color::Magenta),
             added_style: Style::color(Color::Green),
             git_new_style: Style::color(Color::Red),
             git_modified_style: Style::color(Color::Blue),
             marks_style: Style::color(Color::Yellow),
             searched_style: Style::color(Color::Green),
+            dir_style: Style {
+                color: Color::Blue,
+                bg: Color::Reset,
+                mods: Modifier(TuiModifier::BOLD),
+            },
         }
     }
 }
@@ -527,7 +533,7 @@ impl Default for LogConfig {
             warn: Style::color(Color::Yellow),
             trace: Style::color(Color::Magenta),
             info: Style::default(),
-            border_color: Style::default(),
+            border_color: Style::color(Color::Blue),
         }
     }
 }

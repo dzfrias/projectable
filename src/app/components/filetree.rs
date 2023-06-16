@@ -286,7 +286,7 @@ impl Drawable for Filetree {
                             })
                         })
                     };
-                    let style = if !self
+                    let mut style = if !self
                         .marks
                         .borrow()
                         .marks
@@ -313,6 +313,9 @@ impl Drawable for Filetree {
                     } else {
                         self.config.filetree.marks_style.into()
                     };
+                    if style == Style::default() && !item.is_file() {
+                        style = self.config.filetree.dir_style.into();
+                    }
                     ListItem::new(format!(
                         "{}{icon} {file_name}",
                         " ".repeat(indent_amount * INDENT)
@@ -321,8 +324,12 @@ impl Drawable for Filetree {
                 })
                 .collect_vec(),
         )
-        .highlight_style(Style::default().bg(Color::LightGreen).fg(Color::Black))
-        .block(Block::default().borders(Borders::ALL));
+        .highlight_style(self.config.selected.into())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(self.config.filetree.border_color.into()),
+        );
         f.render_stateful_widget(list, area, &mut state);
         self.state.set(state);
 
