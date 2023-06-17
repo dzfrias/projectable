@@ -383,7 +383,7 @@ impl Default for PreviewConfig {
             down_key: Key::ctrl('d'),
             up_key: Key::ctrl('u'),
             scroll_amount: 10,
-            border_color: Style::default(),
+            border_color: Style::color(Color::Cyan),
             scroll_bar_color: Style::color(Color::Magenta),
             unreached_bar_color: Style::color(Color::Blue),
         }
@@ -477,7 +477,7 @@ impl Default for FiletreeConfig {
             border_color: Style::color(Color::Magenta),
             added_style: Style::color(Color::Green),
             git_new_style: Style::color(Color::Red),
-            git_modified_style: Style::color(Color::Blue),
+            git_modified_style: Style::color(Color::Cyan),
             marks_style: Style::color(Color::Yellow),
             searched_style: Style::color(Color::Green),
             dir_style: Style {
