@@ -2,7 +2,7 @@
 
 ![screenshot](./extras/screenshot.png)
 
-<p><sub>Preview done with [bat](https://github.com/sharkdp/bat)</sub></p>
+<p><sub>Preview done with <a href="https://github.com/sharkdp/bat">bat</a></sub></p>
 
 **projectable** is a highly configurable project manager. You can do _everything_
 your project needs from a comfortable and smooth interface: run commands, open
