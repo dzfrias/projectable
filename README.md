@@ -2,12 +2,14 @@
 
 ![screenshot](./extras/screenshot.png)
 
-`projectable` is a highly configurable project manager. You can do everything
+<p><sub>Preview done with [bat](https://github.com/sharkdp/bat)</sub></p>
+
+**projectable** is a highly configurable project manager. You can do _everything_
 your project needs from a comfortable and smooth interface: run commands, open
 your editor, integrate with tmux, see git changes, and more.
 
 Instead of exploring the depths of your most nested directory, open a file simply
-from the `projectable` file listing!
+from the projectable file listing!
 
 Here are just a few builtin things projectable can do:
 
@@ -56,11 +58,44 @@ $ ./target/release/prj
 
 </details>
 
+To verify installation worked correctly, run `prj --version`.
+
 After you've installed, run `prj` to start it up! The default keybinds are
-vim-like (j for up, k for down), but you can change them in
+vim-like (k for up, j for down), but you can change them in
 [CONFIG.md](./extras/CONFIG.md).
 
 ## ⌨️ Keybinds
 
 Here a list of the available actions and their default bindings. For
 customization, see [CONFIG.md](./extras/CONFIG.md).
+
+| Key       | Description                  |
+| --------- | ---------------------------- |
+| `j`       | Go down                      |
+| `k`       | Go up                        |
+| `enter`   | Open file or directory       |
+| `q`/`esc` | Quit                         |
+| `o`       | Expand all                   |
+| `O`       | Collapse all                 |
+| `g`       | Go to first                  |
+| `G`       | Go to last                   |
+| `l`       | Expand all under directory   |
+| `h`       | Collapse all under directory |
+| `n`       | New file                     |
+| `N`       | New directory                |
+| `d`       | Delete file/directory        |
+| `e`       | Execute command              |
+| `v`       | File-specific command        |
+| `ctrl-n`  | Go down by three             |
+| `ctrl-p`  | Go up by three               |
+| `/`       | Search                       |
+| `ctrl-d`  | Move preview down            |
+| `ctrl-u`  | Move preview up              |
+| `t`       | Toggle git diff view         |
+| `T`       | Filter for modified files    |
+| `.`       | Toggle hidden files          |
+| `m`       | Mark file                    |
+| `M`       | Open marks                   |
+
+You can make your own keybinds, too! This is of course done in the configuration
+file, the details of which can be found at [CONFIG.md](./extras/CONFIG.md).
