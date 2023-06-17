@@ -5,8 +5,7 @@
 <p><sub>Preview done with <a href="https://github.com/sharkdp/bat">bat</a></sub></p>
 
 **projectable** is a highly configurable project manager. You can do _everything_
-your project needs from a comfortable and smooth interface: run commands, open
-your editor, integrate with tmux, see git changes, and more.
+your project needs from a comfortable and smooth interface.
 
 Instead of exploring the depths of your most nested directory, open a file simply
 from the projectable file listing!
@@ -85,6 +84,7 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `N`       | New directory                |
 | `d`       | Delete file/directory        |
 | `e`       | Execute command              |
+| `ctrl-c`  | Cancel command(s)            |
 | `v`       | File-specific command        |
 | `ctrl-n`  | Go down by three             |
 | `ctrl-p`  | Go up by three               |
@@ -98,4 +98,34 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `M`       | Open marks                   |
 
 You can make your own keybinds, too! This is of course done in the configuration
-file, the details of which can be found at [CONFIG.md](./extras/CONFIG.md).
+file, the details of which can be found in [CONFIG.md](./extras/CONFIG.md).
+
+### Command Syntax
+
+The execute command action has some extra features that allow for easy and
+dynamic command execution.
+
+By default commands are run in the background, but this behavior can be changed,
+so interactive programs like [fzf](https://github.com/junegunn/fzf) work. In the
+command execution window, prepend `!!` to execute in the foreground. For example,
+`!!fzf` will execute `fzf`.
+
+Additionally, use `{}` to interpolate the currently selected file into your
+command. `echo {}` would log the file you are currently selecting.
+
+Lastly, `{...}` will prompt you for input. This is only available in custom
+commands defined in the config file. So, if you've defined a custom command
+bound to `ctrl-b` that executes `cargo add {...}`, pressing `ctrl-b` will prompt
+you for something to `cargo add`.
+
+In short:
+
+| Item    | Description               |
+| ------- | ------------------------- |
+| `!!`    | Execute in foreground     |
+| `{}`    | Interpolate selected file |
+| `{...}` | Prompt for input          |
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
