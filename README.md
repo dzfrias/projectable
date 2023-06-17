@@ -33,24 +33,27 @@ Here are just a few builtin things projectable can do:
 To get started, you can use one of the following installation methods:
 
 <details>
-<summary>cargo</summary>
-<br>
+  <summary>cargo</summary>
+
 ```bash
 $ cargo install projectable
 ```
+
 </details>
 
 <details>
-<summary>Build from source</summary>
-<br>
+  <summary>Build from source</summary>
+
 Requires [Rust](https://github.com/rust-lang/rust) to be installed on your
 computer.
+
 ```bash
 $ git clone https://github.com/dzfrias/projectable
 $ cd projectable
 $ cargo build --release
 $ ./target/release/prj
 ```
+
 </details>
 
 After you've installed, run `prj` to start it up! The default keybinds are
