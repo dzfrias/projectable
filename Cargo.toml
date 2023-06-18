@@ -1,7 +1,23 @@
 [package]
 name = "projectable"
+authors = ["Diego Frias <styx5242@gmail.com>"]
 version = "0.1.0"
+description = """
+projectable is a highly configurable TUI project manager. You can do everything
+your project needs from a comfortable and smooth interface, instead of exploring
+the depths of your project's most nested directories.
+"""
+documentation = "https://github.com/dzfrias/projectable"
+homepage = "https://github.com/dzfrias/projectable"
+repository = "https://github.com/dzfrias/projectable"
+keywords = ["project", "tui", "terminal", "manager", "files"]
+categories = ["command-line-utilities", "filesystem"]
+license = "MIT"
 edition = "2021"
+
+[[bin]]
+name = "prj"
+path = "src/main.rs"
 
 [dependencies]
 ansi-to-tui = "2.0.2"
