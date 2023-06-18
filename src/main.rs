@@ -118,7 +118,7 @@ fn main() -> Result<()> {
     tui_logger::init_logger(LevelFilter::Debug).unwrap();
     #[cfg(not(debug_assertions))]
     if !args.debug {
-        tui_logger::init_logger(config.log.log_level).unwrap();
+        tui_logger::init_logger(LevelFilter::Info).unwrap();
     } else {
         tui_logger::init_logger(LevelFilter::Debug).unwrap();
     }
