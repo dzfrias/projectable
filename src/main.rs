@@ -71,9 +71,18 @@ fn main() -> Result<()> {
         let config_file = config::get_config_home()
             .context("could not find config home")?
             .join("config.toml");
-        let new_config = Config::default();
+        fs::create_dir_all(
+            config_file
+                .parent()
+                .expect("config file should have parent"),
+        )
+        .context("error making config file")?;
 
-        fs::write(&config_file, toml::to_string(&new_config)?)?;
+        #[cfg(not(target_os = "windows"))]
+        fs::write(&config_file, include_str!("./config_defaults/unix.toml"))?;
+        #[cfg(target_os = "windows")]
+        fs::write(&config_file, include_str!("./config_defaults/windows.toml"))?;
+
         println!("Wrote to config file at {}!", config_file.display());
         return Ok(());
     } else if args.make_config {
@@ -83,6 +92,12 @@ fn main() -> Result<()> {
         if config_file.exists() {
             bail!("config file already exists at {}", config_file.display());
         }
+        fs::create_dir_all(
+            config_file
+                .parent()
+                .expect("config file should have parent"),
+        )
+        .context("error making config file")?;
         fs::File::create(&config_file)?;
         println!("Wrote to config file at {}!", config_file.display());
         return Ok(());

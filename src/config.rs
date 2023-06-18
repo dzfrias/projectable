@@ -3,7 +3,6 @@ use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use itertools::Itertools;
-use log::LevelFilter;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_while_m_n},
@@ -420,11 +419,11 @@ pub struct FiletreeConfig {
 
     pub filtered_out_message: Style,
     pub border_color: Style,
+    // TODO: Actually implement
     pub added_style: Style,
     pub git_new_style: Style,
     pub git_modified_style: Style,
     pub marks_style: Style,
-    pub searched_style: Style,
     pub dir_style: Style,
 
     pub special_command: Key,
@@ -479,7 +478,6 @@ impl Default for FiletreeConfig {
             git_new_style: Style::color(Color::Red),
             git_modified_style: Style::color(Color::Cyan),
             marks_style: Style::color(Color::Yellow),
-            searched_style: Style::color(Color::Green),
             dir_style: Style {
                 color: Color::Blue,
                 bg: Color::Reset,
@@ -527,8 +525,6 @@ impl Merge for FiletreeConfig {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct LogConfig {
-    pub log_level: LevelFilter,
-
     pub error: Style,
     pub debug: Style,
     pub warn: Style,
@@ -540,8 +536,6 @@ pub struct LogConfig {
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            log_level: LevelFilter::Info,
-
             error: Style::color(Color::Red),
             debug: Style::color(Color::Green),
             warn: Style::color(Color::Yellow),
@@ -554,7 +548,7 @@ impl Default for LogConfig {
 
 impl Merge for LogConfig {
     fn merge(&mut self, other: Self) {
-        merge!(self, other; log_level, error, debug, warn, trace, info, border_color);
+        merge!(self, other; error, debug, warn, trace, info, border_color);
     }
 }
 
