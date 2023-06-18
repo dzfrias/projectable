@@ -39,12 +39,14 @@ struct Args {
 
     #[arg(long, help = "Debug mode")]
     debug: bool,
-    #[arg(short, long, help = "Print config location")]
+    #[arg(short, long, help = "Print config location", conflicts_with_all = ["marks_file", "write_config", "make_config"])]
     config: bool,
-    #[arg(long, help = "Print marks file location")]
+    #[arg(long, help = "Print marks file location", conflicts_with_all = ["config", "write_config", "make_config"])]
     marks_file: bool,
-    #[arg(long, help = "Create a default config")]
+    #[arg(long, help = "Create a default config", conflicts_with_all = ["marks_file", "config", "make_config"])]
     write_config: bool,
+    #[arg(long, help = "Create a config file", conflicts_with_all = ["marks_file", "write_config", "config"])]
+    make_config: bool,
 }
 
 fn main() -> Result<()> {
@@ -72,6 +74,16 @@ fn main() -> Result<()> {
         let new_config = Config::default();
 
         fs::write(&config_file, toml::to_string(&new_config)?)?;
+        println!("Wrote to config file at {}!", config_file.display());
+        return Ok(());
+    } else if args.make_config {
+        let config_file = config::get_config_home()
+            .context("could not find config home")?
+            .join("config.toml");
+        if config_file.exists() {
+            bail!("config file already exists at {}", config_file.display());
+        }
+        fs::File::create(&config_file)?;
         println!("Wrote to config file at {}!", config_file.display());
         return Ok(());
     }
