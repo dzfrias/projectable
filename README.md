@@ -118,13 +118,22 @@ commands defined in the config file. So, if you've defined a custom command
 bound to `ctrl-b` that executes `cargo add {...}`, pressing `ctrl-b` will prompt
 you for something to `cargo add`.
 
+There are also keybinds that integrate with [tmux](https://github.com/tmux/tmux).
+When entering input to run a command, press `ctrl-v` to open a vertical split.
+`ctrl-x` will open a horizontal one, `ctrl-n` a new window, and `ctrl-f` a
+floating one.
+
 In short:
 
-| Item    | Description               |
-| ------- | ------------------------- |
-| `!!`    | Execute in foreground     |
-| `{}`    | Interpolate selected file |
-| `{...}` | Prompt for input          |
+| Item     | Description               |
+| -------- | ------------------------- |
+| `!!`     | Execute in foreground     |
+| `{}`     | Interpolate selected file |
+| `{...}`  | Prompt for input          |
+| `ctrl-v` | Vertical split            |
+| `ctrl-x` | Horizontal split          |
+| `ctrl-n` | New window                |
+| `ctrl-f` | Floating window           |
 
 ## License
 
