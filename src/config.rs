@@ -398,8 +398,7 @@ pub struct FiletreeConfig {
 
     pub filtered_out_message: Style,
     pub border_color: Style,
-    // TODO: Actually implement
-    pub added_style: Style,
+    pub git_added_style: Style,
     pub git_new_style: Style,
     pub git_modified_style: Style,
     pub marks_style: Style,
@@ -453,7 +452,7 @@ impl Default for FiletreeConfig {
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::color(Color::Magenta),
-            added_style: Style::color(Color::Green),
+            git_added_style: Style::color(Color::Green),
             git_new_style: Style::color(Color::Red),
             git_modified_style: Style::color(Color::Cyan),
             marks_style: Style::color(Color::Yellow),
@@ -486,7 +485,7 @@ impl Merge for FiletreeConfig {
             diff_mode,
             filtered_out_message,
             border_color,
-            added_style,
+            git_added_style,
             git_new_style,
             git_modified_style,
             special_command,

@@ -163,7 +163,7 @@ dir_style = { color = "blue", mods = ["italic"] }
 filtered_out_message = { color = "yellow" }
 border_color = { color = "magenta" }
 # Color of git added files
-added_style = { color = "green" }
+git_added_style = { color = "green" }
 git_new_style = { color = "red" }
 git_modified_style = { color = "cyan" }
 # Color of marked files

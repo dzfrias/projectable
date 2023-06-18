@@ -301,9 +301,10 @@ impl Drawable for Filetree {
                                         Status::WT_NEW => {
                                             Style::from(self.config.filetree.git_new_style)
                                         }
-                                        Status::INDEX_MODIFIED
-                                        | Status::INDEX_NEW
-                                        | Status::WT_MODIFIED => {
+                                        Status::INDEX_MODIFIED => {
+                                            Style::from(self.config.filetree.git_added_style)
+                                        }
+                                        Status::WT_MODIFIED => {
                                             Style::from(self.config.filetree.git_modified_style)
                                         }
                                         _ => Style::default(),
