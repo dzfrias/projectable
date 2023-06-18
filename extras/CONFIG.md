@@ -36,19 +36,52 @@ When you press `v` while selecting a `Cargo.toml` file, projectable will prompt
 you to run one of these commands!
 
 The key part of the configuration accepts globs, so you could generalize this
-to run with `Cargo.*` if you'd like this prompt to appear in lock file too.
+to run with `Cargo.*` if you'd like this prompt to appear in lock file as well.
 
 ## Keys
 
 Many of the default keybinds can be changed in projectable.
 
-TODO
+For example, if you'd like to change the default up/down selection keys, you
+could do so with:
+
+```toml
+up = "up"
+down = "down"
+```
+
+Changing the new file key could look like this:
+
+```toml
+[filetree]
+new_file = "alt-n"
+```
+
+alt and ctrl are the only currently supported modifiers.
+
+For the rest of the possible keybinds, see
+[the entire configuration](#all-configuration-options).
 
 ## Colors
 
 Like everything else, projectable's colorscheme can be completely user-defined!
+"Colors" is a bit of a misnomer; projectable also allows you to control the
+text style too, giving you the options of bold or italic text.
 
-TODO
+Here's an example of a possible color change:
+
+```toml
+selected = { color = "rgb(0, 0, 0)", bg = "#FFFFFF", mods = ["italic"] }
+
+[filetree]
+border_color = { color = "yellow" }
+```
+
+RGB and hex are both supported, along with a list of modifiers. Currently, only
+italic and bold are available.
+
+To see all possible color options, see
+[the entire configuration reference](#all-configuration-options).
 
 ## All Configuration Options
 
