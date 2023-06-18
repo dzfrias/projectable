@@ -135,6 +135,6 @@ In short:
 | `ctrl-n` | New window                |
 | `ctrl-f` | Floating window           |
 
-## License
+## ✍️ License
 
 This project is licensed under the [MIT License](./LICENSE).
