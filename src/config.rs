@@ -1,5 +1,4 @@
 use anyhow::Error;
-use collect_all::collect;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use itertools::Itertools;
@@ -176,7 +175,6 @@ pub struct Config {
     pub all_up: Key,
     pub open: Key,
     pub kill_processes: Key,
-    #[serde(deserialize_with = "Config::deserialize_special_commands")]
     pub special_commands: HashMap<String, Vec<String>>,
     pub commands: HashMap<Key, String>,
     pub project_roots: GlobList,
@@ -192,25 +190,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn deserialize_special_commands<'de, D>(
-        deserializer: D,
-    ) -> Result<HashMap<String, Vec<String>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let mut initial = Self::default_special_commands();
-        let config = <HashMap<String, Vec<String>>>::deserialize(deserializer)?;
-        initial.merge(config);
-        Ok(initial)
-    }
-
-    pub fn default_special_commands() -> HashMap<String, Vec<String>> {
-        collect![HashMap<_, _>:
-            ("Makefile".to_owned(), vec!["make".to_owned(), "make {...}".to_owned()]),
-            ("Cargo.toml".to_owned(), vec!["cargo add {...}".to_owned(), "cargo remove {...}".to_owned(), "cargo run".to_owned()])
-        ]
-    }
-
     pub fn check_conflicts(&self) -> Vec<KeyConflict> {
         let mut keys = vec![
             (Action::Quit, &self.quit),
@@ -308,7 +287,7 @@ impl Default for Config {
             all_up: Key::normal('g'),
             all_down: Key::normal('G'),
             kill_processes: Key::ctrl('c'),
-            special_commands: Self::default_special_commands(),
+            special_commands: HashMap::new(),
             selected: Style::bg(Color::Black, Color::Magenta),
             popup_border_style: Style::default(),
             help_key_style: Style {
@@ -1031,6 +1010,7 @@ impl Serialize for Key {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use collect_all::collect;
     use crossterm::event::{KeyEventKind, KeyEventState};
     use scopeguard::defer;
     use serial_test::serial;

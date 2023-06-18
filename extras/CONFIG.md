@@ -85,4 +85,107 @@ To see all possible color options, see
 
 ## All Configuration Options
 
-TODO
+These are the default configuration options for projectable. You can override
+them as you wish!
+
+Generally, the file is split up based on pane. For example, the pane that shows
+all of your files corresponds to the `[filetree]` section of the file.
+
+```toml
+# General settings
+project_roots = [".git"]
+# Items of the form: `GLOB = [COMMAND]`
+special_commands = {}
+# Items of the form `KEY = COMMAND`
+commands = {}
+
+# Keys
+up = "k"
+down = "j"
+quit = "q"
+help = "?"
+all_up = "g"
+all_down = "G"
+open = "enter"
+# Kill processes started by projectable
+kill_processes = "ctrl-c"
+
+# General styles
+selected = { color = "black", bg = "magenta" }
+popup_border_style = { color = "white" }
+help_key_style = { color = "lightcyan", mods = ["bold"] }
+
+[preview]
+preview_cmd = "cat {}"
+# Optional git pager
+# git_pager = "delta"
+down_key = "ctrl-d"
+up_key = "ctrl-u"
+scroll_amount = 10
+
+border_color = { color = "cyan" }
+scroll_bar_color = { color = "magenta" }
+# Unreached part of the scroll bar
+unreached_bar_color = { color = "blue" }
+
+[filetree]
+# Whether to show git diffs
+use_git = true
+# Ignore certain globs
+ignore = []
+use_gitignore = true
+refresh_time = 1000
+dirs_first = true
+show_hidden_by_default = false
+
+# Keys
+special_command = "v"
+down_three = "ctrl-n"
+up_three = "ctrl-p"
+exec_cmd = "e"
+delete = "d"
+search = "/"
+# Clear filters (like the git filter)
+clear = '\'
+new_file = "n"
+new_dir = "N"
+git_filter = "T"
+diff_mode = "t"
+open_all = "o"
+close_all = "O"
+mark_selected = "m"
+open_under = "l"
+close_under = "h"
+show_dotfiles = "."
+
+# Colors
+dir_style = { color = "blue", mods = ["italic"] }
+filtered_out_message = { color = "yellow" }
+border_color = { color = "magenta" }
+# Color of git added files
+added_style = { color = "green" }
+git_new_style = { color = "red" }
+git_modified_style = { color = "cyan" }
+# Color of marked files
+marks_style = { color = "yellow" }
+
+[log]
+border_color = { color = "blue" }
+
+info = { color = "white" }
+error = { color = "red" }
+debug = { color = "green" }
+
+# Only shown when run with the --debug option
+warn = { color = "red" }
+trace = { color = "magenta" }
+
+[marks]
+# Whether to show marks as relative paths or not
+relative = true
+open = "M"
+delete = "d"
+
+# Color of marks in marks window
+mark_style = { color = "white" }
+```
