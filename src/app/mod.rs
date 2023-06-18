@@ -259,7 +259,7 @@ impl App {
             ExternalEvent::CommandOutput(out) => {
                 self.text_popup.preset = Preset::Nothing;
                 info!("output:");
-                info!("{out}");
+                info!("{}", if out.is_empty() { " " } else { out });
             }
             _ => (),
         }
