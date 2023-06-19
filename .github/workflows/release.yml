@@ -3,14 +3,52 @@ name: release
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
 
-permissions:
-  contents: write
+permissions: write-all
 
 jobs:
-  build-and-release:
-    name: Build and release
+  # Creates a release and outputs the url
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ env.RELEASE_UPLOAD_URL }}
+      version: ${{ env.VERSION }}
+    steps:
+      - name: Get the release version from the tag
+        shell: bash
+        if: env.VERSION == ''
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "version is: ${{ env.VERSION }}"
+      - name: Create GitHub release
+        uses: actions/github-script@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          script: |
+            try {
+              const response = await github.rest.repos.createRelease({
+                draft: false,
+                generate_release_notes: true,
+                name: process.env.VERSION,
+                owner: context.repo.owner,
+                prerelease: false,
+                repo: context.repo.repo,
+                tag_name: process.env.VERSION,
+              });
+
+              core.exportVariable('RELEASE_ID', response.data.id);
+              core.exportVariable('RELEASE_UPLOAD_URL', response.data.upload_url);
+            } catch (error) {
+              core.setFailed(error.message);
+            }
+
+  build-and-upload:
+    name: Build and upload
+    needs: create-release
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -36,16 +74,6 @@ jobs:
           override: true
           target: ${{ matrix.target }}
 
-      - name: Install macOS dependencies
-        if: matrix.build == 'macos'
-        run: brew install openssl@1.1
-
-      - name: Install Ubuntu dependencies
-        if: matrix.build == 'linux'
-        run: |
-          sudo apt-get update --fix-missing
-          sudo apt-get install -y -qq pkg-config libssl-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
-
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -68,10 +96,12 @@ jobs:
           tar -czf "$name" "$dirname"
           echo "ASSET=$name" >> $GITHUB_ENV
 
-      - name: Create release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ${{ env.ASSET }}
+      - name: Upload archive
+        uses: actions/upload-release-asset@v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ env.ASSET }}
+          asset_name: ${{ env.ASSET }}
+          asset_content_type: application/octet-stream
