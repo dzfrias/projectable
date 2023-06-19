@@ -81,6 +81,7 @@ jobs:
       - name: Installing needed Ubuntu dependencies
         if: matrix.build == 'linux'
         run: |
+          sudo apt-get update --fix-missing
           sudo apt-get install pkg-config libssl-dev
 
       - name: Build
