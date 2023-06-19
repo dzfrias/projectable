@@ -5,6 +5,8 @@ on:
     tags:
       - "[0-9]+.[0-9]+.[0-9]+"
 
+permissions: write-all
+
 jobs:
   # Creates a release and outputs the url
   create-release:
