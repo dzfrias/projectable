@@ -1,0 +1,86 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  # Creates a release and outputs the url
+  create-release:
+    name: create-release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.release.outputs.upload_url }}
+      version: ${{ env.VERSION }}
+    steps:
+      - name: Get the release version from the tag
+        shell: bash
+        if: env.VERSION == ''
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          echo "version is: ${{ env.VERSION }}"
+      - name: Create GitHub release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.VERSION }}
+          release_name: ${{ env.VERSION }}
+
+  build-and-upload:
+    name: Build and upload
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        build: [linux, macos]
+        include:
+          - build: linux
+            os: ubuntu-18.04
+            target: x86_64-unknown-linux-musl
+          - build: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --verbose --release --target ${{ matrix.target }}
+
+      - name: Strip release binary (linux and macos)
+        if: matrix.build == 'linux' || matrix.build == 'macos'
+        run: strip "target/${{ matrix.target }}/release/prj"
+
+      - name: Build archive
+        shell: bash
+        run: |
+          name="prj-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz"
+          tar -czf "$name" "target/${{ matrix.target }}/release/prj"
+          echo "ASSET=$name" >> $GITHUB_ENV
+
+      - name: Upload archive
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ${{ env.ASSET }}
+          asset_name: ${{ env.ASSET }}
+          asset_content_type: application/octet-stream
