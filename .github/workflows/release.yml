@@ -3,52 +3,14 @@ name: release
 on:
   push:
     tags:
-      - "[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
-permissions: write-all
+permissions:
+  contents: write
 
 jobs:
-  # Creates a release and outputs the url
-  create-release:
-    name: create-release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ env.RELEASE_UPLOAD_URL }}
-      version: ${{ env.VERSION }}
-    steps:
-      - name: Get the release version from the tag
-        shell: bash
-        if: env.VERSION == ''
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          echo "version is: ${{ env.VERSION }}"
-      - name: Create GitHub release
-        uses: actions/github-script@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-          script: |
-            try {
-              const response = await github.rest.repos.createRelease({
-                draft: false,
-                generate_release_notes: true,
-                name: process.env.VERSION,
-                owner: context.repo.owner,
-                prerelease: false,
-                repo: context.repo.repo,
-                tag_name: process.env.VERSION,
-              });
-
-              core.exportVariable('RELEASE_ID', response.data.id);
-              core.exportVariable('RELEASE_UPLOAD_URL', response.data.upload_url);
-            } catch (error) {
-              core.setFailed(error.message);
-            }
-
-  build-and-upload:
-    name: Build and upload
-    needs: create-release
+  build-and-release:
+    name: Build and release
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -57,7 +19,7 @@ jobs:
         include:
           - build: linux
             os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-musl
           - build: macos
             os: macos-latest
             target: x86_64-apple-darwin
@@ -74,11 +36,11 @@ jobs:
           override: true
           target: ${{ matrix.target }}
 
-      - name: Installing needed macOS dependencies
+      - name: Install macOS dependencies
         if: matrix.build == 'macos'
         run: brew install openssl@1.1
 
-      - name: Installing needed Ubuntu dependencies
+      - name: Install Ubuntu dependencies
         if: matrix.build == 'linux'
         run: |
           sudo apt-get update --fix-missing
@@ -98,17 +60,18 @@ jobs:
       - name: Build archive
         shell: bash
         run: |
-          name="prj-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz"
-          mv "target/${{ matrix.target }}/release/prj" .
-          tar -czf "$name" prj
+          dirname="projectable-${{ needs.create-release.outputs.version }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          mv "target/${{ matrix.target }}/release/prj" "$dirname"
+          mv LICENSE "$dirname"
+          name="$dirname.tar.gz"
+          tar -czf "$name" "$dirname"
           echo "ASSET=$name" >> $GITHUB_ENV
 
-      - name: Upload archive
-        uses: actions/upload-release-asset@v1.0.1
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.ASSET }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ env.ASSET }}
-          asset_name: ${{ env.ASSET }}
-          asset_content_type: application/octet-stream
