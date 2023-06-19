@@ -74,6 +74,15 @@ jobs:
           override: true
           target: ${{ matrix.target }}
 
+      - name: Installing needed macOS dependencies
+        if: matrix.build == 'macos'
+        run: brew install openssl@1.1
+
+      - name: Installing needed Ubuntu dependencies
+        if: matrix.build == 'linux'
+        run: |
+          sudo apt-get install pkg-config libssl-dev
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -84,15 +93,6 @@ jobs:
       - name: Strip release binary (linux and macos)
         if: matrix.build == 'linux' || matrix.build == 'macos'
         run: strip "target/${{ matrix.target }}/release/prj"
-
-      - name: Installing needed macOS dependencies
-        if: matrix.build == 'macos'
-        run: brew install openssl@1.1
-
-      - name: Installing needed Ubuntu dependencies
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-20.04'
-        run: |
-          sudo apt-get install pkg-config libssl-dev
 
       - name: Build archive
         shell: bash
