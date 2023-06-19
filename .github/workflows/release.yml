@@ -61,6 +61,15 @@ jobs:
           - build: macos
             os: macos-latest
             target: x86_64-apple-darwin
+          - build: windows-gnu
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+          - build: windows-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - build: windows32-msvc
+            os: windows-latest
+            target: i686-pc-windows-msvc
 
     steps:
       - name: Checkout
@@ -90,11 +99,20 @@ jobs:
         run: |
           dirname="projectable-${{ needs.create-release.outputs.version }}-${{ matrix.target }}"
           mkdir "$dirname"
-          mv "target/${{ matrix.target }}/release/prj" "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/prj.exe" "$dirname"
+          else
+            mv "target/${{ matrix.target }}/release/prj" "$dirname"
+          fi
           mv LICENSE "$dirname"
-          name="$dirname.tar.gz"
-          tar -czf "$name" "$dirname"
-          echo "ASSET=$name" >> $GITHUB_ENV
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a "$dirname.zip" "$dirname"
+            echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+            tar -czf "$dirname.tar.gz" "$dirname"
+            echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
 
       - name: Upload archive
         uses: actions/upload-release-asset@v1.0.1
