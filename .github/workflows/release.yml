@@ -82,7 +82,7 @@ jobs:
         if: matrix.build == 'linux'
         run: |
           sudo apt-get update --fix-missing
-          sudo apt-get install pkg-config libssl-dev
+          sudo apt-get install -y -qq pkg-config libssl-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
       - name: Build
         uses: actions-rs/cargo@v1
