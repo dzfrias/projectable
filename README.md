@@ -4,7 +4,7 @@
 
 <p><sub>Preview done with <a href="https://github.com/sharkdp/bat">bat</a></sub></p>
 
-**projectable** is a highly configurable project manager. You can do _everything_
+**projectable** is a highly configurable TUI project manager. You can do _everything_
 your project needs from a comfortable and smooth interface.
 
 Instead of exploring the depths of your most nested directory, open a file simply
