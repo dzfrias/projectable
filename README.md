@@ -46,7 +46,7 @@ $ cargo install projectable
   <summary>Homebrew</summary>
 
 ```bash
-$ cargo install dzfrias/formulae/projectable
+$ brew install dzfrias/formulae/projectable
 ```
 
 </details>
