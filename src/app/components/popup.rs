@@ -79,7 +79,7 @@ impl Drawable for Popup {
 
         let (text, title, height) = match self.preset {
             Preset::Help => {
-                let keybinds = [
+                let mut keybinds = vec![
                     (self.config.open.to_string(), "Open file/toggle opened"),
                     (self.config.down.to_string(), "Move down"),
                     (self.config.up.to_string(), "Move up"),
@@ -142,6 +142,12 @@ impl Drawable for Popup {
                     (self.config.quit.to_string(), "Quit"),
                     (self.config.help.to_string(), "Open help window"),
                 ];
+                keybinds.extend(
+                    self.config
+                        .commands
+                        .iter()
+                        .map(|(key, action)| (key.to_string(), action.as_str())),
+                );
                 let longest_key_len = keybinds
                     .iter()
                     .map(|(key, _)| key.len())
