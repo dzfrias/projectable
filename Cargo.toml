@@ -1,7 +1,7 @@
 [package]
 name = "projectable"
 authors = ["Diego Frias <styx5242@gmail.com>"]
-version = "0.1.0"
+version = "0.2.0"
 description = """
 projectable is a highly configurable TUI project manager. You can do everything
 your project needs from a comfortable and smooth interface, instead of exploring
