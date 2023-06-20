@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use crossbeam_channel::unbounded;
 use log::{error, warn, LevelFilter};
@@ -132,7 +132,8 @@ fn main() -> Result<()> {
 
     // Create tui terminal and app
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-    let root = find_project_root(&config.project_roots)?.ok_or(anyhow!("not in a project!"))?;
+    let root = find_project_root(&config.project_roots)?
+        .unwrap_or(env::current_dir().context("error reading current directory")?);
     let dir = args.dir.map_or(env::current_dir()?, |dir| root.join(dir));
     let marks = Rc::new(RefCell::new(Marks::from_marks_file(&root)?));
     let mut app = App::new(root, dir, Rc::clone(&config), Rc::clone(&marks))
