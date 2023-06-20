@@ -34,7 +34,7 @@ Here are just a few builtin things projectable can do:
 To get started, you can use one of the following installation methods:
 
 <details>
-  <summary>cargo</summary>
+  <summary>[cargo](https://crates.io)</summary>
 
 ```bash
 $ cargo install projectable
@@ -43,7 +43,7 @@ $ cargo install projectable
 </details>
 
 <details>
-  <summary>Homebrew</summary>
+  <summary>[Homebrew](https://brew.sh)</summary>
 
 ```bash
 $ brew install dzfrias/formulae/projectable
