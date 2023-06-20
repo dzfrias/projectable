@@ -43,6 +43,22 @@ $ cargo install projectable
 </details>
 
 <details>
+  <summary>Homebrew</summary>
+
+```bash
+$ cargo install dzfrias/formulae/projectable
+```
+
+</details>
+
+<details>
+  <summary>Releases</summary>
+
+Go to the releases page, and binaries for every major platform should be there.
+
+</details>
+
+<details>
   <summary>Build from source</summary>
 
 Requires [Rust](https://github.com/rust-lang/rust) to be installed on your
