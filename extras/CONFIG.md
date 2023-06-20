@@ -149,6 +149,7 @@ search = "/"
 clear = '\'
 new_file = "n"
 new_dir = "N"
+rename = "r"
 git_filter = "T"
 diff_mode = "t"
 open_all = "o"

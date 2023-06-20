@@ -200,6 +200,15 @@ impl FileListing {
         Ok(())
     }
 
+    pub fn mv<'a, T>(&mut self, index: T, new: impl AsRef<Path>) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let (moved, idx) = self.items.mv(index, new)?;
+        self.folded.as_mut_bitslice().swap_range(moved, idx);
+        Ok(())
+    }
+
     pub fn fold_all(&mut self) {
         for dir_idx in self
             .items
@@ -722,5 +731,18 @@ mod tests {
         let mut items = FileListing::new(&["/root/test.txt"]);
         items.add(Item::Dir("/root/dir".into()));
         assert!(items.folded.first().is_some_and(|is_folded| *is_folded));
+    }
+
+    #[test]
+    fn moving_items_also_moves_folds() {
+        let mut items = FileListing::new(&[
+            "/root/test/test.txt",
+            "/root/test/testing.txt",
+            "/root/test2/test2.txt",
+        ]);
+        items.fold(0);
+        assert!(items.mv(0, "/root/test2/testing").is_ok());
+
+        assert_eq!(bitvec![0, 0, 1, 0, 0], items.folded);
     }
 }

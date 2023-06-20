@@ -26,6 +26,9 @@ pub enum InputOperation {
     Command {
         to: PathBuf,
     },
+    Rename {
+        to: PathBuf,
+    },
     SpecialCommand(String),
     #[default]
     NoOperations,
@@ -159,7 +162,10 @@ impl Component for InputBox {
                             let full_cmd = cmd.replace("{...}", self.text.as_str());
                             self.queue.add(AppEvent::RunCommand(full_cmd));
                         }
-
+                        InputOperation::Rename { to } => {
+                            let text = std::mem::take(&mut self.text);
+                            self.queue.add(AppEvent::RenameFile(to.clone(), PathBuf::from(text)))
+                        }
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };
                     self.reset();
@@ -198,6 +204,7 @@ impl Drawable for InputBox {
             InputOperation::SpecialCommand(_) => "Command Input",
             InputOperation::NewDir { .. } => "New Directory",
             InputOperation::NewFile { .. } => "New File",
+            InputOperation::Rename { .. } => "Rename file",
             InputOperation::NoOperations => unreachable!("checked at top of method"),
         };
         let mut textarea = TextArea::default();

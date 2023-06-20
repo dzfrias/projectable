@@ -48,6 +48,7 @@ pub enum AppEvent {
     Mark(PathBuf),
     OpenFuzzy(Vec<String>, FuzzyOperation),
     FilterFor(Vec<PathBuf>),
+    RenameFile(PathBuf, PathBuf),
     StopAllCommands,
 }
 

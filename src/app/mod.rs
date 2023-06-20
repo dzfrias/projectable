@@ -126,6 +126,15 @@ impl App {
                     info!("created directory \"{}\"", path.display());
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
+                AppEvent::RenameFile(old, new) => {
+                    cmd!("mv", &old, &new).stderr_capture().run()?;
+                    let path = if new.is_relative() {
+                        self.path().join(new)
+                    } else {
+                        new
+                    };
+                    self.tree.move_item(old, path)?;
+                }
                 AppEvent::PreviewFile(path) => self
                     .previewer
                     .preview_file(path)

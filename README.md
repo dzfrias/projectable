@@ -83,6 +83,7 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `n`       | New file                                        |
 | `N`       | New directory                                   |
 | `d`       | Delete file/directory                           |
+| `r`       | Rename/move file                                |
 | `e`       | Execute command (see [syntax](#command-syntax)) |
 | `ctrl-c`  | Cancel command(s)                               |
 | `v`       | File-specific command                           |

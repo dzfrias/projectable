@@ -131,6 +131,9 @@ impl Filetree {
                 }
             }
             RefreshData::Add(path) => {
+                if !path.exists() {
+                    return Ok(());
+                }
                 if path.is_dir() {
                     self.listing.add(Item::Dir(path.clone()));
                 } else {
@@ -143,6 +146,14 @@ impl Filetree {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn move_item(&mut self, old: impl AsRef<Path>, new: impl AsRef<Path>) -> Result<()> {
+        self.listing
+            .mv(old.as_ref(), new)
+            .context("error moving item")?;
+        self.populate_status_cache();
         Ok(())
     }
 
@@ -453,6 +464,11 @@ impl Component for Filetree {
                     self.config.filetree.open_under => self.open_under(),
                     self.config.filetree.close_under => self.close_under(),
                     self.config.filetree.show_dotfiles => self.toggle_dotfiles()?,
+                    self.config.filetree.rename => {
+                        if let Some(selected) = self.get_selected() {
+                            self.queue.add(AppEvent::OpenInput(InputOperation::Rename { to: selected.path().to_path_buf() }))
+                        }
+                    },
                     _ => {
                         let key: crate::config::Key = key.into();
                         if let Some(cmd) = self.config.commands.get(&key) {

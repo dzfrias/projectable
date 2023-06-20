@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use bitvec::slice::BitSlice;
 use itertools::Itertools;
 use log::debug;
 use std::{
@@ -37,6 +38,13 @@ impl PartialOrd for Item {
 
 impl Item {
     pub fn path(&self) -> &Path {
+        match self {
+            Self::File(file) => file,
+            Self::Dir(dir) => dir,
+        }
+    }
+
+    pub fn path_mut(&mut self) -> &mut PathBuf {
         match self {
             Self::File(file) => file,
             Self::Dir(dir) => dir,
@@ -179,12 +187,18 @@ impl Items {
     where
         T: Into<ItemsIndex<'a>>,
     {
-        let index = self.resolve_index(index)?;
+        let range = self.get_children(index).ok()?;
+        debug!("removed items in range: {:?}", &range);
+        self.items.drain(range.clone());
+        Some(range)
+    }
 
-        if index >= self.items.len() {
-            return None;
-        }
-        let item = self.items.get(index)?;
+    fn get_children<'a, T>(&self, index: T) -> Result<RangeInclusive<usize>>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self.resolve_index(index).context("item not found")?;
+        let item = &self.items[index];
         if let Item::Dir(path) = item {
             // Gets index of the last item that has `path` as one of its ancestors
             let end = self
@@ -200,13 +214,9 @@ impl Items {
                     }
                 })
                 .unwrap_or(self.items.len() - 1);
-            self.items.drain(index..=end);
-            debug!("removed items in range: {:?}", index..=end);
-            Some(index..=end)
+            Ok(index..=end)
         } else {
-            self.items.remove(index);
-            debug!("removed item with index: {:?}", index);
-            Some(index..=index)
+            Ok(index..=index)
         }
     }
 
@@ -228,6 +238,76 @@ impl Items {
             + 1;
         self.items.insert(insertion_index, item);
         Ok(insertion_index)
+    }
+
+    pub fn mv<'a, T>(
+        &mut self,
+        idx: T,
+        new_name: impl AsRef<Path>,
+    ) -> Result<(RangeInclusive<usize>, usize)>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let first_idx = self.resolve_index(idx).context("item to move not found")?;
+        let first = self.items[first_idx].clone();
+        let items_to_move = self.get_children(first_idx)?;
+
+        let (rename, move_to, insertion_index) = {
+            let mut rename = false;
+            let mut move_to = None;
+            let mut insertion_index = None;
+
+            for (i, item) in self.items.iter().enumerate() {
+                let Item::Dir(path) = item else {
+                    continue;
+                };
+
+                if path == new_name.as_ref() {
+                    move_to = Some(path.clone());
+                    insertion_index = Some(i);
+                    break;
+                } else if path == new_name.as_ref().parent().unwrap() {
+                    rename = true;
+                    move_to = Some(path.clone());
+                    insertion_index = Some(i);
+                    break;
+                }
+            }
+
+            if move_to.is_none() && new_name.as_ref().parent().unwrap() == self.root() {
+                rename = true;
+                move_to = Some(self.root().to_owned());
+                insertion_index = Some(0);
+            }
+
+            (
+                rename,
+                move_to.context("directory to move to not found")?,
+                insertion_index.unwrap(),
+            )
+        };
+
+        if !rename {
+            for item in &mut self.items[items_to_move.clone()] {
+                let new_path =
+                    move_to.join(item.path().strip_prefix(first.path().parent().unwrap())?);
+                *item.path_mut() = new_path;
+            }
+        } else {
+            *self.items[first_idx].path_mut() = new_name.as_ref().to_owned();
+            for item in self.items[items_to_move.clone()].iter_mut().skip(1) {
+                let new_path = new_name
+                    .as_ref()
+                    .join(item.path().strip_prefix(first.path())?);
+                *item.path_mut() = new_path;
+            }
+        }
+
+        self.items
+            .as_mut_slice()
+            .swap_range(items_to_move.clone(), insertion_index);
+
+        Ok((items_to_move, insertion_index))
     }
 
     pub fn root(&self) -> &Path {
@@ -277,6 +357,50 @@ impl<'a> IntoIterator for &'a mut Items {
 
     fn into_iter(self) -> Self::IntoIter {
         self.items_mut().iter_mut()
+    }
+}
+
+// Defines trait for swapping items, provides `swap_range`
+pub trait Swappable {
+    fn len(&self) -> usize;
+    fn swap(&mut self, a: usize, b: usize);
+
+    fn swap_range(&mut self, old: RangeInclusive<usize>, new: usize) {
+        let mut swap_idx = *old.start();
+        let ratio = old.end() - old.start();
+        while swap_idx != new {
+            for i in (0..=ratio).rev() {
+                if swap_idx + i + 1 == self.len() {
+                    break;
+                }
+                self.swap(swap_idx + i, swap_idx + i + 1);
+            }
+            if *old.start() > new {
+                swap_idx -= 1;
+            } else {
+                swap_idx += 1;
+            }
+        }
+    }
+}
+
+impl Swappable for &mut BitSlice {
+    fn len(&self) -> usize {
+        BitSlice::len(self)
+    }
+
+    fn swap(&mut self, a: usize, b: usize) {
+        BitSlice::swap(self, a, b)
+    }
+}
+
+impl<T> Swappable for &mut [T] {
+    fn len(&self) -> usize {
+        <[T]>::len(self)
+    }
+
+    fn swap(&mut self, a: usize, b: usize) {
+        <[T]>::swap(self, a, b);
     }
 }
 
@@ -613,5 +737,95 @@ mod tests {
         items.add(Item::Dir("/root/test".into())).unwrap();
         assert!(items.remove(0).is_some());
         assert_eq!(vec![Item::File("/root/test.txt".into())], items.items);
+    }
+
+    #[test]
+    fn can_move_files() {
+        let mut items = Items::new(&["/root/test.txt", "/root/test/test2.txt"]);
+        assert!(items.mv(0, "/root/test").is_ok());
+        assert_eq!(
+            vec![
+                Item::Dir("/root/test".into()),
+                Item::File("/root/test/test.txt".into()),
+                Item::File("/root/test/test2.txt".into())
+            ],
+            items.items
+        );
+    }
+
+    #[test]
+    fn can_move_files_and_rename() {
+        let mut items = Items::new(&["/root/test.txt", "/root/test/test2.txt"]);
+        assert!(items.mv(0, "/root/test/testing.txt").is_ok());
+        assert_eq!(
+            vec![
+                Item::Dir("/root/test".into()),
+                Item::File("/root/test/testing.txt".into()),
+                Item::File("/root/test/test2.txt".into())
+            ],
+            items.items
+        );
+    }
+
+    #[test]
+    fn can_move_directories() {
+        let mut items = Items::new(&["/root/test/test.txt", "/root/test2/test2.txt"]);
+        assert!(items.mv(0, "/root/test2").is_ok());
+        assert_eq!(
+            vec![
+                Item::Dir("/root/test2".into()),
+                Item::File("/root/test2/test2.txt".into()),
+                Item::Dir("/root/test2/test".into()),
+                Item::File("/root/test2/test/test.txt".into()),
+            ],
+            items.items
+        );
+    }
+
+    #[test]
+    fn can_move_directories_and_rename() {
+        let mut items = Items::new(&[
+            "/root/test/test.txt",
+            "/root/test/testing.txt",
+            "/root/test2/test2.txt",
+        ]);
+        assert!(items.mv(0, "/root/test2/testing").is_ok());
+        assert_eq!(
+            vec![
+                Item::Dir("/root/test2".into()),
+                Item::File("/root/test2/test2.txt".into()),
+                Item::Dir("/root/test2/testing".into()),
+                Item::File("/root/test2/testing/test.txt".into()),
+                Item::File("/root/test2/testing/testing.txt".into()),
+            ],
+            items.items
+        );
+    }
+
+    #[test]
+    fn can_move_items_backwards() {
+        let mut items = Items::new(&[
+            "/root/test/test.txt",
+            "/root/test/testing.txt",
+            "/root/test2/test2.txt",
+        ]);
+        assert!(items.mv(4, "/root/test").is_ok());
+        assert_eq!(
+            vec![
+                Item::Dir("/root/test".into()),
+                Item::File("/root/test/test2.txt".into()),
+                Item::File("/root/test/test.txt".into()),
+                Item::File("/root/test/testing.txt".into()),
+                Item::Dir("/root/test2".into()),
+            ],
+            items.items
+        );
+    }
+
+    #[test]
+    fn can_rename_at_root() {
+        let mut items = Items::new(&["/root/test.txt"]);
+        assert!(items.mv(0, "/root/test2.txt").is_ok());
+        assert_eq!(vec![Item::File("/root/test2.txt".into())], items.items);
     }
 }

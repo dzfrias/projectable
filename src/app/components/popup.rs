@@ -137,6 +137,7 @@ impl Drawable for Popup {
                         self.config.filetree.mark_selected.to_string(),
                         "Mark selected file",
                     ),
+                    (self.config.filetree.rename.to_string(), "Rename/move file"),
                     (self.config.marks.open.to_string(), "Open marks window"),
                     (self.config.quit.to_string(), "Quit"),
                     (self.config.help.to_string(), "Open help window"),
