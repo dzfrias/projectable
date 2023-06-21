@@ -165,6 +165,14 @@ impl Component for FuzzyMatcher {
                 } => {
                     self.select_next();
                 }
+                Input {
+                    key: Key::Char('u'),
+                    ctrl: true,
+                    alt: false,
+                } => {
+                    self.area = TextArea::default();
+                    self.area.set_block(Block::default().borders(Borders::ALL));
+                }
                 _ => {}
             }
             self.area.input(input_event);
