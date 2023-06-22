@@ -145,6 +145,7 @@ impl FileListing {
         let index = index.into();
         if let ItemsIndex::Path(path) = &index {
             // Fold everything before selected
+            let mut folds_changed = false;
             for index in self
                 .items
                 .iter()
@@ -154,6 +155,10 @@ impl FileListing {
                 .map(|(idx, _)| idx)
             {
                 self.folded.get_mut(index).unwrap().set(false);
+                folds_changed = true;
+            }
+            if folds_changed {
+                self.populate_cache();
             }
         }
         let index = self.relative_to_absolute(index)?;
