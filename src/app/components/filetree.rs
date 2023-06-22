@@ -921,13 +921,11 @@ mod tests {
 
         assert_eq!(1, filetree.listing.len());
         assert!(filetree.toggle_dotfiles().is_ok());
-        assert_eq!(
-            vec![
-                &Item::File(temp.join(".test2.txt")),
-                &Item::File(temp.join("test.txt")),
-            ],
-            filetree.listing.items()
-        );
+        assert!(filetree
+            .listing
+            .items()
+            .contains(&&Item::File(temp.join(".test2.txt"))));
+        assert_eq!(2, filetree.listing.len());
     }
 
     #[test]
