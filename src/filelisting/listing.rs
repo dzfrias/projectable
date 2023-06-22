@@ -12,17 +12,25 @@ pub struct FileListing {
     selected: usize,
     /// A 1:1 track of folded items. It's length should **always** be the same as `items`
     folded: BitVec,
+    cache: Vec<usize>,
 }
 
 impl FileListing {
     pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
         let items = Items::new(items);
         let len = items.len();
-        Self {
+        let mut listing = Self {
             items,
             folded: BitVec::repeat(false, len),
             selected: 0,
-        }
+            cache: Vec::new(),
+        };
+        listing.populate_cache();
+        listing
+    }
+
+    fn populate_cache(&mut self) {
+        self.cache = self.iter().map(|(abs_index, _)| abs_index).collect();
     }
 
     pub fn items(&self) -> Vec<&Item> {
@@ -34,8 +42,7 @@ impl FileListing {
     }
 
     pub fn len(&self) -> usize {
-        // Doesn't take len of `self.items()` because the Iter<'_> doesn't allocate
-        self.iter().count()
+        self.cache.len()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -56,6 +63,7 @@ impl FileListing {
             return Some(idx);
         }
         self.folded.get_mut(idx)?.set(true);
+        self.populate_cache();
         Some(idx)
     }
 
@@ -65,6 +73,7 @@ impl FileListing {
     {
         let idx = self.relative_to_absolute(index)?;
         self.folded.get_mut(idx)?.set(false);
+        self.populate_cache();
         Some(idx)
     }
 
@@ -77,6 +86,7 @@ impl FileListing {
             .get_mut(self.selected)
             .expect("selected should be in folded")
             .set(!current);
+        self.populate_cache();
     }
 
     pub fn is_folded<'a, T>(&self, index: T) -> Option<bool>
@@ -181,6 +191,7 @@ impl FileListing {
             Ok(inserted_at) => self.folded.insert(inserted_at, is_dir),
             Err(err) => debug!("swallowed error: {err}"),
         }
+        self.populate_cache();
     }
 
     pub fn remove<'a, T>(&mut self, index: T) -> Result<()>
@@ -196,6 +207,7 @@ impl FileListing {
         if self.selected >= self.items.len() {
             self.selected = self.items.len().saturating_sub(1);
         }
+        self.populate_cache();
 
         Ok(())
     }
@@ -206,6 +218,7 @@ impl FileListing {
     {
         let (moved, idx) = self.items.mv(index, new)?;
         self.folded.as_mut_bitslice().swap_range(moved, idx);
+        self.populate_cache();
         Ok(())
     }
 
@@ -222,10 +235,12 @@ impl FileListing {
                 .expect("folded should be same length as items")
                 .set(true);
         }
+        self.populate_cache();
     }
 
     pub fn unfold_all(&mut self) {
         self.folded.fill(false);
+        self.populate_cache();
     }
 
     pub fn fold_under<'a, T>(&mut self, index: T) -> Result<()>
@@ -254,6 +269,7 @@ impl FileListing {
                 .expect("folded should have same length as items")
                 .set(true);
         }
+        self.populate_cache();
 
         Ok(())
     }
@@ -284,6 +300,7 @@ impl FileListing {
                 .expect("folded should have same length as items")
                 .set(false);
         }
+        self.populate_cache();
 
         Ok(())
     }
@@ -297,7 +314,7 @@ impl FileListing {
                 if n == 0 {
                     Some(0)
                 } else {
-                    Some(self.iter().nth(n)?.0)
+                    self.cache.get(n).copied()
                 }
             }
             ItemsIndex::Path(path) => self.iter().find_map(|(abs_index, item)| {
