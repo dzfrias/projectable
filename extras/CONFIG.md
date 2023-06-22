@@ -7,6 +7,11 @@ To get started, run `prj --make-config` to create a new config file. Then, run
 `prj --config` to get the location of your config file. Go to that directory,
 and edit the TOML file.
 
+Additionally, you can create _project local_ configurations. Just create a
+`.projectable.toml` file anywhere, and it'll be merged with your global
+configuration. This allows you to have specific commands depending on your
+build system, programming language, and more!
+
 ## Commands
 
 To create a new command, bound to a key, use the `commands` key of the
