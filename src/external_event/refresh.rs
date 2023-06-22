@@ -20,28 +20,12 @@ pub fn fs_watch(
                 Ok(event) => match event.kind {
                     EventKind::Create(_) => event_sender
                         .send(ExternalEvent::PartialRefresh(
-                            event
-                                .paths
-                                .into_iter()
-                                .filter_map(|path| {
-                                    path.try_exists()
-                                        .ok()
-                                        .and_then(|exists| exists.then(|| RefreshData::Add(path)))
-                                })
-                                .collect(),
+                            event.paths.into_iter().map(RefreshData::Add).collect(),
                         ))
                         .map_err(Into::into),
                     EventKind::Remove(_) => event_sender
                         .send(ExternalEvent::PartialRefresh(
-                            event
-                                .paths
-                                .into_iter()
-                                .filter_map(|path| {
-                                    path.try_exists().ok().and_then(|exists| {
-                                        exists.then(|| RefreshData::Delete(path))
-                                    })
-                                })
-                                .collect(),
+                            event.paths.into_iter().map(RefreshData::Delete).collect(),
                         ))
                         .map_err(Into::into),
                     _ => Ok(()),

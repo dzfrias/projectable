@@ -48,7 +48,6 @@ pub struct Filetree {
     state: Cell<ListState>,
     marks: Rc<RefCell<Marks>>,
     is_showing_hidden: bool,
-    ignore: Override,
 }
 
 impl Filetree {
@@ -69,7 +68,6 @@ impl Filetree {
             ),
             state: ListState::default().into(),
             is_showing_hidden: false,
-            ignore: OverrideBuilder::new(path.as_ref()).build()?,
         };
         tree.populate_status_cache();
         if let Some(item) = tree.get_selected() {
@@ -107,7 +105,6 @@ impl Filetree {
             listing,
             config: Rc::clone(&config),
             marks,
-            ignore: build_override_ignorer(&path, &config.filetree.ignore)?,
             ..Self::from_dir(path, queue)?
         })
     }
@@ -128,16 +125,13 @@ impl Filetree {
     pub fn partial_refresh(&mut self, refresh_data: &RefreshData) -> Result<()> {
         match refresh_data {
             RefreshData::Delete(path) => {
-                if self.ignore.matched(path, path.is_dir()).is_none() {
-                    return Ok(());
-                }
                 self.listing.remove(path.as_path())?;
                 if self.get_selected().is_some_and(|item| item.path() == path) {
                     self.queue.add(AppEvent::PreviewFile(path.clone()));
                 }
             }
             RefreshData::Add(path) => {
-                if self.ignore.matched(path, path.is_dir()).is_none() {
+                if !path.exists() {
                     return Ok(());
                 }
                 if path.is_dir() {
