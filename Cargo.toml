@@ -15,6 +15,10 @@ categories = ["command-line-utilities", "filesystem"]
 license = "MIT"
 edition = "2021"
 
+[[bench]]
+name = "listing_selection"
+harness = false
+
 [[bin]]
 name = "prj"
 path = "src/main.rs"
@@ -56,3 +60,4 @@ assert_fs = "1.0.10"
 test-log = "0.2.11"
 env_logger = "0.10.0"
 serial_test = "2.0.0"
+criterion = "0.3"
