@@ -203,7 +203,7 @@ fn run_app(
 
     let stop = Arc::new(AtomicBool::new(false));
     let mut input_handle = external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
-    let _watcher = external_event::fs_watch(
+    let (_watcher, mut change_buffer) = external_event::fs_watch(
         app.path(),
         event_send.clone(),
         config.filetree.refresh_time,
@@ -246,6 +246,7 @@ fn run_app(
                     Command::new(editor).arg(path).status()?;
                     // Resume input receiving thread again
                     stop.store(false, Ordering::Release);
+                    change_buffer.flush(&event_send);
                     input_handle =
                         external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
                 }
@@ -273,6 +274,7 @@ fn run_app(
                     expr.start()?.wait()?;
                     // Resume input receiving thread again
                     stop.store(false, Ordering::Release);
+                    change_buffer.flush(&event_send);
                     input_handle =
                         external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
                 }
