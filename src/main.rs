@@ -200,11 +200,15 @@ fn run_app(
 ) -> Result<()> {
     // Set up event channel
     let (event_send, event_recv) = unbounded();
-    let _watcher =
-        external_event::fs_watch(app.path(), event_send.clone(), config.filetree.refresh_time)?;
 
     let stop = Arc::new(AtomicBool::new(false));
     let mut input_handle = external_event::crossterm_watch(event_send.clone(), Arc::clone(&stop));
+    let _watcher = external_event::fs_watch(
+        app.path(),
+        event_send.clone(),
+        config.filetree.refresh_time,
+        Arc::clone(&stop),
+    )?;
 
     // When set to true, will stop any running child processes of projectable
     let thread_stop = Arc::new(AtomicBool::new(false));
