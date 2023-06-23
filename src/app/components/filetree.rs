@@ -526,6 +526,7 @@ mod tests {
     use super::*;
     use crate::{app::components::testing::*, config::FiletreeConfig};
     use collect_all::collect;
+    use smallvec::smallvec;
     use test_log::test;
 
     /// Create temporary files and return the temp dir
@@ -822,8 +823,9 @@ mod tests {
         let temp = temp_files!("test.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
         scopeguard::guard(temp, |temp| temp.close().unwrap());
-        let event =
-            ExternalEvent::PartialRefresh(vec![RefreshData::Delete("does_not_exist.txt".into())]);
+        let event = ExternalEvent::PartialRefresh(smallvec![RefreshData::Delete(
+            "does_not_exist.txt".into()
+        )]);
         assert!(filetree.handle_event(&event).is_ok());
     }
 
