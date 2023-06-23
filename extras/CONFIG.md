@@ -88,6 +88,36 @@ italic and bold are available.
 To see all possible color options, see
 [the entire configuration reference](#all-configuration-options).
 
+## External Preview Command
+
+The projectable previewer uses two default pagers:
+
+1. `cat` for Unix
+2. `type` for Windows
+
+This can be changed! For example, if you want to use
+[bat](https://github.com/sharkdp/bat):
+
+```toml
+[preview]
+preview_cmd = "bat --force-colorization --line-range 0:1000 {}"
+```
+
+The `--line-range` is not strictly necessary, but it helps to avoid slowdowns
+on massive files.
+
+### Git Pager
+
+You can also modify the `git diff` pager. If you want to use
+[delta](https://github.com/dandavison/delta), you can put this into your config:
+
+```toml
+[preview]
+git_pager = "delta"
+```
+
+Your git preview command will become `git diff | delta`!
+
 ## All Configuration Options
 
 These are the default configuration options for projectable. You can override
@@ -121,6 +151,7 @@ popup_border_style = { color = "white" }
 help_key_style = { color = "lightcyan", mods = ["bold"] }
 
 [preview]
+# For unix, uses `type` for windows
 preview_cmd = "cat {}"
 # Optional git pager
 # git_pager = "delta"
