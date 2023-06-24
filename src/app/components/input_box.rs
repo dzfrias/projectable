@@ -164,7 +164,8 @@ impl Component for InputBox {
                         }
                         InputOperation::Rename { to } => {
                             let text = std::mem::take(&mut self.text);
-                            self.queue.add(AppEvent::RenameFile(to.clone(), PathBuf::from(text)))
+                            self.queue
+                                .add(AppEvent::RenameFile(to.clone(), PathBuf::from(text)));
                         }
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };

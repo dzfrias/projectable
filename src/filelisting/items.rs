@@ -390,7 +390,7 @@ impl Swappable for &mut BitSlice {
     }
 
     fn swap(&mut self, a: usize, b: usize) {
-        BitSlice::swap(self, a, b)
+        BitSlice::swap(self, a, b);
     }
 }
 

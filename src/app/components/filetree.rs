@@ -466,7 +466,7 @@ impl Component for Filetree {
                     self.config.filetree.show_dotfiles => self.toggle_dotfiles()?,
                     self.config.filetree.rename => {
                         if let Some(selected) = self.get_selected() {
-                            self.queue.add(AppEvent::OpenInput(InputOperation::Rename { to: selected.path().to_path_buf() }))
+                            self.queue.add(AppEvent::OpenInput(InputOperation::Rename { to: selected.path().to_path_buf() }));
                         }
                     },
                     _ => {

@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ChangeBuffer {
     create_buf: Arc<Mutex<Vec<PathBuf>>>,
     remove_buf: Arc<Mutex<Vec<PathBuf>>>,
