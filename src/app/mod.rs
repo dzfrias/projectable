@@ -128,12 +128,12 @@ impl App {
                 }
                 AppEvent::RenameFile(old, new) => {
                     cmd!("mv", &old, &new).stderr_capture().run()?;
-                    let path = if new.is_relative() {
-                        self.path().join(new)
-                    } else {
-                        new
-                    };
-                    self.tree.move_item(old, path)?;
+                    info!("renamed file to {}", new.display());
+                    self.tree.rename(old, new)?;
+                }
+                AppEvent::MoveFile(from, to) => {
+                    cmd!("mv", &from, &to).stderr_capture().run()?;
+                    self.tree.move_item(from, to)?;
                 }
                 AppEvent::PreviewFile(path) => self
                     .previewer

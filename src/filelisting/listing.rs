@@ -227,6 +227,13 @@ impl FileListing {
         Ok(())
     }
 
+    pub fn rename<'a, T>(&mut self, index: T, new: impl AsRef<Path>) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        self.items.rename(index, new)
+    }
+
     pub fn fold_all(&mut self) {
         for dir_idx in self
             .items
@@ -763,7 +770,7 @@ mod tests {
             "/root/test2/test2.txt",
         ]);
         items.fold(0);
-        assert!(items.mv(0, "/root/test2/testing").is_ok());
+        assert!(items.mv(0, "/root/test2/").is_ok());
 
         assert_eq!(bitvec![0, 0, 1, 0, 0], items.folded);
     }

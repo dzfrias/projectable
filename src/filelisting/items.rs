@@ -240,6 +240,21 @@ impl Items {
         Ok(insertion_index)
     }
 
+    pub fn rename<'a, T>(&mut self, from: T, to: impl AsRef<Path>) -> Result<()>
+    where
+        T: Into<ItemsIndex<'a>>,
+    {
+        let index = self.resolve_index(from).context("item not found")?;
+        let item = &mut self.items[index];
+        if to.as_ref().components().count() != item.path().components().count() {
+            bail!("cannot move item, just rename");
+        }
+
+        *item.path_mut() = to.as_ref().to_path_buf();
+
+        Ok(())
+    }
+
     pub fn mv<'a, T>(
         &mut self,
         idx: T,
@@ -252,8 +267,7 @@ impl Items {
         let first = self.items[first_idx].clone();
         let items_to_move = self.get_children(first_idx)?;
 
-        let (rename, move_to, insertion_index) = {
-            let mut rename = false;
+        let (move_to, mut insertion_index) = {
             let mut move_to = None;
             let mut insertion_index = None;
 
@@ -266,43 +280,23 @@ impl Items {
                     move_to = Some(path.clone());
                     insertion_index = Some(i);
                     break;
-                } else if path == new_name.as_ref().parent().unwrap() {
-                    rename = true;
-                    move_to = Some(path.clone());
-                    insertion_index = Some(i);
-                    break;
                 }
             }
 
-            if move_to.is_none() && new_name.as_ref().parent().unwrap() == self.root() {
-                rename = true;
-                move_to = Some(self.root().to_owned());
-                insertion_index = Some(0);
-            }
-
             (
-                rename,
                 move_to.context("directory to move to not found")?,
                 insertion_index.unwrap(),
             )
         };
 
-        if !rename {
-            for item in &mut self.items[items_to_move.clone()] {
-                let new_path =
-                    move_to.join(item.path().strip_prefix(first.path().parent().unwrap())?);
-                *item.path_mut() = new_path;
-            }
-        } else {
-            *self.items[first_idx].path_mut() = new_name.as_ref().to_owned();
-            for item in self.items[items_to_move.clone()].iter_mut().skip(1) {
-                let new_path = new_name
-                    .as_ref()
-                    .join(item.path().strip_prefix(first.path())?);
-                *item.path_mut() = new_path;
-            }
+        for item in &mut self.items[items_to_move.clone()] {
+            let new_path = move_to.join(item.path().strip_prefix(first.path().parent().unwrap())?);
+            *item.path_mut() = new_path;
         }
 
+        if insertion_index < *items_to_move.start() {
+            insertion_index += 1;
+        }
         self.items
             .as_mut_slice()
             .swap_range(items_to_move.clone(), insertion_index);
@@ -369,11 +363,17 @@ pub trait Swappable {
         let mut swap_idx = *old.start();
         let ratio = old.end() - old.start();
         while swap_idx != new {
-            for i in (0..=ratio).rev() {
-                if swap_idx + i + 1 == self.len() {
-                    break;
+            if *old.start() > new {
+                for i in 0..=ratio {
+                    self.swap(swap_idx - 1 + i, swap_idx + i)
                 }
-                self.swap(swap_idx + i, swap_idx + i + 1);
+            } else {
+                for i in (0..=ratio).rev() {
+                    if swap_idx + i + 1 == self.len() {
+                        break;
+                    }
+                    self.swap(swap_idx + i, swap_idx + i + 1);
+                }
             }
             if *old.start() > new {
                 swap_idx -= 1;
@@ -754,20 +754,6 @@ mod tests {
     }
 
     #[test]
-    fn can_move_files_and_rename() {
-        let mut items = Items::new(&["/root/test.txt", "/root/test/test2.txt"]);
-        assert!(items.mv(0, "/root/test/testing.txt").is_ok());
-        assert_eq!(
-            vec![
-                Item::Dir("/root/test".into()),
-                Item::File("/root/test/testing.txt".into()),
-                Item::File("/root/test/test2.txt".into())
-            ],
-            items.items
-        );
-    }
-
-    #[test]
     fn can_move_directories() {
         let mut items = Items::new(&["/root/test/test.txt", "/root/test2/test2.txt"]);
         assert!(items.mv(0, "/root/test2").is_ok());
@@ -783,49 +769,29 @@ mod tests {
     }
 
     #[test]
-    fn can_move_directories_and_rename() {
-        let mut items = Items::new(&[
-            "/root/test/test.txt",
-            "/root/test/testing.txt",
-            "/root/test2/test2.txt",
-        ]);
-        assert!(items.mv(0, "/root/test2/testing").is_ok());
-        assert_eq!(
-            vec![
-                Item::Dir("/root/test2".into()),
-                Item::File("/root/test2/test2.txt".into()),
-                Item::Dir("/root/test2/testing".into()),
-                Item::File("/root/test2/testing/test.txt".into()),
-                Item::File("/root/test2/testing/testing.txt".into()),
-            ],
-            items.items
-        );
-    }
-
-    #[test]
     fn can_move_items_backwards() {
         let mut items = Items::new(&[
             "/root/test/test.txt",
             "/root/test/testing.txt",
             "/root/test2/test2.txt",
         ]);
-        assert!(items.mv(4, "/root/test").is_ok());
+        assert!(items.mv(3, "/root/test").is_ok());
         assert_eq!(
             vec![
                 Item::Dir("/root/test".into()),
-                Item::File("/root/test/test2.txt".into()),
+                Item::Dir("/root/test/test2".into()),
+                Item::File("/root/test/test2/test2.txt".into()),
                 Item::File("/root/test/test.txt".into()),
                 Item::File("/root/test/testing.txt".into()),
-                Item::Dir("/root/test2".into()),
             ],
             items.items
         );
     }
 
     #[test]
-    fn can_rename_at_root() {
+    fn can_rename() {
         let mut items = Items::new(&["/root/test.txt"]);
-        assert!(items.mv(0, "/root/test2.txt").is_ok());
+        assert!(items.rename(0, "/root/test2.txt").is_ok());
         assert_eq!(vec![Item::File("/root/test2.txt".into())], items.items);
     }
 }

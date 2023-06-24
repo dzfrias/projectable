@@ -93,6 +93,18 @@ impl InputBox {
                     Some(!self.text.contains('/'))
                 }
             }
+            InputOperation::Rename { .. } => {
+                if MAIN_SEPARATOR == '\\' {
+                    Some(
+                        !(self.text.contains('/')
+                            || self.text.contains('\\')
+                            || self.text == ".."
+                            || self.text == "."),
+                    )
+                } else {
+                    Some(!(self.text.contains('/') || self.text == ".." || self.text == "."))
+                }
+            }
             InputOperation::NoOperations => None,
             _ => Some(true),
         }
@@ -163,9 +175,8 @@ impl Component for InputBox {
                             self.queue.add(AppEvent::RunCommand(full_cmd));
                         }
                         InputOperation::Rename { to } => {
-                            let text = std::mem::take(&mut self.text);
-                            self.queue
-                                .add(AppEvent::RenameFile(to.clone(), PathBuf::from(text)));
+                            let new_path = to.parent().unwrap().join(&self.text);
+                            self.queue.add(AppEvent::RenameFile(to.clone(), new_path));
                         }
                         InputOperation::NoOperations => unreachable!("checked in match guard"),
                     };

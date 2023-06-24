@@ -1,5 +1,5 @@
 use crate::{
-    app::{component::*, InputOperation, PendingOperation},
+    app::{component::*, FuzzyOperation, InputOperation, PendingOperation},
     config::Config,
     external_event::{ExternalEvent, RefreshData},
     filelisting::{FileListing, Item},
@@ -151,8 +151,15 @@ impl Filetree {
 
     pub fn move_item(&mut self, old: impl AsRef<Path>, new: impl AsRef<Path>) -> Result<()> {
         self.listing
-            .mv(old.as_ref(), new)
+            .mv(old.as_ref(), &new)
             .context("error moving item")?;
+        self.populate_status_cache();
+        self.open_path(new)?;
+        Ok(())
+    }
+
+    pub fn rename(&mut self, old: impl AsRef<Path>, new: impl AsRef<Path>) -> Result<()> {
+        self.listing.rename(old.as_ref(), new.as_ref())?;
         self.populate_status_cache();
         Ok(())
     }
@@ -467,6 +474,20 @@ impl Component for Filetree {
                     self.config.filetree.rename => {
                         if let Some(selected) = self.get_selected() {
                             self.queue.add(AppEvent::OpenInput(InputOperation::Rename { to: selected.path().to_path_buf() }));
+                        }
+                    },
+                    self.config.filetree.move_path => {
+                        if let Some(selected) = self.get_selected() {
+                            let vis = if self.is_showing_hidden {
+                                HiddenVisibility::Visible
+                            } else {
+                                HiddenVisibility::Hidden
+                            };
+                            let items = self.build_walkbuilder(vis)?
+                                .filter_map(|item| item.is_dir().then(|| item))
+                                .map(|p| p.display().to_string())
+                                .collect();
+                            self.queue.add(AppEvent::OpenFuzzy(items, FuzzyOperation::MoveFile(selected.path().to_path_buf())));
                         }
                     },
                     _ => {

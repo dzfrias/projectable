@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher as Matcher};
 use itertools::Itertools;
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, path::PathBuf, rc::Rc};
 use tui::{
     backend::Backend,
     layout::{Constraint, Corner, Direction, Layout, Rect},
@@ -19,9 +19,10 @@ use tui::{
 };
 use tui_textarea::{Input, Key, TextArea};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FuzzyOperation {
     OpenFile,
+    MoveFile(PathBuf),
     None,
 }
 
@@ -91,12 +92,17 @@ impl FuzzyMatcher {
 
     pub fn submit(&mut self) {
         let Some(sel) = self.selected() else { return; };
-        let matches = self.compute_best_matches();
-        let Some(selected) = matches.get(sel) else { return; };
+        let selected = if let Some(sel) = self.compute_best_matches().get(sel) {
+            sel.0.to_owned()
+        } else {
+            return;
+        };
         match self.operation {
-            FuzzyOperation::OpenFile => self
-                .queue
-                .add(AppEvent::GotoFile(selected.0.to_owned().into())),
+            FuzzyOperation::OpenFile => self.queue.add(AppEvent::GotoFile(selected.into())),
+            FuzzyOperation::MoveFile(ref mut path) => {
+                let path = std::mem::take(path);
+                self.queue.add(AppEvent::MoveFile(path, selected.into()))
+            }
             FuzzyOperation::None => panic!("should not submit with no operation"),
         }
         self.reset();

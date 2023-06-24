@@ -98,6 +98,7 @@ pub enum Action<'a> {
     FiletreeOpenUnder,
     FiletreeShowDotfiles,
     FiletreeRename,
+    FiletreeMove,
     KillProcesses,
     Arbitrary(&'a str),
 }
@@ -222,6 +223,7 @@ impl Config {
             (Action::FiletreeCloseUnder, &self.filetree.close_under),
             (Action::FiletreeRename, &self.filetree.rename),
             (Action::FiletreeShowDotfiles, &self.filetree.show_dotfiles),
+            (Action::FiletreeMove, &self.filetree.move_path),
             (Action::KillProcesses, &self.kill_processes),
         ];
         // Put custom key binds actions
@@ -424,6 +426,7 @@ pub struct FiletreeConfig {
     pub close_under: Key,
     pub show_dotfiles: Key,
     pub rename: Key,
+    pub move_path: Key,
 }
 
 impl Default for FiletreeConfig {
@@ -453,6 +456,7 @@ impl Default for FiletreeConfig {
             close_under: Key::normal('h'),
             show_dotfiles: Key::normal('.'),
             rename: Key::normal('r'),
+            move_path: Key::normal('R'),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::color(Color::Magenta),
@@ -500,7 +504,8 @@ impl Merge for FiletreeConfig {
             show_dotfiles,
             show_hidden_by_default,
             dir_style,
-            rename
+            rename,
+            move_path
         );
     }
 }
