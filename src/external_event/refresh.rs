@@ -41,29 +41,23 @@ impl ChangeBuffer {
     }
 
     pub fn flush(&mut self, sender: &Sender<ExternalEvent>) {
-        let mut c_buf = self.create_buf.lock().unwrap();
-        if !c_buf.is_empty() {
-            let res = sender.send(ExternalEvent::PartialRefresh(
-                c_buf.drain(..).map(RefreshData::Add).collect(),
-            ));
-            if let Err(err) = res {
-                sender
-                    .send(ExternalEvent::Error(err.into()))
-                    .expect("sending error failed");
-            }
+        macro_rules! send_buffer {
+            ($buffer:expr, $refresh_type:ident) => {
+                if !$buffer.is_empty() {
+                    let res = sender.send(ExternalEvent::PartialRefresh(
+                        $buffer.drain(..).map(RefreshData::$refresh_type).collect(),
+                    ));
+                    if let Err(err) = res {
+                        sender
+                            .send(ExternalEvent::Error(err.into()))
+                            .expect("sending error failed");
+                    }
+                }
+            };
         }
-        let mut r_buf = self.remove_buf.lock().unwrap();
-        if !r_buf.is_empty() {
-            let res = sender.send(ExternalEvent::PartialRefresh(
-                r_buf.drain(..).map(RefreshData::Delete).collect(),
-            ));
 
-            if let Err(err) = res {
-                sender
-                    .send(ExternalEvent::Error(err.into()))
-                    .expect("sending error failed");
-            }
-        }
+        send_buffer!(self.create_buf.lock().unwrap(), Add);
+        send_buffer!(self.remove_buf.lock().unwrap(), Delete);
     }
 }
 
