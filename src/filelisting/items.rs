@@ -365,7 +365,7 @@ pub trait Swappable {
         while swap_idx != new {
             if *old.start() > new {
                 for i in 0..=ratio {
-                    self.swap(swap_idx - 1 + i, swap_idx + i)
+                    self.swap(swap_idx - 1 + i, swap_idx + i);
                 }
             } else {
                 for i in (0..=ratio).rev() {

@@ -484,7 +484,7 @@ impl Component for Filetree {
                                 HiddenVisibility::Hidden
                             };
                             let items = self.build_walkbuilder(vis)?
-                                .filter_map(|item| item.is_dir().then(|| item))
+                                .filter_map(|item| item.is_dir().then_some(item))
                                 .map(|p| p.display().to_string())
                                 .collect();
                             self.queue.add(AppEvent::OpenFuzzy(items, FuzzyOperation::MoveFile(selected.path().to_path_buf())));

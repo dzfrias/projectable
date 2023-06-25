@@ -101,7 +101,7 @@ impl FuzzyMatcher {
             FuzzyOperation::OpenFile => self.queue.add(AppEvent::GotoFile(selected.into())),
             FuzzyOperation::MoveFile(ref mut path) => {
                 let path = std::mem::take(path);
-                self.queue.add(AppEvent::MoveFile(path, selected.into()))
+                self.queue.add(AppEvent::MoveFile(path, selected.into()));
             }
             FuzzyOperation::None => panic!("should not submit with no operation"),
         }
