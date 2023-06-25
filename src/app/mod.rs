@@ -127,6 +127,10 @@ impl App {
                     self.tree.partial_refresh(&RefreshData::Add(path))?;
                 }
                 AppEvent::RenameFile(old, new) => {
+                    let new = old
+                        .parent()
+                        .context("file to rename has no parent")?
+                        .join(new);
                     cmd!("mv", &old, &new).stderr_capture().run()?;
                     info!("renamed file to {}", new.display());
                     self.tree.rename(old, new)?;
