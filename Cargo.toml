@@ -35,6 +35,7 @@ dirs-next = "2.0.0"
 duct = "0.13.6"
 easy-cast = "0.5.2"
 easy_switch = "0.1.0"
+either = { version = "1.8.1", features = ["serde"] }
 fuzzy-matcher = "0.3.7"
 git2 = { version = "0.16.1", features = ["vendored-openssl"] }
 globset = { version = "0.4.10", features = ["serde1"] }

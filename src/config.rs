@@ -1,5 +1,6 @@
 use anyhow::Error;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use either::Either;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use itertools::Itertools;
 use nom::{
@@ -69,7 +70,7 @@ macro_rules! merge {
 }
 
 /// Every possible key action that can be pressed and is not part of a popup
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Display, Copy)]
 #[strum(serialize_all = "snake_case")]
 pub enum Action<'a> {
     Quit,
@@ -169,14 +170,14 @@ impl Serialize for GlobList {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    pub quit: Key,
-    pub help: Key,
-    pub down: Key,
-    pub up: Key,
-    pub all_down: Key,
-    pub all_up: Key,
-    pub open: Key,
-    pub kill_processes: Key,
+    pub quit: KeyBind,
+    pub help: KeyBind,
+    pub down: KeyBind,
+    pub up: KeyBind,
+    pub all_down: KeyBind,
+    pub all_up: KeyBind,
+    pub open: KeyBind,
+    pub kill_processes: KeyBind,
     pub special_commands: HashMap<String, Vec<String>>,
     pub commands: HashMap<Key, String>,
     pub project_roots: GlobList,
@@ -193,7 +194,7 @@ pub struct Config {
 
 impl Config {
     pub fn check_conflicts(&self) -> Vec<KeyConflict> {
-        let mut keys = vec![
+        let keybinds = [
             (Action::Quit, &self.quit),
             (Action::Help, &self.help),
             (Action::Down, &self.down),
@@ -226,13 +227,24 @@ impl Config {
             (Action::FiletreeMove, &self.filetree.move_path),
             (Action::KillProcesses, &self.kill_processes),
         ];
+        let mut keys = Vec::with_capacity(keybinds.len());
+        for keybind in keybinds {
+            match keybind.1.all_bindings() {
+                Either::Left(ref key) => {
+                    keys.push((keybind.0, key));
+                }
+                Either::Right(other_keys) => {
+                    keys.extend(other_keys.iter().map(|key| (keybind.0, key)));
+                }
+            }
+        }
+        let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
         // Put custom key binds actions
         keys.extend(
             self.commands
                 .iter()
                 .map(|(key, cmd)| (Action::Arbitrary(cmd), key)),
         );
-        let mut uses: HashMap<&Key, Vec<Action>> = HashMap::with_capacity(keys.len());
 
         for (name, key) in keys {
             match uses.entry(key) {
@@ -283,14 +295,14 @@ impl Merge for Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            quit: Key::normal('q'),
-            help: Key::normal('?'),
-            down: Key::normal('j'),
-            up: Key::normal('k'),
-            open: Key::key_code(KeyCode::Enter),
-            all_up: Key::normal('g'),
-            all_down: Key::normal('G'),
-            kill_processes: Key::ctrl('c'),
+            quit: KeyBind::key(Key::normal('q')),
+            help: KeyBind::key(Key::normal('?')),
+            down: KeyBind::key(Key::normal('j')),
+            up: KeyBind::key(Key::normal('k')),
+            open: KeyBind::key(Key::key_code(KeyCode::Enter)),
+            all_up: KeyBind::key(Key::normal('g')),
+            all_down: KeyBind::key(Key::normal('G')),
+            kill_processes: KeyBind::key(Key::ctrl('c')),
             special_commands: HashMap::new(),
             selected: Style::bg(Color::Black, Color::Magenta),
             popup_border_style: Style::default(),
@@ -345,8 +357,8 @@ impl KeyConflict<'_> {
 pub struct PreviewConfig {
     pub preview_cmd: String,
     pub git_pager: Option<String>,
-    pub down_key: Key,
-    pub up_key: Key,
+    pub down_key: KeyBind,
+    pub up_key: KeyBind,
     pub scroll_amount: u16,
     pub border_color: Style,
     pub scroll_bar_color: Style,
@@ -362,8 +374,8 @@ impl Default for PreviewConfig {
             preview_cmd: "cat {}".to_owned(),
 
             git_pager: None,
-            down_key: Key::ctrl('d'),
-            up_key: Key::ctrl('u'),
+            down_key: KeyBind::key(Key::ctrl('d')),
+            up_key: KeyBind::key(Key::ctrl('u')),
             scroll_amount: 10,
             border_color: Style::color(Color::Cyan),
             scroll_bar_color: Style::color(Color::Magenta),
@@ -408,25 +420,25 @@ pub struct FiletreeConfig {
     pub marks_style: Style,
     pub dir_style: Style,
 
-    pub special_command: Key,
-    pub down_three: Key,
-    pub up_three: Key,
-    pub exec_cmd: Key,
-    pub delete: Key,
-    pub search: Key,
-    pub clear: Key,
-    pub new_file: Key,
-    pub new_dir: Key,
-    pub git_filter: Key,
-    pub diff_mode: Key,
-    pub open_all: Key,
-    pub close_all: Key,
-    pub mark_selected: Key,
-    pub open_under: Key,
-    pub close_under: Key,
-    pub show_dotfiles: Key,
-    pub rename: Key,
-    pub move_path: Key,
+    pub special_command: KeyBind,
+    pub down_three: KeyBind,
+    pub up_three: KeyBind,
+    pub exec_cmd: KeyBind,
+    pub delete: KeyBind,
+    pub search: KeyBind,
+    pub clear: KeyBind,
+    pub new_file: KeyBind,
+    pub new_dir: KeyBind,
+    pub git_filter: KeyBind,
+    pub diff_mode: KeyBind,
+    pub open_all: KeyBind,
+    pub close_all: KeyBind,
+    pub mark_selected: KeyBind,
+    pub open_under: KeyBind,
+    pub close_under: KeyBind,
+    pub show_dotfiles: KeyBind,
+    pub rename: KeyBind,
+    pub move_path: KeyBind,
 }
 
 impl Default for FiletreeConfig {
@@ -438,25 +450,25 @@ impl Default for FiletreeConfig {
             show_hidden_by_default: false,
             ignore: Vec::new(),
             refresh_time: 1000,
-            down_three: Key::ctrl('n'),
-            up_three: Key::ctrl('p'),
-            exec_cmd: Key::normal('e'),
-            delete: Key::normal('d'),
-            search: Key::normal('/'),
-            clear: Key::normal('\\'),
-            open_all: Key::normal('o'),
-            close_all: Key::normal('O'),
-            new_file: Key::normal('n'),
-            new_dir: Key::normal('N'),
-            git_filter: Key::normal('T'),
-            diff_mode: Key::normal('t'),
-            special_command: Key::normal('v'),
-            mark_selected: Key::normal('m'),
-            open_under: Key::normal('l'),
-            close_under: Key::normal('h'),
-            show_dotfiles: Key::normal('.'),
-            rename: Key::normal('r'),
-            move_path: Key::normal('R'),
+            down_three: KeyBind::key(Key::ctrl('n')),
+            up_three: KeyBind::key(Key::ctrl('p')),
+            exec_cmd: KeyBind::key(Key::normal('e')),
+            delete: KeyBind::key(Key::normal('d')),
+            search: KeyBind::key(Key::normal('/')),
+            clear: KeyBind::key(Key::normal('\\')),
+            open_all: KeyBind::key(Key::normal('o')),
+            close_all: KeyBind::key(Key::normal('O')),
+            new_file: KeyBind::key(Key::normal('n')),
+            new_dir: KeyBind::key(Key::normal('N')),
+            git_filter: KeyBind::key(Key::normal('T')),
+            diff_mode: KeyBind::key(Key::normal('t')),
+            special_command: KeyBind::key(Key::normal('v')),
+            mark_selected: KeyBind::key(Key::normal('m')),
+            open_under: KeyBind::key(Key::normal('l')),
+            close_under: KeyBind::key(Key::normal('h')),
+            show_dotfiles: KeyBind::key(Key::normal('.')),
+            rename: KeyBind::key(Key::normal('r')),
+            move_path: KeyBind::key(Key::normal('R')),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::color(Color::Magenta),
@@ -546,8 +558,8 @@ pub struct MarksConfig {
     pub marks_dir: Option<PathBuf>,
     pub relative: bool,
 
-    pub open: Key,
-    pub delete: Key,
+    pub open: KeyBind,
+    pub delete: KeyBind,
     pub mark_style: Style,
 }
 
@@ -556,8 +568,8 @@ impl Default for MarksConfig {
         Self {
             marks_dir: None,
             relative: true,
-            open: Key::normal('M'),
-            delete: Key::normal('d'),
+            open: KeyBind::key(Key::normal('M')),
+            delete: KeyBind::key(Key::normal('d')),
             mark_style: Style::default(),
         }
     }
@@ -1016,6 +1028,55 @@ impl Serialize for Key {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct KeyBind(#[serde(with = "either::serde_untagged")] Either<Key, Vec<Key>>);
+
+impl fmt::Display for KeyBind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Either::Left(key) => write!(f, "{key}"),
+            Either::Right(keys) => write!(f, "{keys:?}"),
+        }
+    }
+}
+
+impl KeyBind {
+    pub fn key(key: Key) -> Self {
+        Self(Either::Left(key))
+    }
+
+    pub fn keys(keys: Vec<Key>) -> Self {
+        Self(Either::Right(keys))
+    }
+
+    pub fn is_match(&self, other_key: &Key) -> bool {
+        match &self.0 {
+            Either::Left(key) => key == other_key,
+            Either::Right(keys) => keys.contains(other_key),
+        }
+    }
+
+    pub fn all_bindings(&self) -> &Either<Key, Vec<Key>> {
+        &self.0
+    }
+}
+
+impl PartialEq<&KeyEvent> for KeyBind {
+    fn eq(&self, other: &&KeyEvent) -> bool {
+        self == *other
+    }
+}
+
+impl PartialEq<KeyEvent> for KeyBind {
+    fn eq(&self, other: &KeyEvent) -> bool {
+        match &self.0 {
+            Either::Left(key) => key.eq(other),
+            Either::Right(keys) => keys.iter().any(|key| key.eq(other)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1103,37 +1164,37 @@ mod tests {
     #[test]
     fn merge_keeps_lhs_when_rhs_is_default() {
         let mut lhs = Config {
-            quit: Key::normal('z'),
+            quit: KeyBind::key(Key::normal('z')),
             ..Default::default()
         };
         let rhs = Config::default();
         lhs.merge(rhs);
-        assert_eq!(Key::normal('z'), lhs.quit);
+        assert_eq!(KeyBind::key(Key::normal('z')), lhs.quit);
     }
 
     #[test]
     fn merge_has_rhs_take_precedence_over_lhs() {
         let mut lhs = Config {
-            quit: Key::normal('z'),
+            quit: KeyBind::key(Key::normal('z')),
             ..Default::default()
         };
         let rhs = Config {
-            quit: Key::normal('v'),
+            quit: KeyBind::key(Key::normal('v')),
             ..Default::default()
         };
         lhs.merge(rhs);
-        assert_eq!(Key::normal('v'), lhs.quit);
+        assert_eq!(KeyBind::key(Key::normal('v')), lhs.quit);
     }
 
     #[test]
     fn merge_has_rhs_override_lhs_when_lhs_is_default() {
         let mut lhs = Config::default();
         let rhs = Config {
-            quit: Key::normal('v'),
+            quit: KeyBind::key(Key::normal('v')),
             ..Default::default()
         };
         lhs.merge(rhs);
-        assert_eq!(Key::normal('v'), lhs.quit);
+        assert_eq!(KeyBind::key(Key::normal('v')), lhs.quit);
     }
 
     #[test]
@@ -1157,8 +1218,8 @@ mod tests {
     #[test]
     fn properly_reports_keybind_conflicts() {
         let config = Config {
-            help: Key::normal('q'),
-            down: Key::normal('q'),
+            help: KeyBind::key(Key::normal('q')),
+            down: KeyBind::key(Key::normal('q')),
             ..Default::default()
         };
         assert_eq!(
