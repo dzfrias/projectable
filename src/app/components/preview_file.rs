@@ -236,15 +236,6 @@ mod tests {
     use crossterm::event::{KeyModifiers, MouseEvent};
     use test_log::test;
 
-    fn preview_default() -> String {
-        #[cfg(target_os = "windows")]
-        let program = "type {}";
-        #[cfg(not(target_os = "windows"))]
-        let program = "cat {}";
-
-        program.to_owned()
-    }
-
     #[test]
     fn can_get_file_contents() {
         let temp_dir = TempDir::new().expect("should be able to make temp dir");
@@ -288,7 +279,7 @@ mod tests {
             .write_str("should be previewed")
             .unwrap();
         let mut config = Config::default();
-        config.preview.preview_cmd = preview_default().strip_suffix(" {}").unwrap().to_owned();
+        config.preview.preview_cmd = "echo".to_owned();
         let mut previewer = PreviewFile::with_config(Rc::new(config));
         assert!(previewer.preview_file(temp_dir.join("test.txt")).is_ok());
     }
