@@ -15,12 +15,13 @@ build system, programming language, and more!
 ## Commands
 
 To create a new command, bound to a key, use the `commands` key of the
-configuration. This will be a key-value pair value.
+configuration. This will be a key-value pair.
 
 Here's an example:
 
 ```toml
-commands = { "ctrl-e" = "echo Hello, World!" }
+[commands]
+"ctrl-e" = "echo Hello, World!"
 ```
 
 You can use [the command syntax](../README.md#command-syntax) for more dynamic
@@ -34,7 +35,8 @@ By default, this is bound to `v`, but can be [changed](#keys).
 For example, here's a possible configuration for a `Cargo.toml` file:
 
 ```toml
-special_commands = { "Cargo.toml" = ["cargo add {...}", "cargo remove {...}", "cargo build"] }
+[special_commands]
+"Cargo.toml" = ["cargo add {...}", "cargo remove {...}", "cargo build"]
 ```
 
 When you press `v` while selecting a `Cargo.toml` file, projectable will prompt
@@ -188,7 +190,7 @@ clear = '\'
 new_file = "n"
 new_dir = "N"
 rename = "r"
-move = "R"
+move_path = "R"
 git_filter = "T"
 diff_mode = "t"
 open_all = "o"

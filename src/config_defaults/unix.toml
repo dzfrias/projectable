@@ -1,7 +1,5 @@
 # General settings
 project_roots = [".git"]
-special_commands = {}
-commands = {}
 esc_to_close = true
 
 # Keys
@@ -19,6 +17,14 @@ kill_processes = "ctrl-c"
 selected = { color = "black", bg = "magenta" }
 popup_border_style = { color = "white" }
 help_key_style = { color = "lightcyan", mods = ["bold"] }
+
+[special_commands]
+# "<GLOB>" = ["<COMMAND>"] format
+# "..." = ["..."]
+
+[commands]
+# <KEY> = "<COMMAND>" format
+# ... = "..."
 
 [preview]
 preview_cmd = "cat {}"
@@ -54,7 +60,7 @@ clear = '\'
 new_file = "n"
 new_dir = "N"
 rename = "r"
-move = "R"
+move_path = "R"
 git_filter = "T"
 diff_mode = "t"
 open_all = "o"
