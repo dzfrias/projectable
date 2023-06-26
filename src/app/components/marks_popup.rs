@@ -245,11 +245,11 @@ mod tests {
     }
 
     #[test]
-    fn adding_marks_is_unique() {
+    fn adding_duplicate_marks_removes_the_mark() {
         let mut popup = test_popup();
         assert_eq!(2, popup.marks.borrow().marks.len());
         popup.add_mark(".".into());
-        assert_eq!(2, popup.marks.borrow().marks.len());
+        assert_eq!(1, popup.marks.borrow().marks.len());
     }
 
     #[test]
