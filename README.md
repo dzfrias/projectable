@@ -35,6 +35,7 @@ Here are just a few builtin things projectable can do:
 To get started, you can use one of the following installation methods:
 
 ### Minimum Supported Rust Version (MSRV)
+
 When installing from Cargo or building from source, the MSRV for `projectable` is currently 1.70.x
 
 <details>
@@ -103,7 +104,8 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `n`       | New file                                        |
 | `N`       | New directory                                   |
 | `d`       | Delete file/directory                           |
-| `r`       | Rename/move file                                |
+| `r`       | Rename file                                     |
+| `R`       | Move file                                       |
 | `e`       | Execute command (see [syntax](#command-syntax)) |
 | `ctrl-c`  | Cancel command(s)                               |
 | `v`       | File-specific command                           |
@@ -113,9 +115,9 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `ctrl-d`  | Move preview down                               |
 | `ctrl-u`  | Move preview up                                 |
 | `t`       | Toggle git diff view                            |
-| `T`       | Filter for modified files                       |
+| `T`       | Toggle filter for modified files                |
 | `.`       | Toggle hidden files                             |
-| `m`       | Mark file                                       |
+| `m`       | Toggle mark on file                             |
 | `M`       | Open marks                                      |
 
 You can make your own keybinds, too! This is of course done in the configuration

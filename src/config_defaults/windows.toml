@@ -54,6 +54,7 @@ clear = '\'
 new_file = "n"
 new_dir = "N"
 rename = "r"
+move = "R"
 git_filter = "T"
 diff_mode = "t"
 open_all = "o"

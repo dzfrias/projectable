@@ -47,12 +47,12 @@ to run with `Cargo.*` if you'd like this prompt to appear in lock file as well.
 
 Many of the default keybinds can be changed in projectable.
 
-For example, if you'd like to change the default up/down selection keys, you
-could do so with:
+For example, if you'd like to change the default up/down selection keys and
+still keep the defaults, you could do so with:
 
 ```toml
-up = "up"
-down = "down"
+up = ["k", "up"]
+down = ["j", "down"]
 ```
 
 Changing the new file key could look like this:
@@ -134,6 +134,7 @@ project_roots = [".git"]
 special_commands = {}
 # Items of the form `KEY = COMMAND`
 commands = {}
+esc_to_close = true
 
 # Keys
 up = "k"
@@ -182,11 +183,12 @@ up_three = "ctrl-p"
 exec_cmd = "e"
 delete = "d"
 search = "/"
-# Clear filters (like the git filter)
+# Full refresh of tree
 clear = '\'
 new_file = "n"
 new_dir = "N"
 rename = "r"
+move = "R"
 git_filter = "T"
 diff_mode = "t"
 open_all = "o"
@@ -212,10 +214,10 @@ border_color = { color = "blue" }
 
 info = { color = "white" }
 error = { color = "red" }
-debug = { color = "green" }
+warn = { color = "yellow" }
 
 # Only shown when run with the --debug option
-warn = { color = "red" }
+debug = { color = "green" }
 trace = { color = "magenta" }
 
 [marks]
@@ -224,6 +226,6 @@ relative = true
 open = "M"
 delete = "d"
 
-# Color of marks in marks window
+# Color of marks in marks window, NOT in filetree
 mark_style = { color = "white" }
 ```
