@@ -417,7 +417,11 @@ impl Component for Filetree {
                     self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
                             info!("filtered for modified files");
-                            self.filter_include(cache.keys().cloned().collect_vec().as_ref())?;
+                            if self.listing.all_items().iter().filter(|item| item.is_file()).all(|item| cache.get(item.path()).is_some()) {
+                                self.refresh().context("problem refreshing filetree")?;
+                            } else {
+                                self.filter_include(cache.keys().cloned().collect_vec().as_ref())?;
+                            }
                         } else {
                             warn!("no git status to filter for");
                         }
