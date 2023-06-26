@@ -34,6 +34,9 @@ Here are just a few builtin things projectable can do:
 
 To get started, you can use one of the following installation methods:
 
+### Minimum Supported Rust Version (MSRV)
+When installing from Cargo or building from source, the MSRV for `projectable` is currently 1.70.x
+
 <details>
   <summary><a href="https://crates.io">cargo</a></summary>
 
