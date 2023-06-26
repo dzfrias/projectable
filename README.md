@@ -4,8 +4,9 @@
 
 <p><sub>Preview done with <a href="https://github.com/sharkdp/bat">bat</a></sub></p>
 
-**projectable** is a highly configurable TUI project manager. You can do _everything_
-your project needs from a comfortable and smooth interface.
+**projectable** is a highly configurable TUI file manager built for projects.
+You can do handle all your project's file-based needs from a comfortable and
+smooth interface.
 
 Instead of exploring the depths of your most nested directory, open a file simply
 from the projectable file listing!
