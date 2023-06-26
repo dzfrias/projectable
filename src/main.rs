@@ -179,7 +179,7 @@ fn find_project_root(globs: &GlobList) -> Result<Option<PathBuf>> {
     let start = env::current_dir()?;
     Ok(start
         .ancestors()
-        .take_while(|path| *path != &dirs_next::home_dir().unwrap_or_default())
+        .take_while(|path| *path != dirs_next::home_dir().unwrap_or_default())
         .find_map(|path| {
             fs::read_dir(path)
                 .ok()?
