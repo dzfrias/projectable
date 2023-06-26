@@ -251,6 +251,10 @@ impl FileListing {
     }
 
     pub fn unfold_all(&mut self) {
+        if self.folded.not_any() {
+            self.fold_all();
+            return;
+        }
         self.folded.fill(false);
         self.populate_cache();
     }
@@ -773,5 +777,16 @@ mod tests {
         assert!(items.mv(0, "/root/test2/").is_ok());
 
         assert_eq!(bitvec![0, 0, 1, 0, 0], items.folded);
+    }
+
+    #[test]
+    fn unfold_all_folds_all_if_everything_already_unfolded() {
+        let mut items = FileListing::new(&[
+            "/root/test/test.txt",
+            "/root/test/testing.txt",
+            "/root/test2/test2.txt",
+        ]);
+        items.unfold_all();
+        assert_eq!(bitvec![1, 0, 0, 1, 0], items.folded);
     }
 }
