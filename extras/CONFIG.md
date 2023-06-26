@@ -121,7 +121,8 @@ Your git preview command will become `git diff | delta`!
 ## All Configuration Options
 
 These are the default configuration options for projectable. You can override
-them as you wish!
+them as you wish! You can check out
+[my configuration](../src/config_defaults/_my_config.toml), too.
 
 Generally, the file is split up based on pane. For example, the pane that shows
 all of your files corresponds to the `[filetree]` section of the file.

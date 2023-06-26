@@ -1,0 +1,12 @@
+[commands]
+ctrl-g = "!!lazygit"
+ctrl-v = "tmux split-window -h nvim {}"
+ctrl-x = "tmux split-window -v nvim {}"
+
+[special_commands]
+"Cargo.*" = ["cargo add {...}", "cargo remove {...}"]
+"package.json" = ["npm run dev"]
+
+[preview]
+preview_cmd = "bat --force-colorization {} --line-range 0:1000"
+git_pager = "delta"
