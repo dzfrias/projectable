@@ -113,7 +113,7 @@ impl Component for PendingPopup {
                         .selected()
                         .expect("should always have something selected");
                     // Delete option
-                    if selected == 1 {
+                    if selected == 0 {
                         self.reset_work();
                         return Ok(());
                     }
@@ -137,7 +137,7 @@ impl Drawable for PendingPopup {
         if !self.visible() {
             return Ok(());
         }
-        let items = [ListItem::new("Confirm"), ListItem::new("Deny")];
+        let items = [ListItem::new("Deny"), ListItem::new("Confirm")];
         let list = List::new(items).highlight_style(self.config.selected.into());
         let area = ui::centered_rect(30, 20, area);
         let layout = Layout::default()
@@ -227,7 +227,7 @@ mod tests {
             ..Default::default()
         };
         popup.handle_event(&enter).expect("should handle input");
-        assert!(popup.queue.pop().is_some());
+        assert!(popup.queue.pop().is_none());
     }
 
     #[test]
@@ -240,6 +240,6 @@ mod tests {
         for event in events {
             popup.handle_event(&event).expect("should handle input");
         }
-        assert!(popup.queue.pop().is_none());
+        assert!(popup.queue.pop().is_some());
     }
 }
