@@ -221,7 +221,7 @@ impl App {
                     self.tree.open_path(path)?;
                 }
                 AppEvent::Mark(path) => {
-                    info!("marked: \"{}\"", path.display());
+                    info!("toggled mark for: \"{}\"", path.display());
                     self.marks_popup.add_mark(path);
                 }
                 AppEvent::OpenFuzzy(items, operation) => self.fuzzy_matcher.start(items, operation),

@@ -67,11 +67,20 @@ impl MarksPopup {
     }
 
     pub fn add_mark(&mut self, path: PathBuf) {
-        // Not a HashSet so it can be well-ordered
-        if self.marks.borrow().marks.contains(&path) {
-            return;
+        let pos = self
+            .marks
+            .borrow()
+            .marks
+            .iter()
+            .position(|mark| mark == &path);
+        match pos {
+            Some(n) => {
+                self.marks.borrow_mut().marks.remove(n);
+            }
+            None => {
+                self.marks.borrow_mut().marks.push(path);
+            }
         }
-        self.marks.borrow_mut().marks.push(path);
     }
 
     pub fn delete_selected(&mut self) {
