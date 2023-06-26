@@ -265,7 +265,7 @@ impl App {
                     self.config.quit => self.should_quit = true,
                     self.config.help => self.text_popup.preset = Preset::Help,
                     self.config.marks.open => self.marks_popup.open(),
-                    Key::esc() => self.should_quit = true,
+                    Key::esc(), self.config.esc_to_close => self.should_quit = true,
                     self.config.kill_processes => self.queue.add(AppEvent::StopAllCommands),
                 };
             }

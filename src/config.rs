@@ -181,6 +181,7 @@ pub struct Config {
     pub special_commands: HashMap<String, Vec<String>>,
     pub commands: HashMap<Key, String>,
     pub project_roots: GlobList,
+    pub esc_to_close: bool,
 
     pub selected: Style,
     pub popup_border_style: Style,
@@ -282,7 +283,8 @@ impl Merge for Config {
             popup_border_style,
             help_key_style,
             kill_processes,
-            commands
+            commands,
+            esc_to_close
         );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
@@ -318,6 +320,7 @@ impl Default for Config {
             filetree: FiletreeConfig::default(),
             log: LogConfig::default(),
             marks: MarksConfig::default(),
+            esc_to_close: true,
         }
     }
 }
