@@ -136,6 +136,11 @@ impl App {
                     self.tree.rename(old, new)?;
                 }
                 AppEvent::MoveFile(from, to) => {
+                    let to = if to.is_relative() {
+                        self.path().join(to)
+                    } else {
+                        to
+                    };
                     cmd!("mv", &from, &to).stderr_capture().run()?;
                     self.tree.move_item(from, to)?;
                 }

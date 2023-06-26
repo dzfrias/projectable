@@ -485,7 +485,7 @@ impl Component for Filetree {
                             };
                             let items = self.build_walkbuilder(vis)?
                                 .filter_map(|item| item.is_dir().then_some(item))
-                                .map(|p| p.display().to_string())
+                                .map(|p| p.strip_prefix(&self.root_path).expect("paths should start with root").display().to_string())
                                 .collect();
                             self.queue.add(AppEvent::OpenFuzzy(items, FuzzyOperation::MoveFile(selected.path().to_path_buf())));
                         }
