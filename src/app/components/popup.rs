@@ -171,13 +171,13 @@ impl Drawable for Popup {
                     35,
                 )
             }
-            Preset::RunningCommand => (
-                vec![Spans::from(vec![Span::raw(
-                    "Command in-progress. Press CTRL-C to quit",
-                )])],
-                "Command",
-                3,
-            ),
+            Preset::RunningCommand => {
+                let message = format!(
+                    "Command in-progress. Press {} to quit",
+                    self.config.kill_processes
+                );
+                (vec![Spans::from(vec![Span::raw(message)])], "Command", 3)
+            }
             Preset::Nothing => unreachable!("checked at top of method"),
         };
 
