@@ -111,7 +111,7 @@ fn main() -> Result<()> {
         shut_down();
     }
 
-    let config = Rc::new(get_config()?);
+    let config = Rc::new(get_config().context("error gettting project root")?);
 
     // Logging setup
     #[cfg(debug_assertions)]
@@ -131,16 +131,24 @@ fn main() -> Result<()> {
     }
 
     // Create tui terminal and app
-    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-    let root = find_project_root(&config.project_roots)?
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))
+        .context("error initializing stdout terminal")?;
+    let root = find_project_root(&config.project_roots)
+        .context("error getting possible project roots")?
         .unwrap_or(env::current_dir().context("error reading current directory")?);
-    let dir = args.dir.map_or(env::current_dir()?, |dir| root.join(dir));
-    let marks = Rc::new(RefCell::new(Marks::from_marks_file(&root)?));
+    let dir = args.dir.map_or(
+        env::current_dir().context("error gettiing current directory")?,
+        |dir| root.join(dir),
+    );
+    let marks = Rc::new(RefCell::new(
+        Marks::from_marks_file(&root).context("error getting marks file")?,
+    ));
     let mut app = App::new(root, dir, Rc::clone(&config), Rc::clone(&marks))
         .context("failed to create app")?;
 
     // Begin app event loop
-    run_app(&mut terminal, &mut app, Rc::clone(&config), marks)?;
+    run_app(&mut terminal, &mut app, Rc::clone(&config), marks)
+        .context("error during app runtime")?;
 
     Ok(())
 }
@@ -169,13 +177,16 @@ fn get_config() -> Result<Config> {
 /// directory is invalid, and returns `None` if there was no root found.
 fn find_project_root(globs: &GlobList) -> Result<Option<PathBuf>> {
     let start = env::current_dir()?;
-    Ok(start.ancestors().find_map(|path| {
-        fs::read_dir(path)
-            .ok()?
-            .filter_map(|entry| entry.ok())
-            .any(|entry| globs.is_match(entry.path()))
-            .then(|| path.to_path_buf())
-    }))
+    Ok(start
+        .ancestors()
+        .take_while(|path| *path != &dirs_next::home_dir().unwrap_or_default())
+        .find_map(|path| {
+            fs::read_dir(path)
+                .ok()?
+                .filter_map(|entry| entry.ok())
+                .any(|entry| globs.is_match(entry.path()))
+                .then(|| path.to_path_buf())
+        }))
 }
 
 /// Gets the local configuration file. Errors if the current directory is invalid, and returns
