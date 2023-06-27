@@ -57,9 +57,19 @@ $ brew install dzfrias/formulae/projectable
 </details>
 
 <details>
+  <summary><a href="https://aur.archlinux.org">Arch User Repository</a></summary>
+
+projectable is available from the Arch User Repository though
+[this package](https://aur.archlinux.org/packages/projectable). Thanks to
+@Absobel for creating this!
+
+</details>
+
+<details>
   <summary>Releases</summary>
 
-Go to the releases page, and binaries for every major platform should be there.
+Go to the [releases](https://github.com/dzfrias/projectable/releases) page,
+and binaries for every major platform should be there.
 
 </details>
 
