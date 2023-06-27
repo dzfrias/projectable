@@ -10,3 +10,6 @@ ctrl-x = "tmux split-window -v nvim {}"
 [preview]
 preview_cmd = "bat --force-colorization {} --line-range 0:1000"
 git_pager = "delta"
+
+[filetree]
+dirs_first = true

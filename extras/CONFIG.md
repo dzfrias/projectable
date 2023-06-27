@@ -175,7 +175,8 @@ use_git = true
 ignore = []
 use_gitignore = true
 refresh_time = 1000
-dirs_first = true
+# Display directories before files
+dirs_first = false
 show_hidden_by_default = false
 
 # Keys
