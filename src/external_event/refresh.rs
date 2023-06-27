@@ -1,7 +1,11 @@
 use super::{ExternalEvent, RefreshData};
 use anyhow::Result;
 use crossbeam_channel::{unbounded, Sender};
-use notify::{recommended_watcher, Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify_debouncer_full::{
+    new_debouncer,
+    notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher},
+    DebounceEventResult, Debouncer, FileIdMap,
+};
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -65,49 +69,56 @@ impl ChangeBuffer {
 pub fn fs_watch(
     path: &Path,
     event_sender: Sender<ExternalEvent>,
-    refresh_time: u64,
+    _refresh_time: u64,
     is_suspended: Arc<AtomicBool>,
-) -> Result<(RecommendedWatcher, ChangeBuffer)> {
+) -> Result<(Debouncer<RecommendedWatcher, FileIdMap>, ChangeBuffer)> {
     let (tx, rx) = unbounded();
-    let mut watcher = recommended_watcher(tx)?;
-    watcher.configure(Config::default().with_poll_interval(Duration::from_millis(refresh_time)))?;
-    watcher.watch(path, RecursiveMode::Recursive)?;
+    let mut watcher = {
+        let event_sender = event_sender.clone();
+        new_debouncer(
+            Duration::from_secs(2),
+            None,
+            move |result: DebounceEventResult| match result {
+                Ok(events) => {
+                    for event in events {
+                        tx.send(event.event).unwrap();
+                    }
+                }
+                Err(errs) => {
+                    for err in errs {
+                        event_sender.send(ExternalEvent::Error(err.into())).unwrap();
+                    }
+                }
+            },
+        )?
+    };
+    watcher.watcher().watch(path, RecursiveMode::Recursive)?;
     let buffer = ChangeBuffer::new();
     let mut thread_buffer = buffer.clone();
     thread::spawn(move || {
-        for res in rx {
-            let send_result: Result<()> = match res {
-                Ok(event) => match event.kind {
-                    EventKind::Create(_) => {
-                        if is_suspended.load(Ordering::Acquire) {
-                            thread_buffer.add_created(event.paths);
-                            Ok(())
-                        } else {
-                            let data = ExternalEvent::PartialRefresh(
-                                event.paths.into_iter().map(RefreshData::Add).collect(),
-                            );
-                            event_sender.send(data).map_err(Into::into)
-                        }
+        for event in rx {
+            match event.kind {
+                EventKind::Create(_) => {
+                    if is_suspended.load(Ordering::Acquire) {
+                        thread_buffer.add_created(event.paths);
+                    } else {
+                        let data = ExternalEvent::PartialRefresh(
+                            event.paths.into_iter().map(RefreshData::Add).collect(),
+                        );
+                        event_sender.send(data).unwrap();
                     }
-                    EventKind::Remove(_) => {
-                        if is_suspended.load(Ordering::Acquire) {
-                            thread_buffer.add_removed(event.paths);
-                            Ok(())
-                        } else {
-                            let data = ExternalEvent::PartialRefresh(
-                                event.paths.into_iter().map(RefreshData::Delete).collect(),
-                            );
-                            event_sender.send(data).map_err(Into::into)
-                        }
+                }
+                EventKind::Remove(_) => {
+                    if is_suspended.load(Ordering::Acquire) {
+                        thread_buffer.add_removed(event.paths);
+                    } else {
+                        let data = ExternalEvent::PartialRefresh(
+                            event.paths.into_iter().map(RefreshData::Delete).collect(),
+                        );
+                        event_sender.send(data).unwrap();
                     }
-                    _ => Ok(()),
-                },
-                Err(e) => Err(e.into()),
-            };
-            if let Err(err) = send_result {
-                event_sender
-                    .send(ExternalEvent::Error(err))
-                    .expect("sender should not have deallocated");
+                }
+                _ => {}
             }
         }
     });
