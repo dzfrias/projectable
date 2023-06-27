@@ -16,8 +16,8 @@ pub struct FileListing {
 }
 
 impl FileListing {
-    pub fn new<T: AsRef<Path>>(items: &[T]) -> Self {
-        let items = Items::new(items);
+    pub fn new<T: AsRef<Path>>(items: &[T], dirs_first: bool) -> Self {
+        let items = Items::new(items, dirs_first);
         let len = items.len();
         let mut listing = Self {
             items,
@@ -410,11 +410,14 @@ mod tests {
 
     #[test]
     fn can_fold_dirs() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+            ],
+            false,
+        );
 
         items.fold(1);
         assert_eq!(bitvec![0, 1, 0, 0], items.folded);
@@ -422,11 +425,14 @@ mod tests {
 
     #[test]
     fn folded_dirs_are_not_included_in_items() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+            ],
+            false,
+        );
 
         items.fold(1);
         assert_eq!(
@@ -440,12 +446,15 @@ mod tests {
 
     #[test]
     fn nested_dirs_are_folded() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         items.fold(1);
         assert_eq!(
@@ -459,12 +468,15 @@ mod tests {
 
     #[test]
     fn next_selection_does_not_go_past_length() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         items.select_next_n(100);
         assert_eq!(5, items.selected().unwrap());
@@ -472,12 +484,15 @@ mod tests {
 
     #[test]
     fn prev_selection_does_not_go_past_0() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         items.select_prev_n(1);
         assert_eq!(0, items.selected().unwrap());
@@ -485,12 +500,15 @@ mod tests {
 
     #[test]
     fn nested_folds_are_concealed_by_parent_fold() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         items.fold(4);
         items.fold(1);
@@ -505,24 +523,30 @@ mod tests {
 
     #[test]
     fn folding_out_of_range_returns_none() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         assert!(items.fold(100).is_none());
     }
 
     #[test]
     fn can_iterate_over_visible_items() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+            ],
+            false,
+        );
 
         items.fold(1);
         let visible = items.iter().collect_vec();
@@ -537,13 +561,16 @@ mod tests {
 
     #[test]
     fn selection_is_relative() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold(1);
         assert_eq!(0, items.selected().unwrap());
@@ -556,13 +583,16 @@ mod tests {
 
     #[test]
     fn folding_is_relative() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test/test.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test/test.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
         items.fold(1);
         items.fold(2);
         assert_eq!(
@@ -577,11 +607,14 @@ mod tests {
 
     #[test]
     fn can_toggle_fold() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+            ],
+            false,
+        );
 
         items.select_next();
         items.toggle_fold();
@@ -590,13 +623,16 @@ mod tests {
 
     #[test]
     fn can_handle_multiple_folds() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test2/test.txt",
-            "/root/test2/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test2/test.txt",
+                "/root/test2/test2.txt",
+            ],
+            false,
+        );
 
         items.select_next();
         items.toggle_fold();
@@ -607,11 +643,14 @@ mod tests {
 
     #[test]
     fn cannot_fold_files() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+            ],
+            false,
+        );
 
         items.toggle_fold();
         assert!(!items.is_folded(0).unwrap());
@@ -621,12 +660,15 @@ mod tests {
 
     #[test]
     fn fold_all_folds_only_directories() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         assert_eq!(bitvec![0, 1, 0, 0, 1, 0], items.folded);
@@ -634,12 +676,15 @@ mod tests {
 
     #[test]
     fn unfold_all_unfolds_everything() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         items.unfold_all();
@@ -648,11 +693,14 @@ mod tests {
 
     #[test]
     fn adding_items_updates_folded() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         items.add(Item::File("/root/test2.txt".into()));
@@ -661,13 +709,16 @@ mod tests {
 
     #[test]
     fn nested_dirs_are_not_visible_when_topmost_is_folded() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test/test2/test.txt",
-            "/root/test/test3/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test/test2/test.txt",
+                "/root/test/test3/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         assert_eq!(2, items.len());
@@ -675,12 +726,15 @@ mod tests {
 
     #[test]
     fn removing_from_listing_removes_from_folded() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test2.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test2.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         assert!(items.remove(1).is_ok());
@@ -696,7 +750,7 @@ mod tests {
 
     #[test]
     fn removing_with_1_item_left_doesnt_panic() {
-        let mut items = FileListing::new(&["/root/test.txt"]);
+        let mut items = FileListing::new(&["/root/test.txt"], false);
         assert!(items.remove(0).is_ok());
     }
 
@@ -709,7 +763,8 @@ mod tests {
 
     #[test]
     fn opening_path_opens_all_nested_dirs() {
-        let mut items = FileListing::new(&["/root/test/test/test/test.txt", "/root/test.txt"]);
+        let mut items =
+            FileListing::new(&["/root/test/test/test/test.txt", "/root/test.txt"], false);
 
         assert!(items.select("/root/test/test/test").is_some());
         assert_eq!(3, items.selected().unwrap());
@@ -717,12 +772,15 @@ mod tests {
 
     #[test]
     fn going_past_selection_with_fold_does_not_panic() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test.txt",
-            "/root/test/test/test.txt",
-            "/root/test/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test.txt",
+                "/root/test/test/test.txt",
+                "/root/test/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         items.unfold(1);
@@ -734,12 +792,15 @@ mod tests {
 
     #[test]
     fn can_fold_recursively_under_certain_paths() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test/test.txt",
-            "/root/test/test2/test.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test/test.txt",
+                "/root/test/test2/test.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         assert!(items.fold_under(1).is_ok());
         assert_eq!(bitvec![0, 1, 1, 0, 1, 0, 0, 0], items.folded);
@@ -747,12 +808,15 @@ mod tests {
 
     #[test]
     fn can_unfold_recursively_under_certain_paths() {
-        let mut items = FileListing::new(&[
-            "/root/test.txt",
-            "/root/test/test/test.txt",
-            "/root/test/test2/test.txt",
-            "/root/test2/test.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test.txt",
+                "/root/test/test/test.txt",
+                "/root/test/test2/test.txt",
+                "/root/test2/test.txt",
+            ],
+            false,
+        );
 
         items.fold_all();
         assert!(items.unfold_under(1).is_ok());
@@ -761,18 +825,21 @@ mod tests {
 
     #[test]
     fn adding_dir_starts_it_as_folded() {
-        let mut items = FileListing::new(&["/root/test.txt"]);
+        let mut items = FileListing::new(&["/root/test.txt"], false);
         items.add(Item::Dir("/root/dir".into()));
         assert!(items.folded.first().is_some_and(|is_folded| *is_folded));
     }
 
     #[test]
     fn moving_items_also_moves_folds() {
-        let mut items = FileListing::new(&[
-            "/root/test/test.txt",
-            "/root/test/testing.txt",
-            "/root/test2/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test/test.txt",
+                "/root/test/testing.txt",
+                "/root/test2/test2.txt",
+            ],
+            false,
+        );
         items.fold(0);
         assert!(items.mv(0, "/root/test2/").is_ok());
 
@@ -781,11 +848,14 @@ mod tests {
 
     #[test]
     fn unfold_all_folds_all_if_everything_already_unfolded() {
-        let mut items = FileListing::new(&[
-            "/root/test/test.txt",
-            "/root/test/testing.txt",
-            "/root/test2/test2.txt",
-        ]);
+        let mut items = FileListing::new(
+            &[
+                "/root/test/test.txt",
+                "/root/test/testing.txt",
+                "/root/test2/test2.txt",
+            ],
+            false,
+        );
         items.unfold_all();
         assert_eq!(bitvec![1, 0, 0, 1, 0], items.folded);
     }

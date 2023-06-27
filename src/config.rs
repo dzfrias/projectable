@@ -411,7 +411,6 @@ pub struct FiletreeConfig {
     pub ignore: Vec<String>,
     pub use_gitignore: bool,
     pub refresh_time: u64,
-    // TODO: Actually implement
     pub dirs_first: bool,
     pub show_hidden_by_default: bool,
 
@@ -449,7 +448,7 @@ impl Default for FiletreeConfig {
         Self {
             use_git: true,
             use_gitignore: true,
-            dirs_first: true,
+            dirs_first: false,
             show_hidden_by_default: false,
             ignore: Vec::new(),
             refresh_time: 1000,

@@ -65,6 +65,7 @@ impl Filetree {
                     .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
                     .filter(|entry_path| entry_path != path.as_ref())
                     .collect_vec(),
+                false,
             ),
             state: ListState::default().into(),
             is_showing_hidden: false,
@@ -93,6 +94,7 @@ impl Filetree {
                 .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
                 .filter(|entry_path| entry_path != path.as_ref()) // Ignore root
                 .collect_vec(),
+            config.filetree.dirs_first,
         );
         listing.fold_all();
 
@@ -114,6 +116,7 @@ impl Filetree {
             &self
                 .build_walkbuilder(HiddenVisibility::Hidden)?
                 .collect_vec(),
+            self.config.filetree.dirs_first,
         );
         listing.fold_all();
         self.listing = listing;
@@ -211,7 +214,7 @@ impl Filetree {
             })
             .collect_vec();
 
-        self.listing = FileListing::new(&items);
+        self.listing = FileListing::new(&items, self.config.filetree.dirs_first);
 
         Ok(())
     }
@@ -226,7 +229,7 @@ impl Filetree {
             .collect_vec();
         self.is_showing_hidden = !self.is_showing_hidden;
 
-        self.listing = FileListing::new(&items);
+        self.listing = FileListing::new(&items, self.config.filetree.dirs_first);
         self.listing.fold_all();
 
         info!("toggling visibility of dotfiles");

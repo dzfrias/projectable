@@ -40,7 +40,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         "/root/src/queue.rs",
         "/root/src/ui/mod.rs",
         "/root/src/ui/scroll_paragraph.rs",
-    ]);
+    ], false);
     c.bench_function("next item in listing", |b| {
         b.iter(|| {
             listing.fold("/root/benches");
