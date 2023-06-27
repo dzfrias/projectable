@@ -296,12 +296,13 @@ impl FileListing {
     {
         let index = self
             .relative_to_absolute(index)
-            .context("invalid fold under target")?;
+            .context("invalid unfold under target")?;
         let target_item = self
             .items
             .get(index)
             .expect("should be in items, checked at top of method");
 
+        let mut unfolded_one = false;
         for target_idx in self
             .items
             .iter()
@@ -311,10 +312,20 @@ impl FileListing {
             .filter(|(_, item)| !item.is_file())
             .map(|(idx, _)| idx)
         {
+            if *self
+                .folded
+                .get(target_idx)
+                .expect("folded should have same length as items")
+            {
+                unfolded_one = true;
+            }
             self.folded
                 .get_mut(target_idx)
                 .expect("folded should have same length as items")
                 .set(false);
+        }
+        if !unfolded_one {
+            self.fold_under(target_item.path().to_path_buf())?;
         }
         self.populate_cache();
 
