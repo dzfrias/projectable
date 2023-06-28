@@ -147,43 +147,44 @@ impl Items {
                 .filter(|item| item.path() != root && item.path().starts_with(&root))
                 .collect()
         } else {
-            let (out, _) = Self::build_items(
-                &mut items
-                    .into_iter()
-                    .filter(|(dir, _)| dir.starts_with(&root))
-                    .collect(),
-                &root,
-            );
+            let mut new_items: HashMap<PathBuf, Vec<Item>> = items
+                .into_iter()
+                .filter(|(dir, _)| dir.starts_with(&root))
+                .collect();
+            let ordered_dirs = new_items.keys().cloned().sorted().collect_vec();
+            let mut idx = 0;
+            let out = Self::build_items(&mut new_items, &root, &ordered_dirs, &mut idx);
             out
         };
 
         Self { items, root }
     }
 
-    fn build_items(dirs: &mut HashMap<PathBuf, Vec<Item>>, root: &Path) -> (Vec<Item>, usize) {
+    fn build_items(
+        dirs: &mut HashMap<PathBuf, Vec<Item>>,
+        root: &Path,
+        ordered_dirs: &[PathBuf],
+        i: &mut usize,
+    ) -> Vec<Item> {
         if dirs.is_empty() {
-            return (Vec::new(), 0);
+            return Vec::new();
         }
 
-        let ordered_dirs = dirs.keys().cloned().sorted().collect_vec();
-
         let mut items = Vec::new();
-        let mut i = 0;
-        let (p, children) = dirs.remove_entry(&ordered_dirs[i]).unwrap();
-        while i + 1 != ordered_dirs.len()
-            && ordered_dirs[i + 1]
+        let (p, children) = dirs.remove_entry(&ordered_dirs[*i]).unwrap();
+        while *i + 1 != ordered_dirs.len()
+            && ordered_dirs[*i + 1]
                 .parent()
                 .is_some_and(|parent| parent == p)
         {
-            i += 1;
-            items.push(Item::Dir(ordered_dirs[i].clone()));
-            let (it, pushed) = Self::build_items(dirs, root);
-            i += pushed;
+            *i += 1;
+            items.push(Item::Dir(ordered_dirs[*i].clone()));
+            let it = Self::build_items(dirs, root, ordered_dirs, i);
             items.extend(it);
         }
         items.extend(children);
 
-        (items, i)
+        items
     }
 
     pub fn len(&self) -> usize {
