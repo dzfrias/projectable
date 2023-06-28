@@ -153,8 +153,7 @@ impl Items {
                 .collect();
             let ordered_dirs = new_items.keys().cloned().sorted().collect_vec();
             let mut idx = 0;
-            let out = Self::build_items(&mut new_items, &root, &ordered_dirs, &mut idx);
-            out
+            Self::build_items(&mut new_items, &ordered_dirs, &mut idx)
         };
 
         Self { items, root }
@@ -162,7 +161,6 @@ impl Items {
 
     fn build_items(
         dirs: &mut HashMap<PathBuf, Vec<Item>>,
-        root: &Path,
         ordered_dirs: &[PathBuf],
         i: &mut usize,
     ) -> Vec<Item> {
@@ -179,7 +177,7 @@ impl Items {
         {
             *i += 1;
             items.push(Item::Dir(ordered_dirs[*i].clone()));
-            let it = Self::build_items(dirs, root, ordered_dirs, i);
+            let it = Self::build_items(dirs, ordered_dirs, i);
             items.extend(it);
         }
         items.extend(children);
