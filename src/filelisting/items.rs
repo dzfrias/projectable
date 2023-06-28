@@ -147,52 +147,43 @@ impl Items {
                 .filter(|item| item.path() != root && item.path().starts_with(&root))
                 .collect()
         } else {
-            let ordered_dirs = items.keys().cloned().sorted().collect_vec();
-            let mut current_idx = 0;
-            let mut out = Vec::new();
-            Self::build_items(&ordered_dirs, &mut current_idx, &mut items, &mut out, &root);
+            let (out, _) = Self::build_items(
+                &mut items
+                    .into_iter()
+                    .filter(|(dir, _)| dir.starts_with(&root))
+                    .collect(),
+                &root,
+            );
             out
         };
 
         Self { items, root }
     }
 
-    fn build_items(
-        ordered_dirs: &[PathBuf],
-        current_idx: &mut usize,
-        dirs: &mut HashMap<PathBuf, Vec<Item>>,
-        out: &mut Vec<Item>,
-        root: &Path,
-    ) {
-        if *current_idx == ordered_dirs.len()
-            || (*current_idx != 0
-                && !ordered_dirs[*current_idx].starts_with(
-                    &ordered_dirs[*current_idx - 1]
-                        .parent()
-                        .unwrap_or(Path::new("")),
-                ))
-        {
-            return;
+    fn build_items(dirs: &mut HashMap<PathBuf, Vec<Item>>, root: &Path) -> (Vec<Item>, usize) {
+        if dirs.is_empty() {
+            return (Vec::new(), 0);
         }
 
-        let p = &ordered_dirs[*current_idx];
-        if p != root && p.starts_with(root) {
-            out.push(Item::Dir(p.to_path_buf()));
-            if *current_idx + 1 != ordered_dirs.len()
-                && !ordered_dirs[*current_idx + 1].starts_with(p)
-            {
-                out.extend(dirs.remove(p.as_path()).unwrap());
-            }
+        let ordered_dirs = dirs.keys().cloned().sorted().collect_vec();
+
+        let mut items = Vec::new();
+        let mut i = 0;
+        let (p, children) = dirs.remove_entry(&ordered_dirs[i]).unwrap();
+        while i + 1 != ordered_dirs.len()
+            && ordered_dirs[i + 1]
+                .parent()
+                .is_some_and(|parent| parent == p)
+        {
+            i += 1;
+            items.push(Item::Dir(ordered_dirs[i].clone()));
+            let (it, pushed) = Self::build_items(dirs, root);
+            i += pushed;
+            items.extend(it);
         }
-        *current_idx += 1;
-        while *current_idx != ordered_dirs.len() && ordered_dirs[*current_idx].starts_with(p) {
-            Self::build_items(ordered_dirs, current_idx, dirs, out, root);
-            *current_idx += 1;
-        }
-        if let Some(items) = dirs.remove(p.as_path()) {
-            out.extend(items);
-        }
-        *current_idx -= 1;
+        items.extend(children);
+
+        (items, i)
     }
 
     pub fn len(&self) -> usize {
