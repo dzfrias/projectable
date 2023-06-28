@@ -129,6 +129,7 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `.`       | Toggle hidden files                             |
 | `m`       | Toggle mark on file                             |
 | `M`       | Open marks                                      |
+| `?`       | Open help window                                |
 
 You can make your own keybinds, too! This is of course done in the configuration
 file, the details of which can be found in [CONFIG.md](./extras/CONFIG.md).
