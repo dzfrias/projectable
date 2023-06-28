@@ -299,8 +299,8 @@ impl Default for Config {
         Self {
             quit: KeyBind::key(Key::normal('q')),
             help: KeyBind::key(Key::normal('?')),
-            down: KeyBind::key(Key::normal('j')),
-            up: KeyBind::key(Key::normal('k')),
+            down: KeyBind::keys(vec![Key::normal('j'), Key::key_code(KeyCode::Down)]),
+            up: KeyBind::keys(vec![Key::normal('k'), Key::key_code(KeyCode::Up)]),
             open: KeyBind::key(Key::key_code(KeyCode::Enter)),
             all_up: KeyBind::key(Key::normal('g')),
             all_down: KeyBind::key(Key::normal('G')),

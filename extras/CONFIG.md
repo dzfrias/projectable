@@ -139,8 +139,8 @@ commands = {}
 esc_to_close = true
 
 # Keys
-up = "k"
-down = "j"
+up = ["k", "up"]
+down = ["j", "down"]
 quit = "q"
 help = "?"
 all_up = "g"
