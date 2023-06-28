@@ -147,7 +147,7 @@ impl Items {
                 .filter(|item| item.path() != root && item.path().starts_with(&root))
                 .collect()
         } else {
-            let ordered_dirs = items.keys().map(|p| p.clone()).sorted().collect_vec();
+            let ordered_dirs = items.keys().cloned().sorted().collect_vec();
             let mut current_idx = 0;
             let mut out = Vec::new();
             Self::build_items(&ordered_dirs, &mut current_idx, &mut items, &mut out, &root);
@@ -185,7 +185,10 @@ impl Items {
             }
         }
         *current_idx += 1;
-        Self::build_items(ordered_dirs, current_idx, dirs, out, root);
+        while *current_idx != ordered_dirs.len() && ordered_dirs[*current_idx].starts_with(p) {
+            Self::build_items(ordered_dirs, current_idx, dirs, out, root);
+            *current_idx += 1;
+        }
         if let Some(items) = dirs.remove(p.as_path()) {
             out.extend(items);
         }
