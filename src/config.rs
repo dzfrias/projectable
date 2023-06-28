@@ -21,6 +21,7 @@ use std::{
     borrow::Cow,
     collections::{hash_map::Entry, HashMap},
     env,
+    ffi::OsString,
     fmt::{self, Display},
     path::{Path, PathBuf},
     str::FromStr,
@@ -178,6 +179,7 @@ pub struct Config {
     pub all_up: KeyBind,
     pub open: KeyBind,
     pub kill_processes: KeyBind,
+    pub exec_cmd: Option<Vec<OsString>>,
     pub special_commands: HashMap<String, Vec<String>>,
     pub commands: HashMap<Key, String>,
     pub project_roots: GlobList,
@@ -284,7 +286,8 @@ impl Merge for Config {
             help_key_style,
             kill_processes,
             commands,
-            esc_to_close
+            esc_to_close,
+            exec_cmd
         );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
@@ -315,6 +318,7 @@ impl Default for Config {
             },
             commands: HashMap::new(),
             project_roots: GlobList::default(),
+            exec_cmd: None,
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),

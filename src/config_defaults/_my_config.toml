@@ -1,3 +1,5 @@
+exec_cmd = ["zsh", "-ci"]
+
 [commands]
 ctrl-g = "!!lazygit"
 ctrl-v = "tmux split-window -h nvim {}"

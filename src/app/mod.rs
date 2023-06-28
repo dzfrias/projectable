@@ -14,7 +14,6 @@ use crossterm::event::Event;
 use duct::{cmd, Expression};
 use easy_switch::switch;
 use log::{error, info, warn};
-use std::env;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
@@ -22,9 +21,11 @@ use std::process::Command;
 use std::{
     cell::RefCell,
     fs::{self, File},
+    iter,
     path::{Path, PathBuf},
     rc::Rc,
 };
+use std::{env, ffi::OsStr};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -155,14 +156,28 @@ impl App {
                         .strip_prefix("!!")
                         .map_or((true, cmd.as_str()), |s| (false, s));
 
-                    #[cfg(not(target_os = "windows"))]
-                    let cmd = cmd!(
-                        env::var("SHELL").unwrap_or_else(|_| "sh".to_owned()),
-                        "-c",
+                    let cmd = if let Some(cmd_start) = &self.config.exec_cmd {
+                        duct::cmd(
+                            cmd_start.get(0).context(
+                                "problem executing user shell command: no first argument",
+                            )?,
+                            cmd_start
+                                .iter()
+                                .skip(1)
+                                .map(|s| s.as_os_str())
+                                .chain(iter::once(OsStr::new(cmd))),
+                        )
+                    } else {
+                        #[cfg(not(target_os = "windows"))]
+                        let cmd = cmd!(
+                            env::var("SHELL").unwrap_or_else(|_| "sh".to_owned()),
+                            "-c",
+                            cmd
+                        );
+                        #[cfg(target_os = "windows")]
+                        let cmd = cmd!("cmd.exe", "/C", cmd);
                         cmd
-                    );
-                    #[cfg(target_os = "windows")]
-                    let cmd = cmd!("cmd.exe", "/C", cmd);
+                    };
 
                     if threaded {
                         self.text_popup.preset = Preset::RunningCommand;
