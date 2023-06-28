@@ -13,6 +13,7 @@ pub struct FileListing {
     /// A 1:1 track of folded items. It's length should **always** be the same as `items`
     folded: BitVec,
     cache: Vec<usize>,
+    selected_cache: Option<usize>,
 }
 
 impl FileListing {
@@ -24,6 +25,7 @@ impl FileListing {
             folded: BitVec::repeat(false, len),
             selected: 0,
             cache: Vec::new(),
+            selected_cache: Some(0),
         };
         listing.populate_cache();
         listing
@@ -34,7 +36,10 @@ impl FileListing {
     }
 
     pub fn items(&self) -> Vec<&Item> {
-        self.iter().map(|(_, item)| item).collect()
+        self.cache
+            .iter()
+            .map(|idx| self.items.get(*idx).unwrap())
+            .collect()
     }
 
     pub fn all_items(&self) -> &[Item] {
@@ -98,15 +103,7 @@ impl FileListing {
     }
 
     pub fn selected(&self) -> Option<usize> {
-        self.iter()
-            .enumerate()
-            .find_map(|(relative_idx, (abs_index, _))| {
-                if self.selected == abs_index {
-                    Some(relative_idx)
-                } else {
-                    None
-                }
-            })
+        self.selected_cache
     }
 
     pub fn selected_item(&self) -> Option<&Item> {
@@ -122,12 +119,14 @@ impl FileListing {
     }
 
     pub fn select_next_n(&mut self, n: usize) {
-        let Some(new_selected) = self.iter().skip(self.selected().unwrap_or_default()).nth(n) else {
+        let Some(new_selected) = self.cache.get(self.selected().unwrap_or_default() + n) else {
             // Set to last if the jump is over the limit
             self.selected = self.relative_to_absolute(self.len() - 1).unwrap_or_default();
+            self.selected_cache = Some(self.len() - 1);
             return;
         };
-        self.selected = new_selected.0;
+        self.selected = *new_selected;
+        self.selected_cache = Some(self.selected().unwrap_or_default() + n);
     }
 
     pub fn select_prev_n(&mut self, n: usize) {
@@ -136,6 +135,7 @@ impl FileListing {
         self.selected = self
             .relative_to_absolute(new)
             .expect("should be within bounds of listing");
+        self.selected_cache = Some(new);
     }
 
     pub fn select<'a, T>(&mut self, index: T) -> Option<&Item>
@@ -161,6 +161,14 @@ impl FileListing {
                 self.populate_cache();
             }
         }
+        self.selected_cache = match &index {
+            ItemsIndex::Number(n) => Some(*n),
+            ItemsIndex::Path(p) => {
+                self.iter()
+                    .enumerate()
+                    .find_map(|(idx, (_, item))| if item.path() == p { Some(idx) } else { None })
+            }
+        };
         let index = self.relative_to_absolute(index)?;
         self.selected = index;
         Some(
@@ -171,11 +179,13 @@ impl FileListing {
     }
 
     pub fn select_first(&mut self) {
-        self.select(0);
+        self.selected = 0;
+        self.selected_cache = Some(0);
     }
 
     pub fn select_last(&mut self) {
-        self.select(self.len() - 1);
+        self.selected = self.len() - 1;
+        self.selected_cache = Some(self.len() - 1);
     }
 
     pub fn iter(&self) -> Iter<'_> {

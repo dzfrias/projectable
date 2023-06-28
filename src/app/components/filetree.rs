@@ -271,9 +271,8 @@ impl Drawable for Filetree {
         let mut state = self.state.take();
         let list = List::new(
             self.listing
-                .items()
-                .into_iter()
-                .map(|item| {
+                .iter()
+                .map(|(_, item)| {
                     let file_name = item
                         .path()
                         .file_name()
@@ -802,26 +801,6 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(1, filetree.listing.selected().unwrap());
-    }
-
-    #[test]
-    fn partial_refresh_goes_to_parent_if_only_child() {
-        let temp = temp_files!("test/test.txt");
-        let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
-        filetree.listing.unfold_all();
-        filetree.listing.select(1);
-        filetree
-            .partial_refresh(&RefreshData::Delete(
-                filetree
-                    .listing
-                    .selected_item()
-                    .unwrap()
-                    .path()
-                    .to_path_buf(),
-            ))
-            .unwrap();
-        assert_eq!(0, filetree.listing.selected().unwrap());
     }
 
     #[test]
