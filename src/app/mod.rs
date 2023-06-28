@@ -174,7 +174,7 @@ impl App {
                                 .unchecked(),
                         )));
                     } else {
-                        return Ok(Some(TerminalEvent::RunCommand(cmd)));
+                        return Ok(Some(TerminalEvent::RunCommand(cmd.unchecked())));
                     };
                 }
                 AppEvent::RunCommandWithTmux(cmd, opts) => {
