@@ -187,6 +187,8 @@ pub struct Config {
     pub popup_border_style: Style,
     pub help_key_style: Style,
 
+    pub editor_cmd: String,
+
     pub preview: PreviewConfig,
     pub filetree: FiletreeConfig,
     pub log: LogConfig,
@@ -315,6 +317,8 @@ impl Default for Config {
             },
             commands: HashMap::new(),
             project_roots: GlobList::default(),
+
+            editor_cmd: env::var("EDITOR").unwrap_or("vi".to_owned()),
 
             preview: PreviewConfig::default(),
             filetree: FiletreeConfig::default(),
