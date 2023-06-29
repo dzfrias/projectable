@@ -200,6 +200,7 @@ mark_selected = "m"
 open_under = "l"
 close_under = "h"
 show_dotfiles = "."
+focus = "f"
 
 # Colors
 dir_style = { color = "blue", mods = ["italic"] }

@@ -100,6 +100,7 @@ pub enum Action<'a> {
     FiletreeShowDotfiles,
     FiletreeRename,
     FiletreeMove,
+    FiletreeFocus,
     KillProcesses,
     Arbitrary(&'a str),
 }
@@ -227,6 +228,7 @@ impl Config {
             (Action::FiletreeShowDotfiles, &self.filetree.show_dotfiles),
             (Action::FiletreeMove, &self.filetree.move_path),
             (Action::KillProcesses, &self.kill_processes),
+            (Action::FiletreeFocus, &self.filetree.focus),
         ];
         let mut keys = Vec::with_capacity(keybinds.len());
         for keybind in keybinds {
@@ -442,6 +444,7 @@ pub struct FiletreeConfig {
     pub show_dotfiles: KeyBind,
     pub rename: KeyBind,
     pub move_path: KeyBind,
+    pub focus: KeyBind,
 }
 
 impl Default for FiletreeConfig {
@@ -473,6 +476,7 @@ impl Default for FiletreeConfig {
             show_dotfiles: KeyBind::key(Key::normal('.')),
             rename: KeyBind::key(Key::normal('r')),
             move_path: KeyBind::key(Key::normal('R')),
+            focus: KeyBind::key(Key::normal('f')),
 
             filtered_out_message: Style::color(Color::Yellow),
             border_color: Style::color(Color::Magenta),

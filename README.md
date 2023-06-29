@@ -111,6 +111,7 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `G`       | Go to last                                      |
 | `l`       | Expand all under directory                      |
 | `h`       | Collapse all under directory                    |
+| `f`       | Focus directory                                 |
 | `n`       | New file                                        |
 | `N`       | New directory                                   |
 | `d`       | Delete file/directory                           |
@@ -129,6 +130,7 @@ customization, see [CONFIG.md](./extras/CONFIG.md).
 | `.`       | Toggle hidden files                             |
 | `m`       | Toggle mark on file                             |
 | `M`       | Open marks                                      |
+| `\`       | Clear filters (focus, git)                      |
 | `?`       | Open help window                                |
 
 You can make your own keybinds, too! This is of course done in the configuration
