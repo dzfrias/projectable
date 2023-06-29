@@ -252,11 +252,10 @@ fn run_app(
                         io::stdout().execute(EnterAlternateScreen).expect("error entering alternate screen");
                         terminal.clear().expect("error clearing terminal");
                     }
-                    let editor = env::var("EDITOR").unwrap_or("vi".to_owned());
                     // Join the input receiving thread by setting `stop_flag` to true
                     stop.store(true, Ordering::Release);
                     input_handle.join().expect("error joining thread");
-                    Command::new(editor)
+                    Command::new(&config.editor_cmd)
                         .arg(path)
                         .status()
                         .context("error in editor")?;
