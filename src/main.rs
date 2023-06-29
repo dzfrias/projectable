@@ -219,7 +219,8 @@ fn run_app(
         event_send.clone(),
         config.filetree.refresh_time,
         Arc::clone(&stop),
-    )?;
+    )
+    .context("error starting filesystem refresh watcher")?;
 
     // When set to true, will stop any running child processes of projectable
     let thread_stop = Arc::new(AtomicBool::new(false));
@@ -229,7 +230,7 @@ fn run_app(
         if first_run {
             first_run = false;
         } else {
-            match event_recv.recv() {
+            match event_recv.recv().context("error receiving event") {
                 Ok(event) => {
                     if let Err(err) = app.handle_event(&event) {
                         error!("{err:#}");
@@ -242,8 +243,9 @@ fn run_app(
         match app.update() {
             Ok(Some(event)) => match event {
                 TerminalEvent::OpenFile(path) => {
-                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-                    disable_raw_mode()?;
+                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
+                        .context("error leaving screen")?;
+                    disable_raw_mode().context("error disabling raw mode")?;
                     defer! {
                         execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture).expect("error setting up screen");
                         enable_raw_mode().expect("error enabling raw mode");
@@ -254,7 +256,10 @@ fn run_app(
                     // Join the input receiving thread by setting `stop_flag` to true
                     stop.store(true, Ordering::Release);
                     input_handle.join().expect("error joining thread");
-                    Command::new(editor).arg(path).status()?;
+                    Command::new(editor)
+                        .arg(path)
+                        .status()
+                        .context("error in editor")?;
                     // Resume input receiving thread again
                     stop.store(false, Ordering::Release);
                     change_buffer.flush(&event_send);
@@ -268,11 +273,13 @@ fn run_app(
                         event_send.clone(),
                         Duration::from_millis(300),
                         thread_stop.clone(),
-                    )?
+                    )
+                    .context("error starting command")?
                 }
                 TerminalEvent::RunCommand(expr) => {
-                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-                    disable_raw_mode()?;
+                    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
+                        .context("error leaving current screen")?;
+                    disable_raw_mode().context("error disablling raw mode")?;
                     defer! {
                         execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture).expect("error setting up screen");
                         enable_raw_mode().expect("error enabling raw mode");
@@ -282,7 +289,10 @@ fn run_app(
                     // Join the input receiving thread by setting `stop_flag` to true
                     stop.store(true, Ordering::Release);
                     input_handle.join().expect("error joining thread");
-                    expr.start()?.wait()?;
+                    expr.start()
+                        .context("error starting command")?
+                        .wait()
+                        .context("error waiting for command completion")?;
                     // Resume input receiving thread again
                     stop.store(false, Ordering::Release);
                     change_buffer.flush(&event_send);
@@ -296,10 +306,12 @@ fn run_app(
             }
             Ok(None) => {}
         }
-        terminal.draw(|f| app.draw(f, f.size()).unwrap())?;
+        terminal
+            .draw(|f| app.draw(f, f.size()).unwrap())
+            .context("error rendering terminal")?;
 
         if app.should_quit() {
-            marks.borrow_mut().write()?;
+            marks.borrow_mut().write().context("error writing marks")?;
             return Ok(());
         }
     }
@@ -307,9 +319,10 @@ fn run_app(
 
 fn setup() -> Result<()> {
     // Setup terminal
-    enable_raw_mode()?;
+    enable_raw_mode().context("error enabling raw mode")?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+        .context("error setting up screen")?;
 
     panic::set_hook(Box::new(|info| {
         shut_down();
