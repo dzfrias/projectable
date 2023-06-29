@@ -44,6 +44,7 @@ pub enum AppEvent {
     SearchFiles(Vec<PathBuf>),
     TogglePreviewMode,
     SpecialCommand(PathBuf),
+    SpecialCommandFuzzy(PathBuf),
     GotoFile(PathBuf),
     Mark(PathBuf),
     OpenFuzzy(Vec<String>, FuzzyOperation),

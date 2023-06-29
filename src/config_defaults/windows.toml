@@ -48,6 +48,9 @@ use_gitignore = true
 refresh_time = 1000
 dirs_first = false
 show_hidden_by_default = false
+# Whether to show special commands in fuzzy matching view. The alternative is
+# a list-style view
+special_commands_fuzzy = true
 
 # Keys
 special_command = "v"

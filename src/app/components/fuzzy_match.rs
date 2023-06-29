@@ -1,3 +1,4 @@
+use super::InputOperation;
 use crate::{
     app::component::{Component, Drawable},
     config::Config,
@@ -23,6 +24,7 @@ use tui_textarea::{Input, Key, TextArea};
 pub enum FuzzyOperation {
     OpenFile,
     MoveFile(PathBuf),
+    RunCommandOnFile(PathBuf),
     None,
 }
 
@@ -102,6 +104,18 @@ impl FuzzyMatcher {
             FuzzyOperation::MoveFile(ref mut path) => {
                 let path = std::mem::take(path);
                 self.queue.add(AppEvent::MoveFile(path, selected.into()));
+            }
+            FuzzyOperation::RunCommandOnFile(ref mut path) => {
+                let path = std::mem::take(path);
+                let replaced = selected.replace("{}", &path.display().to_string());
+                if replaced.contains("{...}") {
+                    self.queue
+                        .add(AppEvent::OpenInput(InputOperation::SpecialCommand(
+                            replaced,
+                        )));
+                } else {
+                    self.queue.add(AppEvent::RunCommand(replaced));
+                }
             }
             FuzzyOperation::None => panic!("should not submit with no operation"),
         }

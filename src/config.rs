@@ -413,6 +413,7 @@ pub struct FiletreeConfig {
     pub refresh_time: u64,
     pub dirs_first: bool,
     pub show_hidden_by_default: bool,
+    pub special_commands_fuzzy: bool,
 
     pub filtered_out_message: Style,
     pub border_color: Style,
@@ -450,6 +451,7 @@ impl Default for FiletreeConfig {
             use_gitignore: true,
             dirs_first: false,
             show_hidden_by_default: false,
+            special_commands_fuzzy: true,
             ignore: Vec::new(),
             refresh_time: 1000,
             down_three: KeyBind::key(Key::ctrl('n')),

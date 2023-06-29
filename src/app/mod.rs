@@ -217,6 +217,7 @@ impl App {
                     );
                 }
                 AppEvent::SpecialCommand(path) => drop(self.file_cmd_popup.open_for(path)),
+                AppEvent::SpecialCommandFuzzy(path) => drop(self.file_cmd_popup.open_fuzzy(path)),
                 AppEvent::GotoFile(path) => {
                     let path = if path.is_relative() {
                         self.path().join(path)

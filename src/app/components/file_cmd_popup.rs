@@ -19,7 +19,7 @@ use tui::{
     Frame,
 };
 
-use super::InputOperation;
+use super::{FuzzyOperation, InputOperation};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatchState {
@@ -88,6 +88,24 @@ impl FileCmdPopup {
             .position(|file_command| file_command.pattern.is_match(&path));
         if let Some(pos) = position {
             self.opened = Some((self.registry.remove(pos), path));
+            MatchState::Matched
+        } else {
+            MatchState::NotMatched
+        }
+    }
+
+    pub fn open_fuzzy(&mut self, path: PathBuf) -> MatchState {
+        let commands = self.registry.iter().find_map(|file_command| {
+            file_command
+                .pattern
+                .is_match(&path)
+                .then(|| &file_command.commands)
+        });
+        if let Some(commands) = commands {
+            self.queue.add(AppEvent::OpenFuzzy(
+                commands.clone(),
+                FuzzyOperation::RunCommandOnFile(path),
+            ));
             MatchState::Matched
         } else {
             MatchState::NotMatched
