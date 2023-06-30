@@ -1,6 +1,8 @@
 # General settings
 project_roots = [".git"]
 esc_to_close = true
+# Defaults to ["cmd.exe",  "/C"]
+# exec_cmd = ["bash", "-c"]
 
 # Keys
 up = ["k", "up"]

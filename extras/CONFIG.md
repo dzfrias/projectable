@@ -137,6 +137,8 @@ special_commands = {}
 # Items of the form `KEY = COMMAND`
 commands = {}
 esc_to_close = true
+# Defaults to ["$SHELL",  "-c"]
+# exec_cmd = ["zsh", "-ci"]
 
 # Keys
 up = ["k", "up"]
