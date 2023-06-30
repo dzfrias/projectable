@@ -14,6 +14,8 @@ all_down = "G"
 open = "enter"
 # Kill processes started by projectable
 kill_processes = "ctrl-c"
+# Defaults to $EDITOR
+# editor_cmd = "nvim"
 
 # General styles
 selected = { color = "black", bg = "magenta" }
