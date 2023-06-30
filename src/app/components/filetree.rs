@@ -416,9 +416,17 @@ impl Component for Filetree {
                         }
                     },
                     self.config.filetree.diff_mode => self.queue.add(AppEvent::TogglePreviewMode),
+                    self.config.filetree.focus => {
+                        if let Some(Item::Dir(path)) = self.get_selected() {
+                            self.filter_include(&[path.to_path_buf()]).context("problem focusing directory")?;
+                        } else {
+                            warn!("invalid focus target");
+                        }
+                    },
                     self.config.filetree.git_filter => {
                         if let Some(cache) = self.status_cache.as_ref() {
                             info!("filtered for modified files");
+                            // Check if git status is already filter. If so, remove the filter
                             if self.listing.all_items().iter().filter(|item| item.is_file()).all(|item| cache.get(item.path()).is_some()) {
                                 self.refresh().context("problem refreshing filetree")?;
                             } else {
