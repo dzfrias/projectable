@@ -44,6 +44,10 @@ impl ParagraphState {
     pub fn reset(&mut self) {
         self.offset_top = 0;
     }
+
+    pub fn scroll_bottom(&mut self) {
+        self.offset_top = u16::MAX;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -120,8 +124,8 @@ impl<'a> StatefulWidget for ScrollParagraph<'a> {
             inner_area
         });
 
-        let len = self.text.lines.len() as u16;
-        state.offset_top = state.offset_top.min(len - 1);
+        let len = (self.text.lines.len() as u16).saturating_sub(area.height - 1);
+        state.offset_top = state.offset_top.min(len.saturating_sub(1));
 
         buf.set_style(area, self.style);
         let paragraph = Paragraph::new(self.text)

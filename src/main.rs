@@ -6,6 +6,7 @@ use projectable::{
     app::{component::Drawable, App, TerminalEvent},
     config::{self, Config, GlobList, Merge},
     external_event,
+    logger::EVENT_LOGGER,
     marks::{self, Marks},
 };
 use std::{
@@ -113,16 +114,18 @@ fn main() -> Result<()> {
 
     let config = Rc::new(get_config().context("error gettting project root")?);
 
-    // Logging setup
-    #[cfg(debug_assertions)]
-    tui_logger::init_logger(LevelFilter::Debug).unwrap();
-    #[cfg(not(debug_assertions))]
-    if !args.debug {
-        tui_logger::init_logger(LevelFilter::Info).unwrap();
-    } else {
-        tui_logger::init_logger(LevelFilter::Debug).unwrap();
-    }
-    tui_logger::set_default_level(LevelFilter::Trace);
+    log::set_logger(&EVENT_LOGGER)
+        .map(|()| {
+            #[cfg(debug_assertions)]
+            log::set_max_level(LevelFilter::Debug);
+            #[cfg(not(debug_assertions))]
+            if !args.debug {
+                log::set_max_level(LevelFilter::Info);
+            } else {
+                log::set_max_level(LevelFilter::Trace);
+            }
+        })
+        .expect("should not have problem initializing logger");
 
     // Check keybind conflicts
     let conflicts = config.check_conflicts();

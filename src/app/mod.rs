@@ -28,10 +28,8 @@ use std::{
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders},
     Frame,
 };
-use tui_logger::{TuiLoggerLevelOutput as LoggerLevel, TuiLoggerWidget as Logger};
 
 /// Event that is sent back up to main.rs
 #[derive(Debug)]
@@ -55,6 +53,7 @@ pub struct App {
     marks_popup: MarksPopup,
     fuzzy_matcher: FuzzyMatcher,
     config: Rc<Config>,
+    logger: EventLogger,
 }
 
 impl App {
@@ -84,6 +83,7 @@ impl App {
             marks_popup: MarksPopup::new(marks, queue.clone(), Rc::clone(&config), path),
             file_cmd_popup: FileCmdPopup::new(queue.clone(), Rc::clone(&config)),
             fuzzy_matcher: FuzzyMatcher::new_with_config(queue.clone(), Rc::clone(&config)),
+            logger: EventLogger::new(Rc::clone(&config)),
             queue,
         })
     }
@@ -252,9 +252,11 @@ impl App {
         // Do not give the Filetree or previewer focus if there are any popups open
         self.tree.focus(!popup_open);
         self.previewer.focus(!popup_open);
+        self.logger.focus(!popup_open);
 
         self.pending.handle_event(ev)?;
         self.input_box.handle_event(ev)?;
+        self.logger.handle_event(ev)?;
         self.fuzzy_matcher.handle_event(ev)?;
         self.tree.handle_event(ev)?;
         self.previewer.handle_event(ev)?;
@@ -306,27 +308,8 @@ impl Drawable for App {
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
             .split(main_layout[0]);
 
-        let logger = Logger::default()
-            .style_error(self.config.log.error.into())
-            .style_debug(self.config.log.debug.into())
-            .style_warn(self.config.log.warn.into())
-            .style_trace(self.config.log.trace.into())
-            .style_info(self.config.log.info.into())
-            .output_level(Some(LoggerLevel::Long))
-            .output_target(false)
-            .output_file(false)
-            .output_line(false)
-            .output_level(None)
-            .output_timestamp(None)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Log")
-                    .border_style(self.config.log.border_color.into()),
-            );
-
         self.tree.draw(f, left_hand_layout[0])?;
-        f.render_widget(logger, left_hand_layout[1]);
+        self.logger.draw(f, left_hand_layout[1])?;
         self.previewer.draw(f, main_layout[1])?;
         self.pending.draw(f, area)?;
         self.input_box.draw(f, area)?;

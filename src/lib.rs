@@ -91,6 +91,7 @@ pub mod app;
 pub mod config;
 pub mod external_event;
 pub mod filelisting;
+pub mod logger;
 pub mod marks;
 pub mod queue;
 pub mod ui;

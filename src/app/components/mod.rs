@@ -1,3 +1,4 @@
+mod event_logger;
 mod file_cmd_popup;
 mod filetree;
 mod fuzzy_match;
@@ -8,6 +9,7 @@ mod popup;
 mod preview_file;
 mod testing;
 
+pub use event_logger::*;
 pub use file_cmd_popup::*;
 pub use filetree::*;
 pub use fuzzy_match::*;
