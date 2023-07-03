@@ -1052,7 +1052,17 @@ impl fmt::Display for KeyBind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             Either::Left(key) => write!(f, "{key}"),
-            Either::Right(keys) => write!(f, "{keys:?}"),
+            Either::Right(keys) => {
+                write!(f, "[")?;
+                for (i, key) in keys.iter().enumerate() {
+                    write!(f, "{key}")?;
+                    if i != keys.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")?;
+                Ok(())
+            }
         }
     }
 }
