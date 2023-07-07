@@ -92,7 +92,8 @@ pub fn fs_watch(
             },
         )?
     };
-    watcher.watcher().watch(path, RecursiveMode::Recursive)?;
+    // Swallow errors related to watching
+    let _ = watcher.watcher().watch(path, RecursiveMode::Recursive);
     let buffer = ChangeBuffer::new();
     let mut thread_buffer = buffer.clone();
     thread::spawn(move || {
