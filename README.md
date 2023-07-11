@@ -66,6 +66,14 @@ projectable is available from the Arch User Repository though
 </details>
 
 <details>
+  <summary><a href="https://pkgsrc.se/misc/projectable">NetBSD official Repositories</a></summary>
+
+projectable is available from the NetBSD official repositories though
+[this package](https://pkgsrc.se/misc/projectable).
+
+</details>
+
+<details>
   <summary>Releases</summary>
 
 Go to the [releases](https://github.com/dzfrias/projectable/releases) page,
