@@ -17,7 +17,7 @@ use std::env;
 use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 use std::process::Command;
-use std::{cell::Cell, collections::VecDeque, path::Path, rc::Rc};
+use std::{cell::Cell, collections::VecDeque, fs, path::Path, rc::Rc};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -97,6 +97,13 @@ impl PreviewFile {
     }
 
     pub fn preview_file(&mut self, file: impl AsRef<Path>) -> Result<()> {
+        if let Ok(meta) = fs::metadata(&file) {
+            const MB: u64 = 1_048_576;
+            if meta.len() > MB {
+                self.contents = "file is too large to preview".to_owned();
+                return Ok(());
+            }
+        }
         if self.config.preview.preview_cmd.is_empty() || self.git_cmd.is_empty() {
             bail!("should have command");
         }
