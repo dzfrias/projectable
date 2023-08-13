@@ -282,16 +282,17 @@ impl Merge for Config {
             help,
             down,
             up,
+            open,
             all_down,
             all_up,
-            open,
+            kill_processes,
             selected,
             popup_border_style,
             help_key_style,
-            kill_processes,
             commands,
-            esc_to_close,
-            exec_cmd
+            exec_cmd,
+            editor_cmd,
+            esc_to_close
         );
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
