@@ -289,11 +289,11 @@ impl Merge for Config {
             selected,
             popup_border_style,
             help_key_style,
-            commands,
             exec_cmd,
             editor_cmd,
             esc_to_close
         );
+        self.commands.merge(other.commands);
         self.special_commands.merge(other.special_commands);
         self.preview.merge(other.preview);
         self.filetree.merge(other.filetree);
