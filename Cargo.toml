@@ -14,7 +14,7 @@ keywords = ["project", "tui", "terminal", "manager", "files"]
 categories = ["command-line-utilities", "filesystem"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.74.1"
 
 [[bench]]
 name = "listing_selection"
