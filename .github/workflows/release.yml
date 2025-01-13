@@ -88,8 +88,10 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Install Cross
-        if: matrix.use-cross == 'true'
-        run: cargo install cross
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            cargo install cross
+          fi
 
       - name: Build
         run: |
