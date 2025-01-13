@@ -14,10 +14,6 @@ use crossterm::event::Event;
 use duct::{cmd, Expression};
 use easy_switch::switch;
 use log::{error, info, warn};
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-#[cfg(target_os = "windows")]
-use std::process::Command;
 use std::{
     cell::RefCell,
     fs::{self, File},
