@@ -1,7 +1,7 @@
 [package]
 name = "projectable"
 authors = ["Diego Frias <styx5242@gmail.com>"]
-version = "1.3.0"
+version = "1.3.1"
 description = """
 projectable is a highly configurable TUI file manager, built for projects.
 You can handle all your project's file-based needs from a comfortable and smooth
