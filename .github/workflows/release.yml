@@ -23,7 +23,7 @@ jobs:
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           echo "version is: ${{ env.VERSION }}"
       - name: Create GitHub release
-        uses: actions/github-script@v6
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -81,23 +81,24 @@ jobs:
             use-cross: false
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@11df97af8e8102fd60b60a77dfbf58d40cd843b8 # v1
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
           target: ${{ matrix.target }}
 
+      - name: Install Cross
+        if: matrix.use-cross == 'true'
+        run: cargo install cross
+
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: ${{ matrix.use-cross }}
-          command: build
-          args: --verbose --release --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            # Ensure cross is installed above if not included in your toolchain
+            cross build --verbose --release --target ${{ matrix.target }}
+          else
+            cargo build --verbose --release --target ${{ matrix.target }}
+          fi
 
       - name: Strip release binary (linux and macos)
         if: matrix.build == 'linux' || matrix.build == 'macos'
@@ -124,7 +125,7 @@ jobs:
           fi
 
       - name: Upload archive
-        uses: actions/upload-release-asset@v1.0.1
+        uses: actions/upload-release-asset@64e5e85fc528f162d7ba7ce2d15a3bb67efb3d80 # v1.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -137,17 +138,11 @@ jobs:
     name: Publish to Cargo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+      - uses: actions-rust-lang/setup-rust-toolchain@11df97af8e8102fd60b60a77dfbf58d40cd843b8 # v1
 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: publish
-          args: --allow-dirty
+      - name: Publish to Cargo
+      run: cargo publish --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_API_KEY }}
