@@ -143,6 +143,6 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@11df97af8e8102fd60b60a77dfbf58d40cd843b8 # v1
 
       - name: Publish to Cargo
-      run: cargo publish --allow-dirty
+        run: cargo publish --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_API_KEY }}
