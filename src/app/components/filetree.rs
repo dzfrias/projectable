@@ -590,7 +590,7 @@ mod tests {
         let path = temp.path().to_owned();
         let filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         assert_eq!(
             path.join("test.txt"),
             filetree.get_selected().unwrap().path()
@@ -603,7 +603,7 @@ mod tests {
         let path = temp.path().to_owned();
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let d = input_event!(KeyCode::Char('d'));
         filetree
@@ -622,7 +622,7 @@ mod tests {
         let path = temp.path().to_owned();
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let n = input_event!(KeyCode::Char('n'));
         filetree
@@ -649,7 +649,7 @@ mod tests {
         let path = temp.path().to_owned();
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         assert_eq!(
             path.join("test"),
             filetree.listing.selected_item().unwrap().path()
@@ -672,7 +672,7 @@ mod tests {
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
         // Opens dir
         filetree.listing.toggle_fold();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let n = input_event!(KeyCode::Char('n'));
         filetree
@@ -691,7 +691,7 @@ mod tests {
         let mut filetree =
             Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
         filetree.listing.toggle_fold();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let enter = input_event!(KeyCode::Enter);
         filetree
@@ -709,7 +709,7 @@ mod tests {
         let path = temp.path().to_owned();
         let mut filetree =
             Filetree::from_dir(&path, Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let enter = input_event!(KeyCode::Enter);
         filetree
@@ -725,7 +725,7 @@ mod tests {
         let temp = temp_files!("test.txt", "test2.txt", "test3.txt", "test4.txt");
         let mut filetree =
             Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let ctrl_n = input_event!(KeyCode::Char('n'); KeyModifiers::CONTROL);
         filetree
@@ -739,7 +739,7 @@ mod tests {
         let temp = temp_files!("test.txt", "test2.txt", "test3.txt", "test4.txt");
         let mut filetree =
             Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let inputs = input_events!(KeyCode::Char('G'); KeyModifiers::SHIFT, KeyCode::Char('p'); KeyModifiers::CONTROL);
         for input in inputs {
@@ -756,7 +756,7 @@ mod tests {
         let mut filetree =
             Filetree::from_dir(temp.path(), Queue::new()).expect("should be able to make filetree");
         let path = temp.to_path_buf();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let e = input_event!(KeyCode::Char('e'));
         filetree
@@ -773,7 +773,7 @@ mod tests {
     fn can_send_search_cmd() {
         let temp = temp_files!();
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let slash = input_event!(KeyCode::Char('/'));
         filetree
@@ -786,7 +786,7 @@ mod tests {
     fn can_send_toggle_preview_cmd() {
         let temp = temp_files!();
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         let slash = input_event!(KeyCode::Char('t'));
         filetree
@@ -799,7 +799,7 @@ mod tests {
     fn partial_refresh_delete_goes_to_same_item() {
         let temp = temp_files!("test/test.txt", "test/test2.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.listing.unfold_all();
         filetree.listing.select(1);
         filetree
@@ -819,7 +819,7 @@ mod tests {
     fn can_open_all() {
         let temp = temp_files!("test.txt", "test/test2.txt", "test2/test4/test.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.open_all();
         assert_eq!(6, filetree.listing.len());
     }
@@ -829,7 +829,7 @@ mod tests {
         let temp = temp_files!("test.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
         let path = temp.path().to_path_buf();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         let event = input_event!(KeyCode::Char('m'));
         assert!(filetree.handle_event(&event).is_ok());
         assert!(filetree
@@ -841,7 +841,7 @@ mod tests {
     fn swallow_invalid_delete_external_events() {
         let temp = temp_files!("test.txt");
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         let event = ExternalEvent::PartialRefresh(smallvec![RefreshData::Delete(
             "does_not_exist.txt".into()
         )]);
@@ -853,7 +853,7 @@ mod tests {
         let temp = temp_files!("test.txt");
         let path = temp.path().to_path_buf();
         let mut filetree = Filetree::from_dir(temp.path(), Queue::new()).unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
         filetree.open_path(path.join("test.txt")).unwrap();
 
         assert!(filetree
@@ -878,7 +878,7 @@ mod tests {
             Rc::new(RefCell::new(Marks::default())),
         )
         .unwrap();
-        scopeguard::guard(temp, |temp| temp.close().unwrap());
+        let _guard = scopeguard::guard(temp, |temp| temp.close().unwrap());
 
         assert_eq!(1, filetree.listing.items().len());
         assert_eq!(
