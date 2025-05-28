@@ -3,9 +3,13 @@
 Almost every behavior of projectable can be custommized through a simple `toml`
 file.
 
+### Global config
+
 To get started, run `prj --make-config` to create a new config file. Then, run
 `prj --config` to get the location of your config file. Go to that directory,
 and edit the TOML file.
+
+### Project-specific config
 
 Additionally, you can create _project local_ configurations. Just create a
 `.projectable.toml` file anywhere, and it'll be merged with your global
