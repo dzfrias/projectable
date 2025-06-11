@@ -60,7 +60,7 @@ where
 }
 
 /// Merge two structs against their default. As long as the right-hand merge is not the default,
-/// it replaces the left-hande merge.
+/// it replaces the left-hand merge.
 macro_rules! merge {
     ($first:expr, $second:expr; $($field:ident),+) => {{
         let base = Self::default();
@@ -816,9 +816,9 @@ impl<'de> Deserialize<'de> for Modifier {
     where
         D: serde::Deserializer<'de>,
     {
-        struct ModifierVistor;
+        struct ModifierVisitor;
 
-        impl<'de> Visitor<'de> for ModifierVistor {
+        impl<'de> Visitor<'de> for ModifierVisitor {
             type Value = Modifier;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -841,7 +841,7 @@ impl<'de> Deserialize<'de> for Modifier {
             }
         }
 
-        deserializer.deserialize_seq(ModifierVistor)
+        deserializer.deserialize_seq(ModifierVisitor)
     }
 }
 

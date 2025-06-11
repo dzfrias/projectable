@@ -186,7 +186,7 @@ refresh_time = 1000
 # Display directories before files
 dirs_first = false
 show_hidden_by_default = false
-# Whether to show special commads in a fuzzy style. Alternative is a list-like
+# Whether to show special commands in a fuzzy style. Alternative is a list-like
 # view
 special_commands_fuzzy = true
 

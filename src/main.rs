@@ -112,7 +112,7 @@ fn main() -> Result<()> {
         shut_down();
     }
 
-    let config = Rc::new(get_config().context("error gettting project root")?);
+    let config = Rc::new(get_config().context("error getting project root")?);
 
     log::set_logger(&EVENT_LOGGER)
         .map(|()| {
